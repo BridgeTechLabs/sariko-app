@@ -67,6 +67,7 @@ create table public.order_items (
   name_snapshot text null,
   price_snapshot numeric null,
   unit_label_snapshot text null,
+  variant_name_snapshot text null,
   quantity integer not null,
   constraint order_items_pkey primary key (id),
   constraint order_items_food_item_id_fkey foreign KEY (food_item_id) references food_items (id),
@@ -75,3 +76,10 @@ create table public.order_items (
 
 -- Every order detail read embeds order_items, and that page polls every 10s.
 create index IF not exists idx_order_items_order on public.order_items using btree (order_id) TABLESPACE pg_default;
+
+comment on column public.order_items.variant_name_snapshot is
+  'Variant name at order time — "L", "4 người". Display and reconciliation only:
+   price_snapshot already carries the FINAL unit price of that variant, so all
+   existing price_snapshot * quantity arithmetic is unchanged.
+   Deliberately no variant_id FK — a snapshot must never block a seller from
+   deleting a variant, and nothing joins back to the variant row.';

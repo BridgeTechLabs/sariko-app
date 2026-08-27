@@ -13,6 +13,7 @@ alter table public.users enable row level security;
 alter table public.seller_profiles enable row level security;
 alter table public.menu_categories enable row level security;
 alter table public.food_items enable row level security;
+alter table public.food_item_variants enable row level security;
 alter table public.carts enable row level security;
 alter table public.cart_items enable row level security;
 alter table public.orders enable row level security;
@@ -73,6 +74,26 @@ create policy "seller manage food"
 on public.food_items for all
 using (seller_id in (select id from public.seller_profiles where user_id = auth.uid()))
 with check (seller_id in (select id from public.seller_profiles where user_id = auth.uid()));
+
+-- ── food_item_variants ─────────────────────────────────────────────────────
+-- Mirrors food_items: a price level is no more sensitive than the dish price it
+-- belongs to. Ownership is checked one hop up, through the parent dish.
+drop policy if exists "public read variants" on public.food_item_variants;
+create policy "public read variants"
+on public.food_item_variants for select
+using (is_available = true);
+
+drop policy if exists "seller manage variants" on public.food_item_variants;
+create policy "seller manage variants"
+on public.food_item_variants for all
+using (food_item_id in (
+  select fi.id from public.food_items fi
+  join public.seller_profiles sp on sp.id = fi.seller_id
+  where sp.user_id = auth.uid()))
+with check (food_item_id in (
+  select fi.id from public.food_items fi
+  join public.seller_profiles sp on sp.id = fi.seller_id
+  where sp.user_id = auth.uid()));
 
 -- ── carts / cart_items ─────────────────────────────────────────────────────
 drop policy if exists "user manage own cart" on public.carts;

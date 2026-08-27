@@ -116,9 +116,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
+@app.get("/health")
 def get_health():
-    return {"success": True, "version": "v0", "service": "sariko-api"}
+    return {
+        "success": True, 
+        "status": "ok", 
+        "version": os.environ.get("IMAGE_TAG", "0000"), 
+        "service": "sariko-api"
+    }
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True)
