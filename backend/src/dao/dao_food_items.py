@@ -41,8 +41,9 @@ class DAOFoodItems(DAOBase):
     def read_food_items_by_seller_id(self, seller_id: str):
         result = (
             self._supabase_client.table("menu_categories")
-            .select("id, name, food_items(id, name, price_text, price, description, image_url, rating_avg, rating_count)")
+            .select("id, name, food_items(id, name, price_text, price, description, image_url, rating_avg, rating_count, food_item_variants(id, name, price, price_text, sort_order, is_available))")
             .order("sort_order")
+            .order("sort_order", foreign_table="food_items.food_item_variants")
             .eq("seller_id", seller_id)
             .execute()
         )
@@ -51,9 +52,10 @@ class DAOFoodItems(DAOBase):
     def read_menu_by_seller_id(self, seller_id: str):
         result = (
             self._supabase_client.table("menu_categories")
-            .select("id, name, sort_order, is_active, food_items(id, name, description, price, price_text, unit_label, min_quantity, quantity_step, preorder_day, is_available, is_featured, image_url, category_id, rating_avg, rating_count)")
+            .select("id, name, sort_order, is_active, food_items(id, name, description, price, price_text, unit_label, min_quantity, quantity_step, preorder_day, is_available, is_featured, image_url, category_id, rating_avg, rating_count, food_item_variants(id, name, price, price_text, sort_order, is_available))")
             .eq("seller_id", seller_id)
             .order("sort_order")
+            .order("sort_order", foreign_table="food_items.food_item_variants")
             .execute()
         )
         return result.data or []

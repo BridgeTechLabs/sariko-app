@@ -214,6 +214,47 @@ comment on column public.food_items.rating_avg is
    trigger — never write it by hand. NULL until the first review.';
 
 
+-- ============================================================
+-- Price variants: one required, single-select level per dish
+-- (added 2026-08-24 — archive/20260824_food_item_variants.sql)
+-- ============================================================
+
+create table public.food_item_variants (
+  id uuid not null default gen_random_uuid (),
+  food_item_id uuid not null,
+  name text not null,
+  price numeric not null,
+  price_text text null,
+  sort_order integer not null default 0,
+  is_available boolean not null default true,
+  created_at timestamp without time zone null default now(),
+  constraint food_item_variants_pkey primary key (id),
+  constraint food_item_variants_food_item_id_fkey foreign KEY (food_item_id) references food_items (id) on delete CASCADE,
+  -- The name is what the buyer picks by and what gets snapshotted onto the order.
+  constraint food_item_variants_food_item_id_name_key unique (food_item_id, name),
+  constraint food_item_variants_price_check check ((price >= (0)::numeric))
+) TABLESPACE pg_default;
+
+create index IF not exists idx_food_item_variants_item on public.food_item_variants using btree (food_item_id) TABLESPACE pg_default;
+
+comment on table public.food_item_variants is
+  'One row per selectable price level of a dish ("S"/"M"/"L", "1 người"/"4 người").
+   Exactly one must be chosen when the dish has variants — this is not a topping /
+   add-on model, nothing here is cumulative. There is deliberately NO group-label
+   column on food_items: the presence of rows here is the single source of truth
+   for "does this dish have levels?", and the UI heading is a translated string in
+   the frontend rather than seller-typed text no locale file can reach.';
+
+comment on column public.food_item_variants.price is
+  'ABSOLUTE price of this level, NOT a delta on food_items.price. No code path adds
+   the two together. This is what keeps order_items.price_snapshot meaning "final
+   unit price paid", so every price_snapshot * quantity on the frontend stays valid.';
+
+comment on column public.food_item_variants.price_text is
+  'Display string derived from price by _make_price_text() in apis/sellers.py.
+   Same contract as food_items.price_text — never write it by hand.';
+
+
 -- >>>>>>>>>>>>>>>>>>>>  tables/04_carts.sql  <<<<<<<<<<<<<<<<<<<<
 
 -- ============================================================
@@ -238,14 +279,34 @@ create table public.cart_items (
   id uuid not null default gen_random_uuid (),
   cart_id uuid null,
   food_item_id uuid null,
+  variant_id uuid null,
   quantity integer not null,
   constraint cart_items_pkey primary key (id),
   constraint cart_items_cart_id_fkey foreign KEY (cart_id) references carts (id) on delete CASCADE,
   constraint cart_items_food_item_id_fkey foreign KEY (food_item_id) references food_items (id),
-  constraint cart_items_quantity_check check ((quantity > 0)),
-  -- Same race as carts: one row per (cart, dish); quantity carries the count.
-  constraint cart_items_cart_id_food_item_id_key unique (cart_id, food_item_id)
+  -- No ON DELETE, same as the food_items FK: a variant sitting in someone's cart
+  -- must not vanish underneath them. Retire levels with is_available instead.
+  constraint cart_items_variant_id_fkey foreign KEY (variant_id) references food_item_variants (id),
+  constraint cart_items_quantity_check check ((quantity > 0))
 ) TABLESPACE pg_default;
+
+-- One row per (cart, dish, level); quantity carries the count. Same race as carts.
+-- Two PARTIAL indexes rather than one `unique nulls not distinct (...)`: that form
+-- needs PG 15+ and the server version could not be verified from the dev machine
+-- (see archive/20260820_cart_uniqueness.sql). These work on every version and say
+-- the intent plainly — with a level, unique per level; without one, unique per dish.
+create unique index IF not exists cart_items_dish_variant_key
+  on public.cart_items using btree (cart_id, food_item_id, variant_id)
+  where variant_id is not null;
+
+create unique index IF not exists cart_items_dish_novariant_key
+  on public.cart_items using btree (cart_id, food_item_id)
+  where variant_id is null;
+
+comment on column public.cart_items.variant_id is
+  'NULL for dishes without variants. The cart holds a REFERENCE, never a snapshot:
+   the unit price is read live from food_item_variants.price (or food_items.price
+   when NULL) on every cart read, so a seller price change is reflected at once.';
 
 
 -- >>>>>>>>>>>>>>>>>>>>  tables/05_admin_payouts.sql  <<<<<<<<<<<<<<<<<<<<
@@ -357,6 +418,7 @@ create table public.order_items (
   name_snapshot text null,
   price_snapshot numeric null,
   unit_label_snapshot text null,
+  variant_name_snapshot text null,
   quantity integer not null,
   constraint order_items_pkey primary key (id),
   constraint order_items_food_item_id_fkey foreign KEY (food_item_id) references food_items (id),
@@ -365,6 +427,13 @@ create table public.order_items (
 
 -- Every order detail read embeds order_items, and that page polls every 10s.
 create index IF not exists idx_order_items_order on public.order_items using btree (order_id) TABLESPACE pg_default;
+
+comment on column public.order_items.variant_name_snapshot is
+  'Variant name at order time — "L", "4 người". Display and reconciliation only:
+   price_snapshot already carries the FINAL unit price of that variant, so all
+   existing price_snapshot * quantity arithmetic is unchanged.
+   Deliberately no variant_id FK — a snapshot must never block a seller from
+   deleting a variant, and nothing joins back to the variant row.';
 
 
 -- >>>>>>>>>>>>>>>>>>>>  tables/07_reviews.sql  <<<<<<<<<<<<<<<<<<<<
@@ -730,6 +799,7 @@ alter table public.users enable row level security;
 alter table public.seller_profiles enable row level security;
 alter table public.menu_categories enable row level security;
 alter table public.food_items enable row level security;
+alter table public.food_item_variants enable row level security;
 alter table public.carts enable row level security;
 alter table public.cart_items enable row level security;
 alter table public.orders enable row level security;
@@ -790,6 +860,26 @@ create policy "seller manage food"
 on public.food_items for all
 using (seller_id in (select id from public.seller_profiles where user_id = auth.uid()))
 with check (seller_id in (select id from public.seller_profiles where user_id = auth.uid()));
+
+-- ── food_item_variants ─────────────────────────────────────────────────────
+-- Mirrors food_items: a price level is no more sensitive than the dish price it
+-- belongs to. Ownership is checked one hop up, through the parent dish.
+drop policy if exists "public read variants" on public.food_item_variants;
+create policy "public read variants"
+on public.food_item_variants for select
+using (is_available = true);
+
+drop policy if exists "seller manage variants" on public.food_item_variants;
+create policy "seller manage variants"
+on public.food_item_variants for all
+using (food_item_id in (
+  select fi.id from public.food_items fi
+  join public.seller_profiles sp on sp.id = fi.seller_id
+  where sp.user_id = auth.uid()))
+with check (food_item_id in (
+  select fi.id from public.food_items fi
+  join public.seller_profiles sp on sp.id = fi.seller_id
+  where sp.user_id = auth.uid()));
 
 -- ── carts / cart_items ─────────────────────────────────────────────────────
 drop policy if exists "user manage own cart" on public.carts;
