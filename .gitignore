@@ -37,7 +37,7 @@ next-env.d.ts
 __pycache__
 
 backend/.sandbox
-backend/src/envs
+backend/src/envs/*
 backend/src/logs
 
 # idea
@@ -49,3 +49,7 @@ frontend/.prototype
 .claude
 .rtk
 .trello
+
+# ...but keep the env templates tracked
+!.env.example
+!backend/src/envs/.env.example
