@@ -11,12 +11,7 @@ from apis.reviews import mask_reviewer
 from core.auth import verify_token
 from core.phone import to_e164_vn
 from dao.dao_orders import DAOOrders
-from schemas.request_schemas import (
-    RequestUpdateOrderStatus,
-    RequestCreateCategory, RequestUpdateCategory,
-    RequestCreateFoodItem, RequestUpdateFoodItem,
-    RequestUploadImage,
-)
+from schemas import Schema
 from utils.storage import upload_image_base64
 
 router = APIRouter(prefix="/sellers")
@@ -110,7 +105,7 @@ def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
 
 
 @router.patch("/me/orders/{order_id}/status")
-def update_seller_order_status(order_id: str, body: RequestUpdateOrderStatus, user=Depends(verify_token)):
+def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderStatus, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
         dao_orders = DAOOrders()
@@ -263,7 +258,7 @@ def get_seller_menu(user=Depends(verify_token)):
 
 
 @router.post("/me/menu/categories")
-def create_category(body: RequestCreateCategory, user=Depends(verify_token)):
+def create_category(body: Schema.RequestCreateCategory, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
         cat = DAOMenuCategories().create(seller_id, body.name, body.sort_order or 0)
@@ -276,7 +271,7 @@ def create_category(body: RequestCreateCategory, user=Depends(verify_token)):
 
 
 @router.patch("/me/menu/categories/{cat_id}")
-def update_category(cat_id: str, body: RequestUpdateCategory, user=Depends(verify_token)):
+def update_category(cat_id: str, body: Schema.RequestUpdateCategory, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
         fields = body.model_dump(exclude_none=True)
@@ -307,7 +302,7 @@ def delete_category(cat_id: str, user=Depends(verify_token)):
 
 
 @router.post("/me/menu/items")
-def create_food_item(body: RequestCreateFoodItem, user=Depends(verify_token)):
+def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
         fields = body.model_dump(exclude_none=True)
@@ -322,7 +317,7 @@ def create_food_item(body: RequestCreateFoodItem, user=Depends(verify_token)):
 
 
 @router.patch("/me/menu/items/{item_id}")
-def update_food_item(item_id: str, body: RequestUpdateFoodItem, user=Depends(verify_token)):
+def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
         fields = body.model_dump(exclude_none=True)
@@ -342,7 +337,7 @@ def update_food_item(item_id: str, body: RequestUpdateFoodItem, user=Depends(ver
 
 
 @router.post("/me/menu/items/{item_id}/image")
-def upload_food_item_image(item_id: str, body: RequestUploadImage, user=Depends(verify_token)):
+def upload_food_item_image(item_id: str, body: Schema.RequestUploadImage, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
         path = f"food-items/{seller_id}/{item_id}"

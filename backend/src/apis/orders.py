@@ -14,14 +14,14 @@ from dao.dao_cart_items import DAOCartItems
 from dao.dao_orders import DAOOrders
 from dao.dao_order_items import DAOOrderItems
 from dao.dao_seller_profiles import DAOSellerProfiles
-from schemas.request_schemas import RequestCreateOrder
+from schemas import Schema
 
 router = APIRouter(prefix="/orders")
 logger = logging.getLogger(__name__)
 
 
 @router.post("")
-def create_order(request: RequestCreateOrder, user=Depends(verify_token)):
+def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token)):
 
     user_id = user["id"]
 
