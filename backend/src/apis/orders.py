@@ -118,18 +118,6 @@ def get_orders(user=Depends(verify_token)):
     return {"success": True, "orders": orders}
 
 
-# Must stay above /{order_id} — FastAPI matches routes in declaration order,
-# otherwise "head" is read as an order id.
-@router.get("/head")
-def get_orders_head(user=Depends(verify_token)):
-    """Polling probe: latest change + row count, so the client can skip the
-    full list fetch when nothing moved."""
-    dao_orders = DAOOrders()
-    head = dao_orders.read_orders_head_by_user_id(user_id=user["id"])
-
-    return {"success": True, **head}
-
-
 @router.get("/{order_id}")
 def get_order_detail(order_id: str, user=Depends(verify_token)):
 

@@ -30,15 +30,6 @@ export const apiOrders = {
         }
     },
 
-    getOrdersHead: async() => {
-        try {
-            const response = await apiClient.get('/v1/orders/head')
-            return response
-        } catch (error) {
-            throw new Error(error.response?.data?.detail || 'Failed to get orders head')
-        }
-    },
-
     getOrderDetail: async(orderId) => {
         try {
             const response = await apiClient.get(`/v1/orders/${orderId}`)

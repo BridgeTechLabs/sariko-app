@@ -86,25 +86,6 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_orders_by_user_id: {e}")
 
-    def read_orders_head_by_user_id(self, user_id: str):
-        """Cheap "did anything change?" probe for the buyer order-list poller.
-        Index-only on (user_id, updated_at desc) — no joins, no payload."""
-        try:
-            result = self._supabase_client.table(self._table_name) \
-                .select("updated_at", count="exact") \
-                .eq("user_id", user_id) \
-                .order("updated_at", desc=True) \
-                .limit(1) \
-                .execute()
-
-            latest = result.data[0]["updated_at"] if result and result.data else None
-            return {"latest": latest, "count": result.count or 0}
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - read_orders_head_by_user_id: {e}")
-        except Exception as e:
-            raise Exception(f"error read_orders_head_by_user_id: {e}")
-
     def read_order_by_id(self, order_id: str, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
@@ -139,26 +120,6 @@ class DAOOrders(DAOBase):
             raise Exception(f"Supabase error - read_orders_by_seller_id: {e}")
         except Exception as e:
             raise Exception(f"error read_orders_by_seller_id: {e}")
-
-    def read_orders_head_by_seller_id(self, seller_id: str):
-        """Same probe for the seller dashboard poller. Mirrors the payment_status
-        filter of read_orders_by_seller_id so the signature tracks the same rows."""
-        try:
-            result = self._supabase_client.table(self._table_name) \
-                .select("updated_at", count="exact") \
-                .eq("seller_id", seller_id) \
-                .eq("payment_status", "paid") \
-                .order("updated_at", desc=True) \
-                .limit(1) \
-                .execute()
-
-            latest = result.data[0]["updated_at"] if result and result.data else None
-            return {"latest": latest, "count": result.count or 0}
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - read_orders_head_by_seller_id: {e}")
-        except Exception as e:
-            raise Exception(f"error read_orders_head_by_seller_id: {e}")
 
     def read_order_by_id_for_seller(self, order_id: str, seller_id: str):
         try:
