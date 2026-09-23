@@ -15,6 +15,7 @@ export const useOrderStore = defineStore("orderStore", {
 
             _ordersPoller: null,
             _ordersWatchers: 0,
+            _ordersSig: null,
             _orderDetailPoller: null,
             _orderDetailWatchedId: null,
         }
@@ -90,6 +91,19 @@ export const useOrderStore = defineStore("orderStore", {
             }
         },
 
+        // Probe /head (max updated_at + row count) and only pay for the full
+        // list query when that signature moved.
+        async refreshOrdersIfChanged() {
+            const res = await apiOrders.getOrdersHead()
+            if (!res?.data?.success) return
+
+            const sig = `${res.data.latest}|${res.data.count}`
+            if (sig === this._ordersSig) return
+
+            this._ordersSig = sig
+            await this.getOrders({ silent: true })
+        },
+
         // ─── Polling: buyer orders list (refcount) ─────────────────────────
         startWatchingOrders() {
             this._ordersWatchers += 1
@@ -97,7 +111,7 @@ export const useOrderStore = defineStore("orderStore", {
             this._ordersPoller = createPoller({
                 name: 'buyer-orders',
                 intervalMs: ORDER_LIST_POLL_MS,
-                fetch: () => this.getOrders({ silent: true }),
+                fetch: () => this.refreshOrdersIfChanged(),
             })
             this._ordersPoller.start()
         },

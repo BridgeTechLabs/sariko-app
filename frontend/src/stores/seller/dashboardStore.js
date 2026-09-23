@@ -23,6 +23,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
 
             _ordersPoller: null,
             _ordersWatchers: 0,
+            _ordersSig: null,
             _orderDetailPoller: null,
             _orderDetailWatchedId: null,
         }
@@ -139,6 +140,19 @@ export const useDashboardStore = defineStore("dashboardStore", {
             }
         },
 
+        // Probe /head (max updated_at + row count) and only pay for the full
+        // list query when that signature moved.
+        async refreshOrdersIfChanged() {
+            const res = await apiSellerDashboard.getOrdersHead()
+            if (!res?.success) return
+
+            const sig = `${res.latest}|${res.count}`
+            if (sig === this._ordersSig) return
+
+            this._ordersSig = sig
+            await this.fetchOrders({ silent: true })
+        },
+
         // ─── Polling: seller orders list (refcount) ────────────────────────
         startWatchingOrders() {
             this._ordersWatchers += 1
@@ -146,7 +160,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
             this._ordersPoller = createPoller({
                 name: 'seller-orders',
                 intervalMs: ORDER_LIST_POLL_MS,
-                fetch: () => this.fetchOrders({ silent: true }),
+                fetch: () => this.refreshOrdersIfChanged(),
             })
             this._ordersPoller.start()
         },

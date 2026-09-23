@@ -12,6 +12,11 @@ export const apiSellerDashboard = {
         return response.data
     },
 
+    getOrdersHead: async () => {
+        const response = await apiClient.get('/v1/sellers/me/orders/head')
+        return response.data
+    },
+
     getOrderDetail: async (orderId) => {
         const response = await apiClient.get(`/v1/sellers/me/orders/${orderId}`)
         return response.data

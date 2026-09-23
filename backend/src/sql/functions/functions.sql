@@ -157,3 +157,21 @@ create trigger on_review_change
   after insert or update or delete on public.reviews
   for each row
   execute function public.recalc_review_ratings ();
+
+
+-- Orders: stamp updated_at on every write so the /head endpoints can answer
+-- "did anything change?" from an index instead of refetching the whole list.
+create or replace function public.set_orders_updated_at () returns trigger
+  language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists on_orders_update on public.orders;
+create trigger on_orders_update
+  before update on public.orders
+  for each row
+  execute function public.set_orders_updated_at ();

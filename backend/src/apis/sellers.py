@@ -88,6 +88,23 @@ def get_seller_orders(user=Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Must stay above /me/orders/{order_id} — FastAPI matches in declaration order.
+@router.get("/me/orders/head")
+def get_seller_orders_head(user=Depends(verify_token)):
+    """Polling probe: latest change + row count, so the dashboard can skip the
+    full list fetch when nothing moved."""
+    try:
+        seller_id = _get_seller_id(user)
+        dao_orders = DAOOrders()
+        head = dao_orders.read_orders_head_by_seller_id(seller_id)
+        return {"success": True, **head}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Exception in GET /sellers/me/orders/head: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/me/orders/{order_id}")
 def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
     try:
