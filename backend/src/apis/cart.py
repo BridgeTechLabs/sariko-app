@@ -7,11 +7,7 @@ import logging
 
 from dao.dao_cart_items import DAOCartItems
 from dao.dao_carts import DAOCarts
-from schemas.request_schemas import (
-    RequestReadCartItems,
-    RequestAddCartItem,
-    RequestUpdateCartItem
-)
+from schemas import Schema
 
 from fastapi import (
     APIRouter,
@@ -37,7 +33,7 @@ def get_current_cart(user=Depends(verify_token)):
 
 
 @router.post("/add")
-def add_item_to_cart(request: RequestAddCartItem, user=Depends(verify_token)):
+def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_token)):
     
     user_id = user["id"]
     dao_cart = DAOCarts()    
@@ -71,7 +67,7 @@ def add_item_to_cart(request: RequestAddCartItem, user=Depends(verify_token)):
     return {"success": True}
 
 @router.patch("/update")
-def update_food_item_quantity(request: RequestUpdateCartItem, user=Depends(verify_token)):
+def update_food_item_quantity(request: Schema.RequestUpdateCartItem, user=Depends(verify_token)):
 
     dao_cart = DAOCarts()
     cart = dao_cart.read_cart_by_user_id_seller_id(user_id=user["id"])
