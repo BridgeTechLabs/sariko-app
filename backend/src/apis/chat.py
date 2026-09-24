@@ -6,7 +6,7 @@ from core.auth import verify_token
 from dao.dao_chat_conversations import DAOChatConversations
 from dao.dao_chat_messages import DAOChatMessages
 from dao.dao_seller_profiles import DAOSellerProfiles
-from schemas.request_schemas import RequestCreateConversation, RequestSetPinned
+from schemas import Schema
 
 router = APIRouter(prefix="/chat")
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def _resolve_side(conversation: dict, user: dict) -> str:
 
 
 @router.post("/conversations")
-def create_conversation(request: RequestCreateConversation, user=Depends(verify_token)):
+def create_conversation(request: Schema.RequestCreateConversation, user=Depends(verify_token)):
     """Buyer opens (or re-opens) a chat with a seller. Idempotent per (buyer, seller)."""
     dao_sellers = DAOSellerProfiles()
     seller = dao_sellers.read_seller_by_slug_name(request.seller_slug)
@@ -91,7 +91,7 @@ def mark_conversation_read(conversation_id: str, user=Depends(verify_token)):
 
 
 @router.patch("/conversations/{conversation_id}/pin")
-def set_conversation_pinned(conversation_id: str, request: RequestSetPinned, user=Depends(verify_token)):
+def set_conversation_pinned(conversation_id: str, request: Schema.RequestSetPinned, user=Depends(verify_token)):
     """Pin/unpin a conversation to the top of the caller's own inbox."""
     dao_conv = DAOChatConversations()
     conversation = dao_conv.read_by_id(conversation_id)

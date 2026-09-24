@@ -12,7 +12,7 @@ from core.auth import verify_token
 from core.display_name import mask_display_name
 from dao.dao_orders import DAOOrders
 from dao.dao_reviews import DAOReviews, ReviewAlreadyExists
-from schemas.request_schemas import RequestCreateReview
+from schemas import Schema
 
 router = APIRouter(prefix="/reviews")
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def mask_reviewer(row: dict) -> None:
 
 
 @router.post("")
-def create_review(request: RequestCreateReview, user=Depends(verify_token)):
+def create_review(request: Schema.RequestCreateReview, user=Depends(verify_token)):
 
     user_id = user["id"]
 
