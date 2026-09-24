@@ -3,9 +3,29 @@ from typing import Optional
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
+from core.sariko_cache import cache
 from dao.dao_base import DAOBase
 
 logger = logging.getLogger(__name__)
+
+
+def seller_orders_key(seller_id: str) -> str:
+    """Cache key for a seller's order-list signature ({latest, count}).
+
+    Lives here because this module owns the query the signature describes, and
+    is imported by the /head route so the format is written down once.
+    """
+    return f"seller_{seller_id}_orders"
+
+
+def _invalidate_seller_orders(seller_id: Optional[str]) -> None:
+    """Drop a seller's cached signature so the next probe re-reads the database.
+
+    Tolerates None so callers can pass a column straight off an updated row
+    without a guard — an order with no seller_id has no cache entry anyway.
+    """
+    if seller_id:
+        cache.invalidate(seller_orders_key(seller_id))
 
 
 class DAOOrders(DAOBase):
@@ -57,6 +77,12 @@ class DAOOrders(DAOBase):
                 .insert(data) \
                 .execute()
 
+            # Deliberately no _invalidate_seller_orders() here: the row is
+            # inserted payment_status='pending' (set explicitly above) and the
+            # seller signature only counts 'paid' rows, so an insert cannot move
+            # it. The order enters the seller's list at update_payment_status,
+            # which does invalidate. Drop the payment_status filter from
+            # read_orders_head_by_seller_id and this stops being true.
             if result and result.data:
                 return result.data[0]
 
@@ -121,6 +147,32 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_orders_by_seller_id: {e}")
 
+    def read_orders_head_by_seller_id(self, seller_id: str):
+        """Signature of the seller's order list: newest updated_at + row count.
+
+        Mirrors the payment_status filter of read_orders_by_seller_id so the
+        signature tracks exactly the rows that list returns. Callers should read
+        through the cache (see the /head route) rather than calling this on every
+        poll tick — count="exact" counts the whole filtered set, it is not a
+        single-row read.
+        """
+        try:
+            result = self._supabase_client.table(self._table_name) \
+                .select("updated_at", count="exact") \
+                .eq("seller_id", seller_id) \
+                .eq("payment_status", "paid") \
+                .order("updated_at", desc=True) \
+                .limit(1) \
+                .execute()
+
+            latest = result.data[0]["updated_at"] if result and result.data else None
+            return {"latest": latest, "count": result.count or 0}
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_orders_head_by_seller_id: {e}")
+        except Exception as e:
+            raise Exception(f"error read_orders_head_by_seller_id: {e}")
+
     def read_order_by_id_for_seller(self, order_id: str, seller_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
@@ -149,6 +201,9 @@ class DAOOrders(DAOBase):
                 .execute()
 
             if result and result.data:
+                # The updated row carries seller_id, so the cache drop costs
+                # nothing extra here.
+                _invalidate_seller_orders(result.data[0].get("seller_id"))
                 return result.data[0]
 
             return None
@@ -200,6 +255,12 @@ class DAOOrders(DAOBase):
                     'p_transaction_ref': transaction_ref
                 }
             ).execute()
+
+            # The most important invalidation of the lot: pending -> paid is what
+            # makes an order enter the seller's list in the first place. The RPC
+            # returns void, so seller_id costs one primary-key read — once per
+            # payment, against a cache that serves every poll tick in between.
+            self._invalidate_cache_for_order(order_id)
             return True
 
         except PostgrestExceptionAPIError as e:
@@ -207,12 +268,33 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error update_payment_status: {e}")
 
+    def _invalidate_cache_for_order(self, order_id: str):
+        """Drop the owning seller's cached signature for a write that did not
+        hand back the row. Never let a cache problem break the write that
+        already succeeded — a stale entry expires on its own within TTL_SECONDS.
+        """
+        try:
+            result = self._supabase_client.table(self._table_name) \
+                .select("seller_id") \
+                .eq("id", order_id) \
+                .maybe_single() \
+                .execute()
+
+            if result and result.data:
+                _invalidate_seller_orders(result.data.get("seller_id"))
+
+        except Exception as e:
+            logger.warning(f"order cache invalidate failed for order {order_id}: {e}")
+
     def update_payment_create_date(self, order_id: str, payment_create_date: str):
         try:
-            self._supabase_client.table(self._table_name) \
+            result = self._supabase_client.table(self._table_name) \
                 .update({"payment_create_date": payment_create_date}) \
                 .eq("id", order_id) \
                 .execute()
+
+            if result and result.data:
+                _invalidate_seller_orders(result.data[0].get("seller_id"))
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - update_payment_create_date: {e}")
         except Exception as e:
@@ -220,10 +302,13 @@ class DAOOrders(DAOBase):
 
     def update_ipn_data(self, order_id: str, ipn_data: dict):
         try:
-            self._supabase_client.table(self._table_name) \
+            result = self._supabase_client.table(self._table_name) \
                 .update({"ipn_data": ipn_data}) \
                 .eq("id", order_id) \
                 .execute()
+
+            if result and result.data:
+                _invalidate_seller_orders(result.data[0].get("seller_id"))
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - update_ipn_data: {e}")
         except Exception as e:
