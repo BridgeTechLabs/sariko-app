@@ -10,7 +10,8 @@ from fastapi import APIRouter, HTTPException, Depends, Query, status
 from apis.reviews import mask_reviewer
 from core.auth import verify_token
 from core.phone import to_e164_vn
-from dao.dao_orders import DAOOrders
+from core.sariko_cache import cache
+from dao.dao_orders import DAOOrders, seller_orders_key
 from schemas import Schema
 from utils.storage import upload_image_base64
 
@@ -85,6 +86,35 @@ def get_seller_orders(user=Depends(verify_token)):
         raise
     except Exception as e:
         logger.exception(f"Exception in GET /sellers/me/orders: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Must stay above /me/orders/{order_id} — FastAPI matches routes in declaration
+# order, otherwise "head" is read as an order id.
+@router.get("/me/orders/head")
+def get_seller_orders_head(user=Depends(verify_token)):
+    """Polling probe: newest updated_at + row count for the seller's paid orders.
+
+    The dashboard compares this signature against the previous one and only
+    fetches the full (joined) list when it moves. Served from the shared cache,
+    so a tick that finds nothing changed costs no query against orders at all —
+    dao_orders invalidates the key on every write.
+    """
+    try:
+        seller_id = _get_seller_id(user)
+        key = seller_orders_key(seller_id)
+
+        signature = cache.get(key)
+        cached = signature is not None
+        if not cached:
+            signature = DAOOrders().read_orders_head_by_seller_id(seller_id)
+            cache.put(key, signature)
+
+        return {"success": True, "cached": cached, **signature}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Exception in GET /sellers/me/orders/head: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
