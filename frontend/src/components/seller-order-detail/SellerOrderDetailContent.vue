@@ -191,7 +191,7 @@ export default {
         <div class="card">
             <div class="section-label" style="margin-bottom:12px;">{{ $t('seller_order_detail.section_items') }}</div>
             <div v-for="item in order.order_items" :key="item.id" class="item-row">
-                <span class="item-name">{{ item.quantity }}x {{ item.name_snapshot }}</span>
+                <span class="item-name">{{ item.quantity }}x {{ item.name_snapshot }}<span v-if="item.variant_name_snapshot" class="order-variant"> ({{ item.variant_name_snapshot }})</span></span>
                 <span class="item-price">{{ fmt(item.price_snapshot * item.quantity) }}</span>
             </div>
             <q-separator style="background:rgba(255,255,255,0.08);margin:12px 0;" />
@@ -402,5 +402,10 @@ export default {
     font-size: 12px;
     color: #f87171;
     line-height: 1.5;
+}
+
+.order-variant {
+    color: #f5A623;
+    font-weight: 600;
 }
 </style>

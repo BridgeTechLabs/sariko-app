@@ -15,6 +15,7 @@ from dao.dao_orders import DAOOrders
 from dao.dao_order_items import DAOOrderItems
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
+from utils.pricing import cart_item_unit_price
 
 router = APIRouter(prefix="/orders")
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
     # 2. Calculate subtotal + commission (snapshot seller's rate at order time)
     cart_items = cart["cart_items"]
     subtotal = sum(
-        item["food_items"]["price"] * item["quantity"]
+        cart_item_unit_price(item) * item["quantity"]
         for item in cart_items
     )
     total_amount = subtotal + float(request.delivery_fee or 0)

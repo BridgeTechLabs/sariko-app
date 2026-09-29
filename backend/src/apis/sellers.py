@@ -12,6 +12,7 @@ from core.auth import verify_token
 from core.phone import to_e164_vn
 from dao.dao_orders import DAOOrders
 from schemas import Schema
+from dao.dao_food_item_variants import DAOFoodItemVariants
 from utils.storage import upload_image_base64
 
 router = APIRouter(prefix="/sellers")
@@ -333,6 +334,69 @@ def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depe
         raise
     except Exception as e:
         logger.exception(f"Exception in PATCH /sellers/me/menu/items/{item_id}: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _assert_owns_variant(variant_id: str, seller_id: str):
+    """A variant carries no seller_id, so ownership is checked one hop up through
+    the dish it belongs to. Without this any seller could edit another's prices."""
+    item_id = DAOFoodItemVariants().read_parent_item_id(variant_id)
+    if not item_id or not DAOFoodItems().read_owned_by_seller(item_id, seller_id):
+        raise HTTPException(status_code=404, detail="Variant not found")
+
+
+@router.post("/me/menu/items/{item_id}/variants")
+def create_variant(item_id: str, body: Schema.RequestCreateVariant, user=Depends(verify_token)):
+    try:
+        seller_id = _get_seller_id(user)
+        if not DAOFoodItems().read_owned_by_seller(item_id, seller_id):
+            raise HTTPException(status_code=404, detail="Item not found")
+        fields = body.model_dump(exclude_none=True)
+        fields["price_text"] = _make_price_text(body.price)
+        variant = DAOFoodItemVariants().create(item_id, fields)
+        return {"success": True, "variant": variant}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Exception in POST /sellers/me/menu/items/{item_id}/variants: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/me/menu/variants/{variant_id}")
+def update_variant(variant_id: str, body: Schema.RequestUpdateVariant, user=Depends(verify_token)):
+    try:
+        seller_id = _get_seller_id(user)
+        _assert_owns_variant(variant_id, seller_id)
+        fields = body.model_dump(exclude_none=True)
+        if not fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        if "price" in fields:
+            fields["price_text"] = _make_price_text(fields["price"])
+        variant = DAOFoodItemVariants().update(variant_id, fields)
+        if not variant:
+            raise HTTPException(status_code=404, detail="Variant not found")
+        return {"success": True, "variant": variant}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Exception in PATCH /sellers/me/menu/variants/{variant_id}: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/me/menu/variants/{variant_id}")
+def delete_variant(variant_id: str, user=Depends(verify_token)):
+    try:
+        seller_id = _get_seller_id(user)
+        _assert_owns_variant(variant_id, seller_id)
+        DAOFoodItemVariants().delete(variant_id)
+        return {"success": True}
+    except ValueError:
+        # Raised by the DAO on FK 23503 — the level is in a buyer's cart right now.
+        raise HTTPException(status_code=409, detail="This price option is in a customer's cart. Hide it instead of deleting.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Exception in DELETE /sellers/me/menu/variants/{variant_id}: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

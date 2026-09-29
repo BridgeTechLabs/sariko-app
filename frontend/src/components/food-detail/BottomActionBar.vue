@@ -3,6 +3,7 @@ import { Minus, Plus, ShoppingBasket } from 'lucide-vue-next';
 import { useSellerStore } from '@/stores/seller/sellerStore';
 import { useCartStore } from '@/stores/cart/cartStore';
 import { useAuthStore } from '@/stores/auth/authStore';
+import { formatVnd } from '@/utils/priceDisplay';
 
 export default {
     components: { Minus, Plus, ShoppingBasket },
@@ -28,16 +29,28 @@ export default {
             return !!this.food && this.quantity > 1
         },
         canAdd() {
-            return !!this.food && !!this.seller && !this.loading
+            // A dish with levels cannot be priced until one is picked — the backend
+            // rejects it anyway, so the button must not offer it.
+            const levelPicked = !this.levels.length || !!this.sellerStore.selectedVariantId
+            return !!this.food && !!this.seller && levelPicked && !this.loading
+        },
+        levels() {
+            return (this.food?.food_item_variants || []).filter(v => v.is_available !== false)
+        },
+        selectedVariant() {
+            return this.levels.find(v => v.id === this.sellerStore.selectedVariantId) || null
+        },
+        unitPrice() {
+            if (!this.food) return 0
+            return this.selectedVariant ? Number(this.selectedVariant.price) : Number(this.food.price)
         },
         singlePriceText() {
             if (!this.food) return '—'
-            return new Intl.NumberFormat('vi-VN').format(this.food.price) + ' ₫'
+            return formatVnd(this.unitPrice)
         },
         totalPriceText() {
             if (!this.food) return '—'
-            const total = this.food.price * this.quantity
-            return new Intl.NumberFormat('vi-VN').format(total) + ' ₫'
+            return formatVnd(this.unitPrice * this.quantity)
         }
     },
 
@@ -60,7 +73,7 @@ export default {
             this.loading = true
             const cartStore = useCartStore()
             try {
-                await cartStore.addItem(this.seller.id, this.food.id, this.seller.store_name, this.quantity)
+                await cartStore.addItem(this.seller.id, this.food.id, this.seller.store_name, this.quantity, this.sellerStore.selectedVariantId)
                 if (cartStore.isShowModalCartConflict) {
                     this.loading = false
                     return

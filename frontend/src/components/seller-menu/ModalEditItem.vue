@@ -1,11 +1,11 @@
 <script>
 import { useMenuStore } from '@/stores/seller/menuStore'
-import { ImagePlus, X } from 'lucide-vue-next'
+import { ImagePlus, X, Plus, Trash2 } from 'lucide-vue-next'
 
 export default {
     name: 'ModalEditItem',
 
-    components: { ImagePlus, X },
+    components: { ImagePlus, X, Plus, Trash2 },
 
     props: {
         modelValue: { type: Boolean, default: false },
@@ -31,7 +31,10 @@ export default {
 
     computed: {
         isEdit() { return !!this.item },
-        canSave() { return this.form.name.trim() && this.form.price > 0 && this.form.category_id && !this.saving },
+        canSave() {
+            const variantsOk = this.form.variants.every(v => v.name.trim() && v.price > 0)
+            return this.form.name.trim() && this.form.price > 0 && this.form.category_id && variantsOk && !this.saving
+        },
         categoryOptions() {
             return useMenuStore().categories.map(c => ({ label: c.name, value: c.id }))
         },
@@ -57,6 +60,7 @@ export default {
                 is_available: true,
                 is_featured: false,
                 image_url: null,
+                variants: [],
             }
         },
 
@@ -76,6 +80,14 @@ export default {
                     is_available: this.item.is_available ?? true,
                     is_featured: this.item.is_featured ?? false,
                     image_url: this.item.image_url || null,
+                    // Copied, not referenced: cancelling the modal must leave the
+                    // store's rows untouched.
+                    variants: (this.item.food_item_variants || []).map(v => ({
+                        id: v.id,
+                        name: v.name,
+                        price: v.price,
+                        is_available: v.is_available !== false,
+                    })),
                 }
             } else {
                 this.form = this._emptyForm()
@@ -84,6 +96,14 @@ export default {
         },
 
         close() { this.$emit('update:modelValue', false) },
+
+        addVariant() {
+            this.form.variants.push({ id: null, name: '', price: null, is_available: true })
+        },
+
+        removeVariant(idx) {
+            this.form.variants.splice(idx, 1)
+        },
 
         onImagePick(e) {
             const file = e.target.files?.[0]
@@ -129,6 +149,9 @@ export default {
                     const created = await store.createItem(payload)
                     itemId = created.id
                 }
+
+                // Levels need the item ID too, so they go after create/update.
+                await store.syncVariants(itemId, this.form.variants)
 
                 // Upload image after we have the item ID
                 if (this.imageFile) {
@@ -228,6 +251,29 @@ export default {
                     <div class="field-group" style="width:110px;">
                         <div class="field-label">{{ $t('seller_menu.item_unit_label') }}</div>
                         <q-input v-model="form.unit_label" dense outlined dark :placeholder="$t('seller_menu.item_unit_label_placeholder')" />
+                    </div>
+                </div>
+
+                <!-- Price levels (S/M/L, 1-2-4 people, …) -->
+                <div class="field-group">
+                    <div class="field-label">{{ $t('seller_menu.variants_label') }}</div>
+                    <div v-if="form.variants.length" class="variant-list">
+                        <div v-for="(v, idx) in form.variants" :key="idx" class="variant-row">
+                            <q-input v-model="v.name" dense outlined dark class="variant-name"
+                                :placeholder="$t('seller_menu.variant_name_placeholder')" />
+                            <q-input v-model.number="v.price" dense outlined dark type="number" class="variant-price"
+                                :placeholder="$t('seller_menu.variant_price_placeholder')" />
+                            <q-toggle v-model="v.is_available" dense color="amber" />
+                            <button class="btn-variant-remove" @click="removeVariant(idx)">
+                                <Trash2 :size="16" />
+                            </button>
+                        </div>
+                    </div>
+                    <button class="btn-variant-add" @click="addVariant">
+                        <Plus :size="16" /> {{ $t('seller_menu.variant_add') }}
+                    </button>
+                    <div class="variant-hint">
+                        {{ form.variants.length ? $t('seller_menu.variants_hint_active') : $t('seller_menu.variants_hint_empty') }}
                     </div>
                 </div>
 
@@ -415,6 +461,55 @@ export default {
 .field-row {
     display: flex;
     gap: 10px;
+}
+
+.variant-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.variant-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.variant-name { flex: 1; }
+.variant-price { width: 120px; }
+
+.btn-variant-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    &:hover { color: #ef4444; }
+}
+
+.btn-variant-add {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 1px dashed rgba(255,255,255,0.2);
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 8px 12px;
+    width: 100%;
+    justify-content: center;
+    cursor: pointer;
+    &:hover { color: var(--accent, #f5A623); border-color: var(--accent, #f5A623); }
+}
+
+.variant-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    line-height: 1.4;
 }
 
 .flex-1 { flex: 1; }

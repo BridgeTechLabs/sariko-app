@@ -153,7 +153,8 @@
         "toast_added_to_cart": "{name} added to cart",
         "reviews_title": "Reviews",
         "reviews_empty": "No reviews for this dish yet.",
-        "review_anonymous": "Customer"
+        "review_anonymous": "Customer",
+        "label_choose_option": "Choose an option"
     },
     "cart_page": {
         "section_delivery_address": {
@@ -612,7 +613,13 @@
         "toast_item_saved": "Item saved",
         "toast_item_deleted": "Item deleted",
         "toast_save_failed": "Failed to save. Please try again.",
-        "toast_delete_failed": "Failed to delete. Please try again."
+        "toast_delete_failed": "Failed to delete. Please try again.",
+        "variants_label": "Price options",
+        "variant_add": "Add price option",
+        "variant_name_placeholder": "e.g. S, L, 2 people",
+        "variant_price_placeholder": "Price (₫)",
+        "variants_hint_empty": "Leave empty if the dish has one price. Add options for sizes or servings.",
+        "variants_hint_active": "Buyers must pick one option. The Price field above will not be used."
     },
     "forgot_password_page": {
         "greeting_text": "Forgot your password?",

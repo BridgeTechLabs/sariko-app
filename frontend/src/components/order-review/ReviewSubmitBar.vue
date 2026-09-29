@@ -19,10 +19,10 @@ export default {
         // Dishes left at 0 stars. Submitting is one-shot, so these can never be rated
         // from this order again — worth one confirmation before it becomes permanent.
         unratedCount() {
-            const items = (useOrderStore().currentOrder?.order_items || [])
-                .filter(item => item.food_item_id)
-            return items.filter(
-                item => !(this.reviewStore.itemDrafts[item.food_item_id]?.rating > 0)
+            const dishIds = new Set((useOrderStore().currentOrder?.order_items || [])
+                .map(item => item.food_item_id).filter(Boolean))
+            return [...dishIds].filter(
+                id => !(this.reviewStore.itemDrafts[id]?.rating > 0)
             ).length
         }
     },

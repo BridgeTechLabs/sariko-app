@@ -2,12 +2,13 @@ import { apiClient } from "@/lib/axiosPolicy.js"
 
 export const apiCarts = {
 
-    addItem: async(sellerId, foodItemId, quantity = 1) => {
+    addItem: async(sellerId, foodItemId, quantity = 1, variantId = null) => {
         try {
             const payload = {
                 "seller_id": sellerId,
                 "food_item_id": foodItemId,
-                "quantity": quantity
+                "quantity": quantity,
+                "variant_id": variantId
             }
             const response = await apiClient.post('/v1/cart/add', payload, { _silent: true })
             return response
@@ -31,11 +32,12 @@ export const apiCarts = {
         }
     },
 
-    updateQuantity: async(foodItemId, newQuantity) => {
+    updateQuantity: async(foodItemId, newQuantity, variantId = null) => {
         try {
             const payload = {
                 "food_item_id": foodItemId,
-                "quantity": newQuantity
+                "quantity": newQuantity,
+                "variant_id": variantId
             }
             const response = await apiClient.patch('/v1/cart/update', payload)
             return response
@@ -53,9 +55,10 @@ export const apiCarts = {
         }
     },
 
-    removeItem: async(foodItemId) => {
+    removeItem: async(foodItemId, variantId = null) => {
         try {
-            const response = await apiClient.delete(`/v1/cart/remove/${foodItemId}`)
+            const params = variantId ? { variant_id: variantId } : {}
+            const response = await apiClient.delete(`/v1/cart/remove/${foodItemId}`, { params })
             return response
         } catch (error) {
             throw new Error(error.response?.data?.detail || 'Failed to removeItem')

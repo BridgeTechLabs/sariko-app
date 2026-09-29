@@ -53,6 +53,7 @@ export default {
             </div>
             <div v-if="isExpanded" class="items">
                 <ItemCard  v-for="item in cartItems"
+                :key="item.rowKey"
                 :item-id="item.id"
                 :item-name="item.name"
                 :item-price="item.price"
@@ -60,6 +61,8 @@ export default {
                 :item-category="item.category"
                 :item-img-src="item.imgSrc || '/images/default-food-image.webp'"
                 :item-quantity="item.quantity"
+                :item-variant-id="item.variantId"
+                :item-variant-name="item.variantName"
                 :seller-store="item.sellerStore"
                 :seller-slug-name="item.sellerSlugName"
                 />

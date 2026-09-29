@@ -5,8 +5,10 @@ import { useCartStore } from '@/stores/cart/cartStore';
 import FoodCard from '@/components/seller/seller-page/FoodCard.vue'
 import MenuEmptyState from '@/components/seller/seller-page/MenuEmptyState.vue'
 import ModalCartConflict from '@/components/order-cart/ModalCartConflict.vue';
+import { foodPriceDisplay, hasVariants } from '@/utils/priceDisplay';
 
 export default {
+    methods: { foodPriceDisplay, hasVariants },
     components: {
         FoodCard,
         MenuEmptyState,
@@ -37,7 +39,8 @@ export default {
                 :key="food.id"
                 :item-id="food.id"
                 :name="food.name"
-                :price="food.price_text"
+                :price="foodPriceDisplay(food)"
+                :has-variants="hasVariants(food)"
                 :imgSrc="food.image_url ? food.image_url : '/images/default-food-image.webp'"
                 :unit-label="food.unit_label || 'pcs'"
                 :preorder-day="food.preorder_day || 0"

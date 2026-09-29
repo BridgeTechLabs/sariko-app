@@ -15,7 +15,8 @@ class DAOFoodItems(DAOBase):
         result = (
             self._supabase_client.table(self._table_name)
             .select(
-                "id, name, image_url, preorder_day, "
+                "id, name, price, price_text, image_url, preorder_day, "
+                "food_item_variants(price, is_available), "
                 "menu_categories(name), "
                 "seller_profiles(slug, store_name, avatar_url)"
             )
@@ -29,7 +30,7 @@ class DAOFoodItems(DAOBase):
     def read_featured_dishes(self, limit: int = 12):
         result = (
             self._supabase_client.table(self._table_name)
-            .select("id, name, price_text, image_url, rating_avg, rating_count, seller_profiles!inner(id, slug, store_name)")
+            .select("id, name, price, price_text, image_url, rating_avg, rating_count, food_item_variants(price, is_available), seller_profiles!inner(id, slug, store_name)")
             .eq("is_featured", True)
             .eq("is_available", True)
             .eq("seller_profiles.is_listed", True)
@@ -65,6 +66,17 @@ class DAOFoodItems(DAOBase):
         result = (
             self._supabase_client.table(self._table_name)
             .insert(fields)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+
+    def read_owned_by_seller(self, item_id: str, seller_id: str):
+        result = (
+            self._supabase_client.table(self._table_name)
+            .select("id")
+            .eq("id", item_id)
+            .eq("seller_id", seller_id)
+            .limit(1)
             .execute()
         )
         return result.data[0] if result.data else None

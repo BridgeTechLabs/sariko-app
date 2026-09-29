@@ -7,6 +7,10 @@ import { useAuthStore } from '@/stores/auth/authStore';
 
 export default {
     props: {
+        hasVariants: {
+            type: Boolean,
+            default: false
+        },
         itemId: {
             required: true,
             type: String
@@ -69,6 +73,8 @@ export default {
 
         async handleAddToCart(e) {
             e.stopPropagation()
+            // No single price to add — the level is picked on the detail page.
+            if (this.hasVariants) return this.goToDetail()
             const authStore = useAuthStore()
             if (!authStore.user) {
                 this.$router.push('/signin')

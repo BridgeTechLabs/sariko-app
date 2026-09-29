@@ -56,6 +56,7 @@ class DAOCartItems(DAOBase):
                 .select("id, quantity") \
                 .eq("cart_id", cart_id) \
                 .eq("food_item_id", food_item_id)
+            
             result = self._match_variant(query, variant_id) \
                 .limit(1) \
                 .execute()
