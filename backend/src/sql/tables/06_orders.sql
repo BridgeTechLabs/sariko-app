@@ -33,6 +33,7 @@ create table public.orders (
   ipn_data jsonb null,
   delivery_appointment timestamp with time zone null,
   payment_create_date text null,
+  updated_at timestamp with time zone not null default now(),
   constraint orders_pkey primary key (id),
   constraint orders_payout_id_fkey foreign KEY (payout_id) references admin_payouts (id) on delete set null,
   constraint orders_user_id_fkey foreign KEY (user_id) references users (id),
@@ -58,6 +59,11 @@ create table public.orders (
 
 create index IF not exists idx_orders_user on public.orders using btree (user_id) TABLESPACE pg_default;
 create index IF not exists idx_orders_seller on public.orders using btree (seller_id) TABLESPACE pg_default;
+
+-- The order-list pollers hit /head first (max(updated_at) + row count) and only refetch
+-- the full list when that changes, so these two indexes carry every idle poll tick.
+create index IF not exists idx_orders_user_updated on public.orders using btree (user_id, updated_at desc) TABLESPACE pg_default;
+create index IF not exists idx_orders_seller_updated on public.orders using btree (seller_id, updated_at desc) TABLESPACE pg_default;
 
 
 create table public.order_items (
