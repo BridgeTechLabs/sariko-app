@@ -12,6 +12,7 @@ os.environ.setdefault("SUPABASE_JWKS_URL", "https://test.invalid/jwks")
 from fastapi import HTTPException
 
 import apis.cart as cart
+from apis.orders import unavailable_names
 from utils.pricing import cart_item_unit_price
 
 
@@ -55,8 +56,20 @@ def test_variant_guard():
     assert _guard(levels, "XL") == "This price option is sold out"
 
 
+def test_unavailable_names():
+    ok = {"food_items": {"name": "Chè", "is_available": True}, "food_item_variants": None}
+    dish_off = {"food_items": {"name": "Bún", "is_available": False}, "food_item_variants": None}
+    level_off = {"food_items": {"name": "Bún", "is_available": True},
+                 "food_item_variants": {"name": "L", "is_available": False}}
+    assert unavailable_names([ok]) == []
+    assert unavailable_names([dish_off]) == ["Bún"]
+    assert unavailable_names([level_off]) == ["Bún (L)"]
+    assert unavailable_names([ok, dish_off, level_off]) == ["Bún", "Bún (L)"]
+
+
 if __name__ == "__main__":
     test_unit_price_prefers_variant()
     test_subtotal_matches_sum_of_snapshots()
     test_variant_guard()
+    test_unavailable_names()
     print("ok")

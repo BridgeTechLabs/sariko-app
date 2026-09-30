@@ -31,11 +31,16 @@ export default {
         canAdd() {
             // A dish with levels cannot be priced until one is picked — the backend
             // rejects it anyway, so the button must not offer it.
+            // Every level sold out: nothing addable, even though `levels` is empty.
+            if (this.allLevels.length && !this.levels.length) return false
             const levelPicked = !this.levels.length || !!this.sellerStore.selectedVariantId
             return !!this.food && !!this.seller && levelPicked && !this.loading
         },
+        allLevels() {
+            return this.food?.food_item_variants || []
+        },
         levels() {
-            return (this.food?.food_item_variants || []).filter(v => v.is_available !== false)
+            return this.allLevels.filter(v => v.is_available !== false)
         },
         selectedVariant() {
             return this.levels.find(v => v.id === this.sellerStore.selectedVariantId) || null
