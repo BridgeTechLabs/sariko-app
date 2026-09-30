@@ -6,3 +6,8 @@
 .env.keys
 .env.local
 .env.*.local
+
+# Production dumps pulled by scripts/get_seeds.sh — real customer PII, never commit.
+# Kept only as a reference for the shape of real data; seeds/03_mock_data.sql is
+# what db reset actually loads.
+reference/

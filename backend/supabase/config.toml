@@ -70,6 +70,7 @@ enabled = true
 sql_paths = [
   "./seeds/00_admin_tier_config.sql",
   "./seeds/01_admin_tax_config.sql",
+  "./seeds/03_mock_data.sql",
 ]
 
 [db.network_restrictions]
