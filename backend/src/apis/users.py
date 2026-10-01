@@ -17,6 +17,7 @@ from fastapi import (
 import time
 
 from core.auth import verify_token
+from core.phone import to_e164_vn
 from dao.dao_users import DAOUsers
 from dao.dao_seller_profiles import DAOSellerProfiles
 from dao.dao_user_addresses import DAOUserAddresses
@@ -62,6 +63,14 @@ def get_current_user_profile(user=Depends(verify_token)):
         
 @router.patch("/me/profile")
 def update_current_user_profile(body: Schema.RequestUpdateProfile, user=Depends(verify_token)):
+    # Store E.164 so "0901…", "901…" and "+84901…" end up the same; a bad number
+    # is refused here instead of surfacing at Lalamove booking time.
+    if body.phone:
+        try:
+            body.phone = to_e164_vn(body.phone)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid phone number")
+
     try:
         user_id = user["id"]
         dao_users = DAOUsers()

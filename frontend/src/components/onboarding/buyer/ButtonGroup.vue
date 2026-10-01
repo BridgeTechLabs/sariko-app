@@ -11,6 +11,19 @@ export default {
     methods: {
         async saveAndContinue() {
             const authStore = useAuthStore()
+
+            // Same rule as backend core/phone.py:to_e164_vn — checked here only so
+            // the error reads in the user's language instead of the API's English.
+            const phone = authStore.inputPhoneNumber
+            if (phone && !/^[1-9]\d{8,9}$/.test(phone.replace(/\D/g, '').replace(/^(84|0)/, ''))) {
+                this.$q.notify({
+                    classes: 'quasar-notify-negative',
+                    message: this.$t('edit_profile_page.validation_phone_invalid'),
+                    position: 'bottom',
+                })
+                return
+            }
+
             this.isSaving = true
 
             const langMap = { 'Tiếng Việt': 'vi', 'English': 'en_ph', 'Fillipino': 'en_ph' }
@@ -29,11 +42,17 @@ export default {
                 })
             } catch (e) {
                 console.error('Failed to save onboarding profile:', e)
-            } finally {
-                this.isSaving = false
-                const route = useAuthStore().user?.isSeller ? '/seller/home' : '/home'
-                this.$router.push(route)
+                // Backstop if the client check above ever drifts from the backend:
+                // stay so the user can fix it (axiosPolicy toasts the 422).
+                // Other failures still move on.
+                if (e.response?.data?.detail === 'Invalid phone number') {
+                    this.isSaving = false
+                    return
+                }
             }
+            this.isSaving = false
+            const route = useAuthStore().user?.isSeller ? '/seller/home' : '/home'
+            this.$router.push(route)
         },
         skipOnboarding() {
             const authStore = useAuthStore()

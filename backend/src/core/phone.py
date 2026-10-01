@@ -14,6 +14,7 @@ def to_e164_vn(phone: str) -> str:
         digits = digits[2:]
     elif digits.startswith("0"):
         digits = digits[1:]
-    if not re.fullmatch(r"\d{9,10}", digits):
+    # Subscriber part never starts with 0 — "00901…" would otherwise become "+840901…".
+    if not re.fullmatch(r"[1-9]\d{8,9}", digits):
         raise ValueError(f"Invalid VN phone: {phone!r}")
     return "+84" + digits
