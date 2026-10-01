@@ -12,16 +12,23 @@ begin;
 -- ── Auth ────────────────────────────────────────────────────────────────────
 -- Column list copied from the project's own auth schema. bcrypt via pgcrypto;
 -- if a fresh project puts it elsewhere, drop the "extensions." prefix.
+--
+-- The token columns are nullable with no default, but GoTrue scans them into
+-- plain Go strings: left NULL, every login/lookup of these users is a 500
+-- "Database error loading user". A real signup writes '' — so do we.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
-  is_sso_user, is_anonymous
+  is_sso_user, is_anonymous,
+  confirmation_token, recovery_token, email_change, email_change_token_new,
+  email_change_token_current, phone_change, phone_change_token, reauthentication_token
 )
 select
   '00000000-0000-0000-0000-000000000000', u.id, 'authenticated', 'authenticated',
   u.email, extensions.crypt('devpassword123', extensions.gen_salt('bf')), now(),
   '{"provider":"email","providers":["email"]}'::jsonb,
-  jsonb_build_object('fullname', u.name, 'is_seller', u.is_seller), now(), now(), false, false
+  jsonb_build_object('fullname', u.name, 'is_seller', u.is_seller), now(), now(), false, false,
+  '', '', '', '', '', '', '', ''
 from (values
   ('11111111-1111-1111-1111-111111111111'::uuid, 'buyer@dev.local',   'Mai Buyer', false),
   ('22222222-2222-2222-2222-222222222222'::uuid, 'buyer2@dev.local',  'Nam Buyer', false),
@@ -92,6 +99,14 @@ insert into public.food_items (
   ('cccccccc-0000-0000-0000-000000000005', 'aaaaaaaa-0000-0000-0000-000000000002', 'bbbbbbbb-0000-0000-0000-000000000003',
    'Pork BBQ Skewer', 'Charcoal grilled.', 25000, '25.000 ₫', 'xiên', 2, 1, 0, true, false)
 on conflict (id) do nothing;
+
+-- Same path apis/sellers.py writes: food-items/{seller_id}/{item_id}. The files
+-- themselves are put there by scripts/copy_images_to_dev.sh — a db reset empties
+-- storage, so run it after every reset. Host is the dev project's.
+update public.food_items
+set image_url = 'https://saphxhqpjrhdsqbtnwqe.supabase.co/storage/v1/object/public/sariko-public/food-items/'
+  || seller_id || '/' || id
+where id::text like 'cccccccc-0000-0000-0000-%';
 
 -- ── Price variants ──────────────────────────────────────────────────────────
 -- Chicken Adobo gets three levels, one of them sold out: the range shown on the
