@@ -183,12 +183,15 @@ export const setUpAxiosPolicy = () => {
                     return apiClient(config);
                     
                 } catch (e) {
-                    if (!config._silent) {
-                        toast("Session expired. Please sign in again.");
-                    }
                     authStore?.signOutRedirectSignIn?.();
                     return Promise.reject(error);
                 }
+            }
+
+            // Still 401 after refresh + retry (or retry disabled) → back to sign in
+            if (status === 401) {
+                authStore?.signOutRedirectSignIn?.();
+                return Promise.reject(error);
             }
 
             switch (status) {

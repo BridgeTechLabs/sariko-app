@@ -196,6 +196,36 @@ const routes = [
         meta: { requiresAuth: true }
     },
     {
+        path: '/v2/account',
+        name: 'account-v2',
+        component: () => import('@/pages/v2/account/AccountPage.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/v2/account/addresses',
+        name: 'account-addresses-v2',
+        component: () => import('@/pages/v2/account/AddressesPage.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/v2/account/addresses/new',
+        name: 'account-address-new-v2',
+        component: () => import('@/pages/v2/account/AddressFormPage.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/v2/account/addresses/:id/edit',
+        name: 'account-address-edit-v2',
+        component: () => import('@/pages/v2/account/AddressFormPage.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/v2/account/language',
+        name: 'account-language-v2',
+        component: () => import('@/pages/v2/account/LanguagePage.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/pages/NotFoundPage.vue'),
