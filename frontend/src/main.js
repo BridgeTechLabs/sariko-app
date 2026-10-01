@@ -3,7 +3,12 @@ import VueAxios from 'vue-axios'
 import axios from 'axios'
 import App from './App.vue'
 import '@/assets/quasar/main.scss'
+import './assets/tokens.css'
+import './assets/tokens-layout.css'
 import './assets/main.css'
+import '@fontsource/open-sans/400.css'
+import '@fontsource/open-sans/600.css'
+import '@fontsource/open-sans/700.css'
 
 const app = createApp(App)
 app.use(VueAxios, axios);

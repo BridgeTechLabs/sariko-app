@@ -1,0 +1,235 @@
+/*
+ * SariKo semantic color tokens — generated from Figma export (Figma · SariKo Redesign · collections 'SariKo / Primitives' + 'SariKo / Semantic', 2026-09-25).
+ * Keep values in sync with the Figma export (sariko-colors.json); don't hand-pick colors here.
+ * :root = light, [data-theme='dark'] = dark. data-theme is set on <html> by utils/theme.js.
+ */
+
+:root {
+  /* base */
+  --background: #fbf3e8; /* cream/200 */
+  --foreground: #1b2a4a; /* navy/600 */
+  --card: #ffffff; /* white */
+  --card-foreground: #1b2a4a; /* navy/600 */
+  --popover: #ffffff; /* white */
+  --popover-foreground: #1b2a4a; /* navy/600 */
+  --primary: #1b2a4a; /* navy/600 */
+  --primary-foreground: #ffffff; /* white */
+  --secondary: #f4eadb; /* cream/300 */
+  --secondary-foreground: #1b2a4a; /* navy/600 */
+  --muted: #f4eadb; /* cream/300 */
+  --muted-foreground: #6f675c; /* cream/700 */
+  --accent: #eee3d3; /* cream/400 */
+  --accent-foreground: #1b2a4a; /* navy/600 */
+  --destructive: #e8563a; /* coral/500 */
+  --destructive-foreground: #ffffff; /* white */
+  --border: #eee3d3; /* cream/400 */
+  --input: #eee3d3; /* cream/400 */
+  --ring: #1b2a4a; /* navy/600 */
+
+  /* brand */
+  --brand-navy: #1b2a4a; /* navy/600 */
+  --brand-navy-foreground: #ffffff; /* white */
+  --brand-navy-foreground-muted: #a7b0c6; /* navy/200 */
+  --brand-gold: #c4a86a; /* gold/500 */
+  --brand-gold-soft: #f5ebd3; /* gold/100 */
+  --brand-gold-foreground: #1b2a4a; /* navy/600 */
+  --brand-gold-hi: #e6cf8f; /* gold/300 */
+  --brand-saffron: #f5a623; /* saffron/500 */
+  --brand-saffron-soft: #fdebd0; /* saffron/100 */
+  --brand-saffron-foreground: #0e1526; /* navy/900 */
+
+  /* text */
+  --text-primary: #1b2a4a; /* navy/600 */
+  --text-secondary: #6f675c; /* cream/700 */
+  --text-placeholder: #9c9284; /* cream/600 */
+  --text-disabled: #d9cbb6; /* cream/500 */
+  --text-link: #1b2a4a; /* navy/600 */
+  --text-price: #1b2a4a; /* navy/600 */
+  --text-gold: #8f7642; /* gold/700 */
+  --text-saffron: #c77a10; /* saffron/700 */
+  --text-on-image: #ffffff; /* white */
+
+  /* status */
+  --status-success: #2e9e5b; /* green/500 */
+  --status-success-soft: #d4efdf; /* green/100 */
+  --status-success-foreground: #1d663b; /* green/700 */
+  --status-warning: #dd8f12; /* saffron/600 */
+  --status-warning-soft: #fdebd0; /* saffron/100 */
+  --status-warning-foreground: #9a5e0d; /* saffron/800 */
+  --status-error: #e8563a; /* coral/500 */
+  --status-error-soft: #fbdcd5; /* coral/100 */
+  --status-error-foreground: #a83820; /* coral/700 */
+  --status-info: #3b82f6; /* blue/500 */
+  --status-info-soft: #dbeafe; /* blue/100 */
+  --status-info-foreground: #1d4ed8; /* blue/700 */
+  --status-neutral: #d9cbb6; /* cream/500 */
+  --status-neutral-soft: #f4eadb; /* cream/300 */
+  --status-neutral-foreground: #6f675c; /* cream/700 */
+
+  /* nav */
+  --nav-background: #ffffff; /* white */
+  --nav-item: #6f675c; /* cream/700 */
+  --nav-item-active: #1b2a4a; /* navy/600 */
+  --nav-cart-button: #1b2a4a; /* navy/600 */
+  --nav-cart-button-foreground: #ffffff; /* white */
+  --nav-badge: #e8563a; /* coral/500 */
+  --nav-badge-foreground: #ffffff; /* white */
+
+  /* chip */
+  --chip-background: #f4eadb; /* cream/300 */
+  --chip-foreground: #1b2a4a; /* navy/600 */
+  --chip-background-selected: #1b2a4a; /* navy/600 */
+  --chip-foreground-selected: #ffffff; /* white */
+
+  /* button */
+  --button-disabled: #eee3d3; /* cream/400 */
+  --button-disabled-foreground: #9c9284; /* cream/600 */
+
+  /* overlay */
+  --overlay-scrim: #00000066;
+
+  /* photo */
+  --photo-placeholder: #eee3d3; /* cream/400 */
+  --photo-1: #d9c3a5;
+  --photo-2: #c9a98a;
+  --photo-3: #b7a98c;
+  --photo-4: #e1cdaf;
+  --photo-5: #cdb08e;
+
+  /* skeleton */
+  --skeleton-base: #f4eadb; /* cream/300 */
+  --skeleton-shine: #fbf3e8; /* cream/200 */
+
+  /* rating */
+  --rating-star: #f5a623; /* saffron/500 */
+  --rating-star-empty: #d9cbb6; /* cream/500 */
+
+  /* base */
+  --divider: #eee3d3; /* cream/400 */
+
+  /* icon */
+  --icon-default: #1b2a4a; /* navy/600 */
+  --icon-muted: #6f675c; /* cream/700 */
+
+  /* partner */
+  --partner-zen: #5b2a86;
+  --partner-zen-soft: #efe7f7;
+  --partner-zen-foreground: #ffffff;
+
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  /* base */
+  --background: #121a2b; /* navy/800 */
+  --foreground: #fff8f0; /* cream/100 */
+  --card: #1c2740; /* navy/700 */
+  --card-foreground: #fff8f0; /* cream/100 */
+  --popover: #1c2740; /* navy/700 */
+  --popover-foreground: #fff8f0; /* cream/100 */
+  --primary: #c4a86a; /* gold/500 */
+  --primary-foreground: #0e1526; /* navy/900 */
+  --secondary: #263252; /* navy/500 */
+  --secondary-foreground: #fff8f0; /* cream/100 */
+  --muted: #263252; /* navy/500 */
+  --muted-foreground: #a7b0c6; /* navy/200 */
+  --accent: #3a4a70; /* navy/400 */
+  --accent-foreground: #fff8f0; /* cream/100 */
+  --destructive: #f0694f; /* coral/400 */
+  --destructive-foreground: #ffffff; /* white */
+  --border: #263252; /* navy/500 */
+  --input: #263252; /* navy/500 */
+  --ring: #c4a86a; /* gold/500 */
+
+  /* brand */
+  --brand-navy: #0e1526; /* navy/900 */
+  --brand-navy-foreground: #ffffff; /* white */
+  --brand-navy-foreground-muted: #a7b0c6; /* navy/200 */
+  --brand-gold: #c4a86a; /* gold/500 */
+  --brand-gold-soft: #4a3e24; /* gold/900 */
+  --brand-gold-foreground: #0e1526; /* navy/900 */
+  --brand-gold-hi: #e6cf8f; /* gold/300 */
+  --brand-saffron: #f5a623; /* saffron/500 */
+  --brand-saffron-soft: #3b2e1a; /* saffron/950 */
+  --brand-saffron-foreground: #0e1526; /* navy/900 */
+
+  /* text */
+  --text-primary: #fff8f0; /* cream/100 */
+  --text-secondary: #a7b0c6; /* navy/200 */
+  --text-placeholder: #6a7ba0; /* navy/300 */
+  --text-disabled: #3a4a70; /* navy/400 */
+  --text-link: #e6cf8f; /* gold/300 */
+  --text-price: #fff8f0; /* cream/100 */
+  --text-gold: #e6cf8f; /* gold/300 */
+  --text-saffron: #f7b448; /* saffron/400 */
+  --text-on-image: #ffffff; /* white */
+
+  /* status */
+  --status-success: #4cc582; /* green/400 */
+  --status-success-soft: #0f331e; /* green/900 */
+  --status-success-foreground: #7bcf9c; /* green/300 */
+  --status-warning: #f7b448; /* saffron/400 */
+  --status-warning-soft: #3b2e1a; /* saffron/950 */
+  --status-warning-foreground: #f9c36e; /* saffron/300 */
+  --status-error: #f0694f; /* coral/400 */
+  --status-error-soft: #2f0f08; /* coral/950 */
+  --status-error-foreground: #f19680; /* coral/300 */
+  --status-info: #60a5fa; /* blue/400 */
+  --status-info-soft: #172554; /* blue/950 */
+  --status-info-foreground: #93c5fd; /* blue/300 */
+  --status-neutral: #3a4a70; /* navy/400 */
+  --status-neutral-soft: #263252; /* navy/500 */
+  --status-neutral-foreground: #a7b0c6; /* navy/200 */
+
+  /* nav */
+  --nav-background: #0e1526; /* navy/900 */
+  --nav-item: #a7b0c6; /* navy/200 */
+  --nav-item-active: #c4a86a; /* gold/500 */
+  --nav-cart-button: #c4a86a; /* gold/500 */
+  --nav-cart-button-foreground: #0e1526; /* navy/900 */
+  --nav-badge: #f0694f; /* coral/400 */
+  --nav-badge-foreground: #ffffff; /* white */
+
+  /* chip */
+  --chip-background: #263252; /* navy/500 */
+  --chip-foreground: #fff8f0; /* cream/100 */
+  --chip-background-selected: #c4a86a; /* gold/500 */
+  --chip-foreground-selected: #0e1526; /* navy/900 */
+
+  /* button */
+  --button-disabled: #263252; /* navy/500 */
+  --button-disabled-foreground: #6a7ba0; /* navy/300 */
+
+  /* overlay */
+  --overlay-scrim: #00000099;
+
+  /* photo */
+  --photo-placeholder: #263252; /* navy/500 */
+  --photo-1: #4a4033;
+  --photo-2: #4e3e33;
+  --photo-3: #433d31;
+  --photo-4: #55493a;
+  --photo-5: #4b3f30;
+
+  /* skeleton */
+  --skeleton-base: #263252; /* navy/500 */
+  --skeleton-shine: #3a4a70; /* navy/400 */
+
+  /* rating */
+  --rating-star: #f5a623; /* saffron/500 */
+  --rating-star-empty: #3a4a70; /* navy/400 */
+
+  /* base */
+  --divider: #263252; /* navy/500 */
+
+  /* icon */
+  --icon-default: #fff8f0; /* cream/100 */
+  --icon-muted: #a7b0c6; /* navy/200 */
+
+  /* partner */
+  --partner-zen: #5b2a86;
+  --partner-zen-soft: #2a1f3d;
+  --partner-zen-foreground: #ffffff;
+
+  color-scheme: dark;
+}
