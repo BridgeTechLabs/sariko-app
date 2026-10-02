@@ -17,7 +17,7 @@ export default {
     },
     methods: {
         openZen() {
-            window.open('https://link.zenapppro.com/online', '_blank', 'noopener,noreferrer')
+            window.open(import.meta.env.VITE_ZEN_URL || 'https://link.zenapppro.com/online', '_blank', 'noopener,noreferrer')
         },
         dismiss() {
             this.dismissed = true
