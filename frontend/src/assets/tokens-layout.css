@@ -1,0 +1,105 @@
+/*
+ * SariKo layout & type tokens — from Figma (SariKo Redesign · Buyer · frame "Tokens · Layout & Type", node 206:429).
+ * 8px base: spacing, radius, line-height are all multiples of 8. Theme-independent (same in light/dark).
+ * Color tokens live in tokens.css.
+ */
+
+:root {
+  /* spacing */
+  --space-0: 0px;
+  --space-8: 8px;   /* icon → label, tight inline gaps */
+  --space-16: 16px; /* screen gutter, card padding */
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-48: 48px;
+  --space-56: 56px; /* section gap (airy layout) */
+  --space-64: 64px;
+  --space-80: 80px;
+  --space-96: 96px;
+
+  /* radius */
+  --radius-none: 0px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+  --radius-full: 9999px;
+
+  /* border width */
+  --border-default: 1px;
+  --border-strong: 2px;
+
+  /* font */
+  --font-family-sans: 'Open Sans', sans-serif;
+
+  --font-size-xs: 12px;
+  --font-size-base: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --font-line-height-16: 16px;
+  --font-line-height-24: 24px;
+  --font-line-height-32: 32px;
+}
+
+/*
+ * Text styles (Figma text styles). Prefixed `type-` to avoid clashing with Quasar's .text-caption / .text-body1.
+ * Figma letter-spacing is in %, converted to em.
+ */
+.type-display {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--font-line-height-32);
+  letter-spacing: -0.01em;
+}
+
+.type-title {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-line-height-24);
+  letter-spacing: -0.005em;
+}
+
+.type-body {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-line-height-24);
+}
+
+.type-body-strong {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-line-height-24);
+}
+
+.type-caption {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--font-line-height-16);
+}
+
+.type-caption-strong {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-line-height-16);
+}
+
+.type-label {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--font-line-height-16);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

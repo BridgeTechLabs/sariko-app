@@ -1,60 +1,83 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
-:root {
-  /* Colors */
-  --bg-main: #040A14; /* primary_background */
-  --bg-surface: #1f2940; /* card background slightly lighter */
-  --bg-surface-2: #111620;
-  --bg-card-hover: #2a375a;
-  --text-primary: #ffffff; /* primary_text */
-  --text-secondary: #9ca3af; /* lower opacity text */
-  --text-muted: rgba(255, 255, 255, 0.5);
-  --text-active: #f5A623;
+/* Color tokens (light/dark) live in tokens.css — generated from the Figma export. */
 
-  --accent-dim: rgba(250, 204, 21, 0.12);
-  
+:root {
+  /* Legacy aliases → semantic tokens. Prefer the semantic names (--background, --card, --primary...) in new code. */
+  --bg-main: var(--background);
+  --bg-surface: var(--card);
+  --bg-surface-2: var(--muted);
+  --bg-card-hover: var(--accent);
+  --surface: var(--card);
+  /* --text-primary / --text-secondary are defined directly in tokens.css */
+  --text-muted: var(--text-placeholder);
+  --text-active: var(--text-saffron);
+
+  --accent-dim: var(--brand-gold-soft);
+
   /* Primary Palette */
-  --color-primary: #121b2f; 
-  --color-accent: #facc15; /* accent gold */
+  --color-primary: var(--brand-navy);
+  /* Stays gold in both themes: many components pair it with hardcoded dark text as a button fill */
+  --color-accent: var(--brand-gold);
 
   /* Secondary / Semantic */
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
-  --color-info: #3b82f6;
+  --color-success: var(--status-success);
+  --color-warning: var(--status-warning);
+  --color-error: var(--status-error);
+  --color-info: var(--status-info);
 
   /* Borders and Dividers */
-  --border-color: #374151; /* dark gray border */
-  
+  --border-color: var(--border);
+
   /* Shared values */
   --border-radius-sm: 8px;
   --border-radius-md: 12px;
   --border-radius-lg: 16px;
   --border-radius-xl: 16px; /* Cards specific */
   --border-radius-full: 9999px;
-  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
-  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.25), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
   --shadow-button: 0 4px 6px -1px rgba(250, 204, 21, 0.3);
-
-  /* Hero radial glow — warm gold/orange behind floating food */
-  --hero-glow: radial-gradient(
-    ellipse 70% 55% at 50% 45%,
-    rgba(245, 166, 35, 0.28) 0%,
-    rgba(250, 204, 21, 0.14) 25%,
-    rgba(250, 204, 21, 0.04) 55%,
-    rgba(4, 10, 20, 0) 80%
-  );
-
-  /* Ghost surfaces (icon buttons, qty pill) */
-  --ghost-bg: rgba(255, 255, 255, 0.06);
-  --ghost-bg-hover: rgba(255, 255, 255, 0.10);
-  --ghost-bg-active: rgba(255, 255, 255, 0.14);
-  --ghost-border: 1px solid rgba(255, 255, 255, 0.10);
 
   /* Gold CTA shadow stack */
   --cta-shadow: 0 8px 24px rgba(250, 204, 21, 0.25),
                 0 2px 6px rgba(250, 204, 21, 0.18);
   --cta-shadow-active: 0 4px 12px rgba(250, 204, 21, 0.22);
+
+  /* Theme-dependent effects not covered by the Figma tokens — light */
+  --shadow-card: 0 4px 6px -1px rgba(27, 42, 74, 0.08), 0 2px 4px -1px rgba(27, 42, 74, 0.04);
+  --shadow-card-hover: 0 10px 15px -3px rgba(27, 42, 74, 0.12), 0 4px 6px -2px rgba(27, 42, 74, 0.06);
+
+  /* Hero radial glow — warm gold/orange behind floating food */
+  --hero-glow: radial-gradient(
+    ellipse 70% 55% at 50% 45%,
+    rgba(245, 166, 35, 0.22) 0%,
+    rgba(250, 204, 21, 0.10) 25%,
+    rgba(250, 204, 21, 0.03) 55%,
+    transparent 80%
+  );
+
+  /* Ghost surfaces (icon buttons, qty pill) */
+  --ghost-bg: rgba(27, 42, 74, 0.04);
+  --ghost-bg-hover: rgba(27, 42, 74, 0.07);
+  --ghost-bg-active: rgba(27, 42, 74, 0.10);
+  --ghost-border: 1px solid rgba(27, 42, 74, 0.10);
+}
+
+[data-theme='dark'] {
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.25), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
+
+  --hero-glow: radial-gradient(
+    ellipse 70% 55% at 50% 45%,
+    rgba(245, 166, 35, 0.28) 0%,
+    rgba(250, 204, 21, 0.14) 25%,
+    rgba(250, 204, 21, 0.04) 55%,
+    transparent 80%
+  );
+
+  --ghost-bg: rgba(255, 255, 255, 0.06);
+  --ghost-bg-hover: rgba(255, 255, 255, 0.10);
+  --ghost-bg-active: rgba(255, 255, 255, 0.14);
+  --ghost-border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 * {

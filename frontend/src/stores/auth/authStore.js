@@ -13,6 +13,20 @@ const LANG_MAP = { 'Tiếng Việt': 'vi', 'English': 'en_ph', 'Fillipino': 'en_
 const ROLE_KEY = 'sariko.role';
 const ROLE_USER_KEY = 'sariko.roleUserId';
 
+let _redirectingToSignIn = false;
+
+// The axios interceptor reads the token via supabase.auth.getSession() (storage),
+// so wait until the new session is persisted before anything calls the API.
+async function waitForStoredSession(accessToken, timeoutMs = 5000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        const { data } = await supabase.auth.getSession();
+        if (data?.session?.access_token === accessToken) return data.session;
+        await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error("Session was not persisted in time");
+}
+
 function getStoredRole(userId) {
     try {
         if (!userId) return null;
@@ -266,7 +280,9 @@ export const useAuthStore = defineStore("authStore", {
                 );
                 if (!res?.session || !res?.user) throw new Error("No user data");
 
-                this._setFromSession(res.session);
+                // Setting user triggers App.vue to load conversations — token must be stored first
+                const session = await waitForStoredSession(res.session.access_token);
+                this._setFromSession(session);
 
                 try {
                     const profile = await apiUsers.getProfile()
@@ -352,7 +368,8 @@ export const useAuthStore = defineStore("authStore", {
                     this.isSelectedSignUpRoleSeller,
                 );
                 if (res?.session && res?.user) {
-                    this._setFromSession(res.session);
+                    const session = await waitForStoredSession(res.session.access_token);
+                    this._setFromSession(session);
                     if (this.user) {
                         this.user.isSeller = this.isSelectedSignUpRoleSeller;
                         setStoredRole(this.user.id, this.isSelectedSignUpRoleSeller);
@@ -405,22 +422,32 @@ export const useAuthStore = defineStore("authStore", {
         },
 
         async signOutRedirectSignIn() {
+            // Several requests can 401 at once — redirect only once
+            if (_redirectingToSignIn) return;
+            _redirectingToSignIn = true;
             try {
                 await apiAuth.authSignout();
-                this.session = null;
-                this.user = null;
-                clearStoredRole();
-                useCartStore().$reset();
-                Notify.create({
-                    classes: 'quasar-notify-negative',
-                    message: "Session expired. Please log in again.",
-                    progress: true,
-                    icon: 'fa-regular fa-circle-xmark',
-                    position: "bottom",
-                });
-                router.push("/signin");
             } catch (error) {
                 console.error(`authStore - signOutRedirectSignIn - ${error}`);
+            }
+            this.session = null;
+            this.user = null;
+            clearStoredRole();
+            useCartStore().$reset();
+            Notify.create({
+                classes: 'quasar-notify-negative',
+                message: "Session expired. Please log in again.",
+                progress: true,
+                icon: 'fa-regular fa-circle-xmark',
+                position: "bottom",
+            });
+            const current = router.currentRoute.value;
+            try {
+                if (current.name !== 'signin') {
+                    await router.push({ name: 'signin', query: { redirect: current.fullPath } });
+                }
+            } finally {
+                _redirectingToSignIn = false;
             }
         },
     }
