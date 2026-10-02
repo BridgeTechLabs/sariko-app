@@ -2,6 +2,7 @@
 import { useMenuStore } from '@/stores/seller/menuStore'
 import { Pencil } from 'lucide-vue-next'
 import ModalEditItem from './ModalEditItem.vue'
+import { foodPriceDisplay, hasVariants } from '@/utils/priceDisplay';
 
 export default {
     name: 'SellerMenuFoodItem',
@@ -20,6 +21,7 @@ export default {
     },
 
     methods: {
+        foodPriceDisplay, hasVariants,
         async onToggleAvailable(val) {
             this.toggling = true
             try {
@@ -44,8 +46,8 @@ export default {
         />
         <div class="food-info">
             <div class="food-name">{{ item.name }}</div>
-            <div class="food-price">{{ item.price_text }}</div>
-            <div v-if="item.unit_label" class="food-unit">/ {{ item.unit_label }}</div>
+            <div class="food-price">{{ foodPriceDisplay(item) }}</div>
+            <div v-if="item.unit_label && !hasVariants(item)" class="food-unit">/ {{ item.unit_label }}</div>
         </div>
         <div class="food-actions">
             <button class="btn-edit" @click="showEditModal = true">

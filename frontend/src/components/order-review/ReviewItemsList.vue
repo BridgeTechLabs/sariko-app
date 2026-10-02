@@ -12,7 +12,10 @@ export default {
         items() {
             // A dish deleted from the menu after the order leaves food_item_id null;
             // it cannot be reviewed (no row to attach to), so it is not listed.
-            return (this.order?.order_items || []).filter(item => item.food_item_id)
+            // Reviews are per dish, so two levels of one dish (S + L) show one card.
+            const seen = new Set()
+            return (this.order?.order_items || []).filter(item =>
+                item.food_item_id && !seen.has(item.food_item_id) && seen.add(item.food_item_id))
         }
     }
 }

@@ -40,6 +40,7 @@ export const useSellerStore = defineStore('sellerStore', {
             currentFood: null,
             currentSeller: null,
             foodQuantity: 1,
+            selectedVariantId: null,
         }
     },
 
@@ -123,6 +124,7 @@ export const useSellerStore = defineStore('sellerStore', {
             this.currentFood = null
             this.currentSeller = null
             this.foodQuantity = 1
+            this.selectedVariantId = null
 
             // Load seller if not already loaded for this slug
             if (this.seller?.slug !== sellerSlug) {
@@ -139,6 +141,10 @@ export const useSellerStore = defineStore('sellerStore', {
                 const found = category.food_items?.find(f => f.id === foodId)
                 if (found) {
                     this.currentFood = found
+                    // Preselect the first level on offer, so the buyer never faces
+                    // a disabled button with no hint why.
+                    const levels = (found.food_item_variants || []).filter(v => v.is_available !== false)
+                    this.selectedVariantId = levels.length ? levels[0].id : null
                     break
                 }
             }

@@ -14,14 +14,33 @@ from dao.dao_cart_items import DAOCartItems
 from dao.dao_orders import DAOOrders
 from dao.dao_order_items import DAOOrderItems
 from dao.dao_seller_profiles import DAOSellerProfiles
-from schemas.request_schemas import RequestCreateOrder
+from schemas import Schema
+from utils.pricing import cart_item_unit_price
 
 router = APIRouter(prefix="/orders")
 logger = logging.getLogger(__name__)
 
 
+def unavailable_names(cart_items: list) -> list:
+    """Dishes (or levels) in the cart that the seller has since stopped selling.
+
+    The cart holds live references, so a dish or level can go off sale between
+    "add to cart" and "place order". Creating the order anyway sells something
+    the seller no longer offers.
+    """
+    names = []
+    for item in cart_items:
+        food = item.get("food_items") or {}
+        variant = item.get("food_item_variants")
+        if food.get("is_available") is False:
+            names.append(food.get("name"))
+        elif variant and variant.get("is_available") is False:
+            names.append(f"{food.get('name')} ({variant.get('name')})")
+    return names
+
+
 @router.post("")
-def create_order(request: RequestCreateOrder, user=Depends(verify_token)):
+def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token)):
 
     user_id = user["id"]
 
@@ -46,8 +65,15 @@ def create_order(request: RequestCreateOrder, user=Depends(verify_token)):
 
     # 2. Calculate subtotal + commission (snapshot seller's rate at order time)
     cart_items = cart["cart_items"]
+
+    sold_out = unavailable_names(cart_items)
+    if sold_out:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No longer available: {', '.join(sold_out)}",
+        )
     subtotal = sum(
-        item["food_items"]["price"] * item["quantity"]
+        cart_item_unit_price(item) * item["quantity"]
         for item in cart_items
     )
     total_amount = subtotal + float(request.delivery_fee or 0)

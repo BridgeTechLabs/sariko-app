@@ -331,7 +331,7 @@ export default {
                     <div class="item-left">
                         <span class="item-qty">{{ item.quantity }}</span>
                         <span class="item-sep">×</span>
-                        <span class="item-name">{{ item.name_snapshot }}</span>
+                        <span class="item-name">{{ item.name_snapshot }}<span v-if="item.variant_name_snapshot" class="order-variant"> ({{ item.variant_name_snapshot }})</span></span>
                     </div>
                     <span class="item-price">{{ fmt(item.price_snapshot * item.quantity) }}</span>
                 </div>
@@ -868,5 +868,10 @@ export default {
 
 .custom-reason-input {
     margin-top: 8px;
+}
+
+.order-variant {
+    color: #f5A623;
+    font-weight: 600;
 }
 </style>

@@ -32,6 +32,16 @@ export default {
             required: true,
             type: Number
         },
+        itemVariantId: {
+            required: false,
+            type: String,
+            default: null
+        },
+        itemVariantName: {
+            required: false,
+            type: String,
+            default: null
+        },
         sellerStore: {
             require: true,
             type: String
@@ -66,13 +76,13 @@ export default {
 
     methods: {
         async onClickPlus() {
-            await this.cartStore.updateQuantity(this.itemId, this.itemQuantity + 1)
+            await this.cartStore.updateQuantity(this.itemId, this.itemQuantity + 1, this.itemVariantId)
         },
         async onClickMinus() {
             if (this.itemQuantity <= 1) {
-                await this.cartStore.removeItem(this.itemId)
+                await this.cartStore.removeItem(this.itemId, this.itemVariantId)
             } else {
-                await this.cartStore.updateQuantity(this.itemId, this.itemQuantity - 1)
+                await this.cartStore.updateQuantity(this.itemId, this.itemQuantity - 1, this.itemVariantId)
             }
         }
     }
@@ -100,6 +110,7 @@ export default {
                         <div class="group-1">
                             <div class="item-name">
                                 {{ itemName }}
+                                <span v-if="itemVariantName" class="item-variant">{{ itemVariantName }}</span>
                             </div>
                             <div class="item-category">
                                 <div>{{ itemCategory }}</div> &nbsp; | &nbsp; <Star color="#f5A623" size="12px"/> &nbsp; 4.5
@@ -165,6 +176,18 @@ export default {
     flex-direction: column;
     justify-content: space-between;
     align-items: flex-start;
+}
+
+.item-variant {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 8px;
+    border-radius: 8px;
+    background: rgba(245, 166, 35, 0.15);
+    color: #f5A623;
+    font-size: 11px;
+    font-weight: 600;
+    vertical-align: middle;
 }
 
 .item-name {

@@ -10,7 +10,7 @@ from core.phone import to_e164_vn
 from dao.dao_deliveries import DAODeliveries
 from dao.dao_orders import DAOOrders
 from dao.dao_seller_profiles import DAOSellerProfiles
-from schemas.delivery_schemas import RequestQuotation
+from schemas import Schema
 from services.lalamove_service import get_lalamove_service
 
 router = APIRouter(prefix="/deliveries")
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # POST /deliveries/quotation — get delivery fee estimate
 # --------------------------------------------------------------------------
 @router.post("/quotation")
-def get_quotation(body: RequestQuotation, user=Depends(verify_token)):
+def get_quotation(body: Schema.RequestQuotation, user=Depends(verify_token)):
     try:
         dao_sellers = DAOSellerProfiles()
         seller = dao_sellers.read_seller_coords_by_id(body.seller_id)

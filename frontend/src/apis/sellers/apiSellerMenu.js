@@ -39,6 +39,22 @@ export const apiSellerMenu = {
         return res.data
     },
 
+    // Price variants (one required, single-select level per dish)
+    createVariant: async (itemId, fields) => {
+        const res = await apiClient.post(`/v1/sellers/me/menu/items/${itemId}/variants`, fields)
+        return res.data
+    },
+
+    updateVariant: async (variantId, fields) => {
+        const res = await apiClient.patch(`/v1/sellers/me/menu/variants/${variantId}`, fields)
+        return res.data
+    },
+
+    deleteVariant: async (variantId) => {
+        const res = await apiClient.delete(`/v1/sellers/me/menu/variants/${variantId}`)
+        return res.data
+    },
+
     uploadItemImage: async (itemId, imageBase64, contentType) => {
         const res = await apiClient.post(`/v1/sellers/me/menu/items/${itemId}/image`, { image_base64: imageBase64, content_type: contentType })
         return res.data

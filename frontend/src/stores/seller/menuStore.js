@@ -103,6 +103,37 @@ export const useMenuStore = defineStore('menuStore', {
             return this.updateItem(itemId, { is_available: isAvailable })
         },
 
+        // ── Price variants ───────────────────────────────────────────────────
+        // The modal buffers edits and calls syncVariants once, on save.
+        // `desired` rows without an id are new; ids missing from it are deleted.
+
+        async syncVariants(itemId, desired) {
+            const item = this.allItems.find(i => i.id === itemId)
+            const current = item?.food_item_variants || []
+
+            const keptIds = desired.filter(v => v.id).map(v => v.id)
+            for (const old of current) {
+                if (!keptIds.includes(old.id)) await apiSellerMenu.deleteVariant(old.id)
+            }
+
+            const saved = []
+            for (const [i, v] of desired.entries()) {
+                const fields = {
+                    name: v.name.trim(),
+                    price: Number(v.price),
+                    sort_order: i,
+                    is_available: v.is_available !== false,
+                }
+                const res = v.id
+                    ? await apiSellerMenu.updateVariant(v.id, fields)
+                    : await apiSellerMenu.createVariant(itemId, fields)
+                saved.push(res.variant)
+            }
+
+            if (item) item.food_item_variants = saved
+            return saved
+        },
+
         // ── Image upload (via backend, service role) ─────────────────────────
 
         async uploadImage(itemId, file) {

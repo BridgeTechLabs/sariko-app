@@ -3,6 +3,7 @@ import logging
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
 from dao.dao_base import DAOBase
+from utils.pricing import cart_item_unit_price
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +19,14 @@ class DAOOrderItems(DAOBase):
             rows = []
             for item in cart_items:
                 food = item.get("food_items", {})
+                variant = item.get("food_item_variants")
                 rows.append({
                     "order_id": order_id,
                     "food_item_id": food.get("id"),
                     "name_snapshot": food.get("name"),
-                    "price_snapshot": food.get("price"),
+                    "price_snapshot": cart_item_unit_price(item),
                     "unit_label_snapshot": food.get("unit_label"),
+                    "variant_name_snapshot": variant["name"] if variant else None,
                     "quantity": item.get("quantity"),
                 })
 

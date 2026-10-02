@@ -7,14 +7,6 @@ export default {
         Phone
     },
 
-    data() {
-        const options = ["VN (+84)", "KR (+82)"]
-        return {
-            options,
-            region: options[0],
-        }
-    },
-
     computed: {
         phone: {
             get() {
@@ -36,33 +28,19 @@ export default {
             <Phone class="icon-phone"/> {{ $t('onboarding_page.buyer.section_phone_number.title') }}
         </div>
 
-        <div class="row q-gutter-md input-group">
-            <div class="col-4">
-                <div class="input-container">
-                    <q-select
-                    class="input-select"
-                    dense
-                    outlined
-                    popup-content-class="my-select-popup"
-                    color="white"
-                    bg-color="bgInputField"
-                    v-model="region" :options="options"
-                    />
-                </div>
-            </div>
-            <div class="col">
-                <div class="input-container">
-                    <q-input
-                    class="input"
-                    dense
-                    outlined
-                    type="text"
-                    color="white"
-                    bg-color="bgInputField"
-                    v-model="phone"
-                    />
-                </div>
-            </div>
+        <!-- Leading 0 or not, the backend normalizes to +84… -->
+        <div class="input-container">
+            <q-input
+            class="input"
+            dense
+            outlined
+            type="tel"
+            prefix="+84"
+            placeholder="901 234 567"
+            color="white"
+            bg-color="bgInputField"
+            v-model="phone"
+            />
         </div>
 
         <div class="tooltip">
@@ -92,10 +70,6 @@ export default {
     margin-bottom: 10px;
 }
 
-.input-select {
-    width: 100%;
-}
-
 .input {
     width: 100%;
 }
@@ -112,10 +86,6 @@ export default {
 </style>
 
 <style lang="scss">
-
-.input-select .q-field__control {
-    border-radius: .75rem;
-}
 
 .input .q-field__control {
     border-radius: .75rem;

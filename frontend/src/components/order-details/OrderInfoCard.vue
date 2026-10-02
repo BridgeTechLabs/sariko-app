@@ -83,7 +83,7 @@ export default {
         <div class="dashed-line" />
 
         <div class="order-row" v-for="item in order.order_items" :key="item.id">
-            <span>{{ item.quantity }}x {{ item.name_snapshot }}</span>
+            <span>{{ item.quantity }}x {{ item.name_snapshot }}<span v-if="item.variant_name_snapshot" class="order-variant"> ({{ item.variant_name_snapshot }})</span></span>
             <span>{{ formatPrice(item.price_snapshot * item.quantity) }}</span>
         </div>
 
@@ -147,5 +147,10 @@ export default {
         to right, #454545 0px, #454545 10px, transparent 2px, transparent 15px
     );
     margin: 12px 0;
+}
+
+.order-variant {
+    color: #f5A623;
+    font-weight: 600;
 }
 </style>
