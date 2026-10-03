@@ -661,6 +661,18 @@
         "stat_reviews": "Đánh giá",
         "stat_following": "Đang theo dõi",
         "edit_profile": "Sửa hồ sơ",
+        "edit_profile_photo_hint": "Chạm để đổi ảnh · tối đa 2 MB",
+        "edit_profile_photo_size_error": "Ảnh phải nhỏ hơn 2 MB. Hãy thử ảnh khác.",
+        "edit_profile_photo_type_error": "Vui lòng chọn tệp hình ảnh.",
+        "edit_profile_name": "Họ và tên",
+        "edit_profile_name_placeholder": "Họ và tên của bạn",
+        "edit_profile_name_error": "Vui lòng nhập tên của bạn",
+        "edit_profile_phone": "Số điện thoại",
+        "edit_profile_phone_placeholder": "903 059 993",
+        "edit_profile_phone_hint": "Người bán và tài xế dùng số này để liên hệ bạn",
+        "edit_profile_phone_error": "Nhập số điện thoại 9 chữ số",
+        "edit_profile_save": "Lưu thay đổi",
+        "edit_profile_saved": "Đã cập nhật hồ sơ",
         "saved_addresses": "Địa chỉ đã lưu",
         "saved_count": "{count} địa chỉ",
         "default_payment": "Thanh toán mặc định",
@@ -746,6 +758,12 @@
         "terms_delivery_body": "Phí giao hàng được ước tính khi thanh toán và do người bán xác nhận. Món đặt trước sẽ được giao vào ngày đã hiển thị.",
         "terms_refunds_title": "Hoàn tiền và khiếu nại",
         "terms_refunds_body": "Nếu đơn hàng có vấn đề, hãy liên hệ với chúng tôi trong vòng 48 giờ sau khi giao để được hỗ trợ.",
-        "terms_placeholder_note": "Nội dung tạm thời. Sẽ thay bằng văn bản pháp lý đã được duyệt. Chính sách bảo mật, Chính sách giao hàng, Phương thức thanh toán và Giới thiệu SariKo dùng chung bố cục trang này."
+        "terms_placeholder_note": "Nội dung tạm thời. Sẽ thay bằng văn bản pháp lý đã được duyệt. Chính sách bảo mật, Chính sách giao hàng, Phương thức thanh toán và Giới thiệu SariKo dùng chung bố cục trang này.",
+        "address_saved": "Đã lưu địa chỉ",
+        "phone_country_unsupported": "Hiện chỉ hỗ trợ số điện thoại Việt Nam (+84)",
+        "country_code_title": "Mã quốc gia",
+        "country_code_search": "Tìm quốc gia hoặc mã",
+        "country_code_empty": "Không tìm thấy quốc gia",
+        "country_code_close": "Đóng"
     }
 }

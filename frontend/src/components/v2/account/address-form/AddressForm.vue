@@ -1,10 +1,11 @@
 <script>
 import { mapState, mapActions } from 'pinia';
-import { useAccountV2Store, toPhoneE164VN } from '@/stores/v2/account/accountStore';
+import { useAccountV2Store, toPhoneE164VN, PHONE_SUPPORTED_COUNTRY } from '@/stores/v2/account/accountStore';
 import BaseChip from '@/components/v2/shared/BaseChip.vue';
 import BaseTextField from '@/components/v2/shared/BaseTextField.vue';
 import BaseSwitch from '@/components/v2/shared/BaseSwitch.vue';
 import BaseIcon from '@/components/v2/shared/BaseIcon.vue';
+import BaseCountryCodeSelect from '@/components/v2/shared/BaseCountryCodeSelect.vue';
 import apiAddress from '@/apis/address/apiAddress';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -15,7 +16,7 @@ const LABEL_ICONS = { home: 'home', work: 'store', other: 'map-pin' }
 const DEFAULT_CENTER = [10.7769, 106.7009]
 
 export default {
-    components: { BaseChip, BaseTextField, BaseSwitch, BaseIcon },
+    components: { BaseChip, BaseTextField, BaseSwitch, BaseIcon, BaseCountryCodeSelect },
 
     data() {
         return {
@@ -43,11 +44,15 @@ export default {
             return LABEL_ICONS[this.addressForm.label] || 'home'
         },
 
-        showPhoneError() {
+        // Another country shows its error right away — only +84 can be saved for now
+        phoneError() {
+            if (this.addressForm.phoneCountry !== PHONE_SUPPORTED_COUNTRY) return this.$t('account_v2.phone_country_unsupported')
             return (this.phoneTouched || this.addressFormSubmitted) && !this.isAddressPhoneValid
+                ? this.$t('account_v2.address_form_phone_error')
+                : null
         },
 
-        // Input shows the national part after the fixed +84 prefix; the store keeps E.164
+        // Input shows the national part after the country code; the store keeps E.164
         phoneNational: {
             get() {
                 return this.addressForm.phone.replace(/^\+84/, '')
@@ -314,12 +319,15 @@ export default {
             type="tel"
             inputmode="numeric"
             autocomplete="tel-national"
-            prefix="+84"
             :label="$t('account_v2.address_form_phone')"
             :placeholder="$t('account_v2.address_form_phone_placeholder')"
-            :error="showPhoneError ? $t('account_v2.address_form_phone_error') : null"
+            :error="phoneError"
             @blur="phoneTouched = true"
-        />
+        >
+            <template #leading>
+                <BaseCountryCodeSelect v-model="addressForm.phoneCountry" />
+            </template>
+        </BaseTextField>
 
         <BaseTextField
             v-model="addressForm.note"
