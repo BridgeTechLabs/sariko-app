@@ -658,6 +658,18 @@
         "stat_reviews": "Reviews",
         "stat_following": "Following",
         "edit_profile": "Edit profile",
+        "edit_profile_photo_hint": "Tap to change photo · max 2 MB",
+        "edit_profile_photo_size_error": "Image must be under 2 MB. Try another photo.",
+        "edit_profile_photo_type_error": "Please choose an image file.",
+        "edit_profile_name": "Full name",
+        "edit_profile_name_placeholder": "Your full name",
+        "edit_profile_name_error": "Please enter your name",
+        "edit_profile_phone": "Phone number",
+        "edit_profile_phone_placeholder": "903 059 993",
+        "edit_profile_phone_hint": "Sellers and riders use this to reach you",
+        "edit_profile_phone_error": "Enter a 9-digit phone number",
+        "edit_profile_save": "Save changes",
+        "edit_profile_saved": "Profile updated",
         "saved_addresses": "Saved addresses",
         "saved_count": "{count} saved",
         "default_payment": "Default payment",
@@ -743,6 +755,12 @@
         "terms_delivery_body": "Delivery fees are estimated at checkout and confirmed by the seller. Pre-order dishes are delivered on the date shown.",
         "terms_refunds_title": "Refunds and disputes",
         "terms_refunds_body": "If something is wrong with your order, contact us within 48 hours of delivery so we can help.",
-        "terms_placeholder_note": "Placeholder copy. Replace with the approved legal text. Privacy policy, Shipping policy, Payment methods and About SariKo use this same page layout."
+        "terms_placeholder_note": "Placeholder copy. Replace with the approved legal text. Privacy policy, Shipping policy, Payment methods and About SariKo use this same page layout.",
+        "address_saved": "Address saved",
+        "phone_country_unsupported": "Only Vietnamese numbers (+84) are supported for now",
+        "country_code_title": "Country code",
+        "country_code_search": "Search country or code",
+        "country_code_empty": "No matching country",
+        "country_code_close": "Close"
     }
 }

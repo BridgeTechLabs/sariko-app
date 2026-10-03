@@ -3,6 +3,8 @@ import apiUsers from '@/apis/users/apiUsers'
 import apiUserAddresses from '@/apis/users/apiUserAddresses'
 import apiAuth from '@/apis/auth/apiAuth'
 import { i18n } from '@/plugins/i18n'
+import { useAuthStore } from '@/stores/auth/authStore'
+import { fileToBase64 } from '@/utils/fileToBase64'
 
 // Address form keeps phone as E.164 (+84 + 9 digits). Accepts local "0903…", "84903…" or "+84903…" input
 // and strips spaces/leading zeros so the field only ever holds the 9-digit national part.
@@ -13,7 +15,21 @@ export const toPhoneE164VN = (value) => {
     return digits ? `+84${digits}` : ''
 }
 
+// The country picker lists every country, but backend (to_e164_vn) + Lalamove only accept VN numbers for now
+export const PHONE_SUPPORTED_COUNTRY = 'VN'
+
+const isPhoneValidVN = (country, phone) => country === PHONE_SUPPORTED_COUNTRY && /^\+84\d{9}$/.test(phone)
+
 const PASSWORD_MIN_LENGTH = 6
+
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024
+
+const emptyProfileForm = () => ({
+    name: '',
+    phone: '',
+    phoneCountry: PHONE_SUPPORTED_COUNTRY,
+    avatarUrl: '',
+})
 
 const emptyPasswordForm = () => ({
     newPassword: '',
@@ -28,6 +44,7 @@ const emptyAddressForm = () => ({
     building: '',
     receiverName: '',
     phone: '',
+    phoneCountry: PHONE_SUPPORTED_COUNTRY,
     note: '',
     isDefault: false,
 })
@@ -69,6 +86,7 @@ export const useAccountV2Store = defineStore('accountV2Store', {
             name: '',
             phone: '',
             district: '',
+            avatarUrl: '',
         },
         stats: {
             orders: 12,
@@ -96,6 +114,15 @@ export const useAccountV2Store = defineStore('accountV2Store', {
         // Set when a filled field loses focus — its error then shows live
         passwordNewTouched: false,
         passwordConfirmTouched: false,
+        // Edit profile form draft — name/phone errors show after Save (phone also on blur once filled)
+        profileForm: emptyProfileForm(),
+        profileFormSubmitted: false,
+        profilePhoneTouched: false,
+        // Local object URL shown while the picked photo uploads
+        avatarPreview: null,
+        avatarUploading: false,
+        // i18n key of the photo error (too big / not an image), replaces the "Tap to change photo" hint
+        avatarErrorKey: null,
     }),
 
     getters: {
@@ -110,7 +137,7 @@ export const useAccountV2Store = defineStore('accountV2Store', {
 
         isEditingAddress: (state) => state.editingAddressId !== null,
 
-        isAddressPhoneValid: (state) => /^\+84\d{9}$/.test(state.addressForm.phone),
+        isAddressPhoneValid: (state) => isPhoneValidVN(state.addressForm.phoneCountry, state.addressForm.phone),
 
         isAddressReceiverValid: (state) => state.addressForm.receiverName.trim() !== '',
 
@@ -137,6 +164,23 @@ export const useAccountV2Store = defineStore('accountV2Store', {
                 && this.isPasswordConfirmValid
         },
 
+        isProfileNameValid: (state) => state.profileForm.name.trim() !== '',
+
+        isProfilePhoneValid: (state) => isPhoneValidVN(state.profileForm.phoneCountry, state.profileForm.phone),
+
+        // Gates the Save button — nothing changed means nothing to save
+        isProfileFormDirty: (state) => {
+            const form = state.profileForm
+            return form.name.trim() !== state.profile.name
+                || form.phone !== toPhoneE164VN(state.profile.phone)
+                || form.phoneCountry !== PHONE_SUPPORTED_COUNTRY
+                || form.avatarUrl !== state.profile.avatarUrl
+        },
+
+        isProfileFormValid() {
+            return this.isProfileNameValid && this.isProfilePhoneValid
+        },
+
         isAddressFormValid() {
             return this.isAddressFormReady
                 && this.isAddressReceiverValid
@@ -157,6 +201,7 @@ export const useAccountV2Store = defineStore('accountV2Store', {
                     name: user.name || '',
                     phone: user.phone || '',
                     district: '',
+                    avatarUrl: user.avatar_url || '',
                 }
                 this.selectedLanguage = toLanguageId(user.preferred_language)
                 this.addresses = (addressRes?.addresses || []).map(toAddressV2)
@@ -206,6 +251,7 @@ export const useAccountV2Store = defineStore('accountV2Store', {
                 building: address.building || '',
                 receiverName: address.receiverName,
                 phone: toPhoneE164VN(address.phone),
+                phoneCountry: PHONE_SUPPORTED_COUNTRY,
                 note: address.note || '',
                 isDefault: address.isDefault,
             }
@@ -233,6 +279,74 @@ export const useAccountV2Store = defineStore('accountV2Store', {
             }
             // PATCH rejects is_default=false on the current default (400) — only send it when setting a new default
             await apiUserAddresses.update(this.editingAddressId, form.isDefault ? { ...data, is_default: true } : data)
+        },
+
+        // Fetches the profile first when opened directly (store not loaded yet)
+        async initEditProfileForm() {
+            this.profileForm = emptyProfileForm()
+            this.profileFormSubmitted = false
+            this.profilePhoneTouched = false
+            this.avatarPreview = null
+            this.avatarUploading = false
+            this.avatarErrorKey = null
+
+            if (!this.profile.name) await this.fetchAccount()
+            this.profileForm = {
+                name: this.profile.name,
+                phone: toPhoneE164VN(this.profile.phone),
+                phoneCountry: PHONE_SUPPORTED_COUNTRY,
+                avatarUrl: this.profile.avatarUrl,
+            }
+        },
+
+        // Uploads right away (POST /users/me/avatar); the returned URL is only saved to the profile on Save.
+        // Throws on upload failure so the caller can show a toast.
+        async uploadProfileAvatar(file) {
+            this.avatarErrorKey = null
+            if (!file.type.startsWith('image/')) {
+                this.avatarErrorKey = 'account_v2.edit_profile_photo_type_error'
+                return
+            }
+            if (file.size > AVATAR_MAX_BYTES) {
+                this.avatarErrorKey = 'account_v2.edit_profile_photo_size_error'
+                return
+            }
+
+            this.avatarPreview = URL.createObjectURL(file)
+            this.avatarUploading = true
+            try {
+                const res = await apiUsers.uploadAvatar(await fileToBase64(file), file.type)
+                this.profileForm.avatarUrl = res.avatar_url
+            } catch (error) {
+                this.avatarPreview = null
+                throw error
+            } finally {
+                this.avatarUploading = false
+            }
+        },
+
+        // PATCH /users/me/profile, then mirror the change into this store and authStore.user (v1 screens read it)
+        async saveProfileForm() {
+            const form = this.profileForm
+            const res = await apiUsers.updateProfile({
+                name: form.name.trim(),
+                phone: form.phone,
+                avatar_url: form.avatarUrl || null,
+            })
+            const user = res?.user || {}
+            this.profile = {
+                ...this.profile,
+                name: user.name ?? form.name.trim(),
+                phone: user.phone ?? form.phone,
+                avatarUrl: form.avatarUrl,
+            }
+
+            const authStore = useAuthStore()
+            if (authStore.user) {
+                authStore.user.fullName = this.profile.name
+                authStore.user.phone = this.profile.phone
+                authStore.user.avatarUrl = this.profile.avatarUrl || null
+            }
         },
 
         initPasswordForm() {

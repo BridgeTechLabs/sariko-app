@@ -13,31 +13,31 @@ export default {
     },
 
     computed: {
-        ...mapState(useAccountV2Store, ['isEditingAddress', 'isAddressFormReady', 'isAddressFormValid']),
+        ...mapState(useAccountV2Store, ['isProfileFormDirty', 'isProfileFormValid', 'avatarUploading']),
     },
 
     methods: {
-        ...mapActions(useAccountV2Store, ['saveAddressForm']),
+        ...mapActions(useAccountV2Store, ['saveProfileForm']),
 
         async onClickedSave() {
             if (this.saving) return
-            // Reveals receiver/phone errors in AddressForm
-            useAccountV2Store().addressFormSubmitted = true
-            if (!this.isAddressFormValid) return
+            // Reveals name/phone errors in EditProfileForm
+            useAccountV2Store().profileFormSubmitted = true
+            if (!this.isProfileFormValid) return
 
             this.saving = true
             try {
-                await this.saveAddressForm()
+                await this.saveProfileForm()
                 this.$q.notify({
                     classes: 'notify-v2-success',
                     icon: 'fa-solid fa-check',
-                    message: this.$t('account_v2.address_saved'),
+                    message: this.$t('account_v2.edit_profile_saved'),
                     position: 'bottom',
                     timeout: 2000,
                 })
-                this.$router.push({ name: 'account-addresses-v2' })
+                this.$router.push({ name: 'account-v2' })
             } catch (error) {
-                console.error(`AddressFormSaveBar - onClickedSave - ${error}`)
+                console.error(`EditProfileSaveBar - onClickedSave - ${error}`)
                 this.$q.notify({
                     classes: 'quasar-notify-negative',
                     message: this.$t('common.toast_update_failed'),
@@ -56,21 +56,25 @@ export default {
     <div class="save-bar">
         <BaseButton
             class="save-btn"
-            :disabled="!isAddressFormReady || saving"
+            :disabled="!isProfileFormDirty || avatarUploading || saving"
             @click="onClickedSave"
         >
-            {{ isEditingAddress ? $t('account_v2.address_form_save_changes') : $t('account_v2.address_form_save') }}
+            {{ $t('account_v2.edit_profile_save') }}
         </BaseButton>
     </div>
 </template>
 
 <style scoped>
+/* Figma shadow/floating */
 .save-bar {
     position: sticky;
     bottom: 0;
     padding: var(--space-16) var(--space-24) max(var(--space-32), calc(env(safe-area-inset-bottom, 0px) + var(--space-16)));
     background: var(--card);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow:
+        0 2px 4px color-mix(in srgb, var(--brand-navy) 8%, transparent),
+        0 16px 40px -8px color-mix(in srgb, var(--brand-navy) 16%, transparent);
 }
 
 .save-btn {

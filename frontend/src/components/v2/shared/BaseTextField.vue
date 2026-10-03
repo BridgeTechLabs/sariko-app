@@ -3,7 +3,8 @@ import BaseIcon from '@/components/v2/shared/BaseIcon.vue';
 
 // Labeled text input, use with v-model. Extra attrs (type, inputmode, autocomplete, @blur...)
 // go to the <input>/<textarea>. A non-empty `error` switches to the error state and replaces `hint`.
-// `size` lg = taller field with body text (Edit profile / Change password); `trailing` slot sits after the input.
+// `size` lg = taller field with body text (Edit profile / Change password); `trailing` slot sits after the input,
+// `leading` slot before it (e.g. BaseCountryCodeSelect in place of a fixed `prefix`).
 export default {
     components: { BaseIcon },
 
@@ -74,6 +75,7 @@ export default {
         <span class="input" :class="{ error: !!error, multiline }">
             <BaseIcon v-if="icon" class="input-icon" :name="icon" :size="20" />
             <span v-if="prefix" class="prefix">{{ prefix }}</span>
+            <slot name="leading" />
             <textarea
                 v-if="multiline"
                 v-bind="$attrs"
