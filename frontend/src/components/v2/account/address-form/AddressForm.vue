@@ -6,8 +6,13 @@ import BaseTextField from '@/components/v2/shared/BaseTextField.vue';
 import BaseSwitch from '@/components/v2/shared/BaseSwitch.vue';
 import BaseIcon from '@/components/v2/shared/BaseIcon.vue';
 import apiAddress from '@/apis/address/apiAddress';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const LABELS = ['home', 'work', 'other']
+const LABEL_ICONS = { home: 'home', work: 'store', other: 'map-pin' }
+// HCMC — same bias the backend uses for Goong autocomplete
+const DEFAULT_CENTER = [10.7769, 106.7009]
 
 export default {
     components: { BaseChip, BaseTextField, BaseSwitch, BaseIcon },
@@ -21,6 +26,9 @@ export default {
             streetQuery: '',
             suggestions: [],
             debounceTimer: null,
+            isLocating: false,
+            // Drops stale reverse-geocode responses when the pin moved again
+            reverseSeq: 0,
         }
     },
 
@@ -29,6 +37,10 @@ export default {
 
         showReceiverError() {
             return (this.receiverTouched || this.addressFormSubmitted) && !this.isAddressReceiverValid
+        },
+
+        pinIcon() {
+            return LABEL_ICONS[this.addressForm.label] || 'home'
         },
 
         showPhoneError() {
@@ -52,10 +64,21 @@ export default {
             handler: 'initFromRoute',
             immediate: true,
         },
+
+        // Map is hidden (v-show) while suggestions are listed — Leaflet must re-measure once it shows again
+        'suggestions.length'(count) {
+            if (!count) this.$nextTick(() => this.map?.invalidateSize())
+        },
+    },
+
+    mounted() {
+        this.initMap()
     },
 
     beforeUnmount() {
         clearTimeout(this.debounceTimer)
+        this.map?.remove()
+        this.map = null
     },
 
     methods: {
@@ -80,6 +103,80 @@ export default {
                 return
             }
             this.streetQuery = this.addressForm.street
+            this.centerMap()
+        },
+
+        // Pin stays fixed at the map center — the user drags the map underneath it.
+        // Zoom is locked to the center so only a drag moves the pin.
+        initMap() {
+            const { lat, lon } = this.addressForm
+            const hasCoords = lat != null && lon != null
+            this.map = L.map(this.$refs.mapContainer, {
+                center: hasCoords ? [lat, lon] : DEFAULT_CENTER,
+                zoom: hasCoords ? 16 : 13,
+                zoomControl: false,
+                attributionControl: false,
+                doubleClickZoom: false,
+                scrollWheelZoom: 'center',
+                touchZoom: 'center',
+            })
+            const tiles = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark_all' : 'light_all'
+            L.tileLayer(`https://{s}.basemaps.cartocdn.com/${tiles}/{z}/{x}/{y}{r}.png`, {
+                maxZoom: 19,
+                subdomains: 'abcd',
+            }).addTo(this.map)
+            this.map.on('dragend', this.onMapDragEnd)
+        },
+
+        centerMap() {
+            const { lat, lon } = this.addressForm
+            if (!this.map || lat == null || lon == null) return
+            this.map.setView([lat, lon], 16)
+        },
+
+        onMapDragEnd() {
+            const { lat, lng } = this.map.getCenter()
+            this.setPinLocation(lat, lng)
+        },
+
+        // Moves the address to a raw coordinate and fills the street from reverse geocoding
+        async setPinLocation(lat, lon) {
+            this.addressForm.lat = lat
+            this.addressForm.lon = lon
+            this.addressForm.street = ''
+            const seq = ++this.reverseSeq
+            try {
+                const res = await apiAddress.reverse(lat, lon)
+                if (seq !== this.reverseSeq || !res?.success || !res.address) return
+                this.addressForm.street = res.address
+                this.streetQuery = res.address
+            } catch (error) {
+                console.error(`AddressForm - setPinLocation - ${error}`)
+            }
+        },
+
+        onClickedUseLocation() {
+            if (!navigator.geolocation || this.isLocating) return
+            this.isLocating = true
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    const { latitude, longitude } = pos.coords
+                    this.map?.setView([latitude, longitude], 16)
+                    await this.setPinLocation(latitude, longitude)
+                    this.isLocating = false
+                },
+                (error) => {
+                    console.error(`AddressForm - onClickedUseLocation - ${error.message}`)
+                    this.isLocating = false
+                    this.$q.notify({
+                        classes: 'quasar-notify-negative',
+                        message: this.$t('account_v2.address_form_locate_error'),
+                        position: 'bottom',
+                        timeout: 2000,
+                    })
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            )
         },
 
         // Typing invalidates the picked address until a new suggestion is chosen
@@ -88,6 +185,7 @@ export default {
             this.addressForm.street = ''
             this.addressForm.lat = null
             this.addressForm.lon = null
+            this.reverseSeq++
 
             clearTimeout(this.debounceTimer)
             if (value.trim().length < 3) {
@@ -111,6 +209,7 @@ export default {
         async onClickedSuggestion(item) {
             this.streetQuery = item.label
             this.suggestions = []
+            this.reverseSeq++
             try {
                 const res = await apiAddress.getDetail(item.place_id)
                 if (!res?.success) return
@@ -118,6 +217,7 @@ export default {
                 this.addressForm.lat = res.lat
                 this.addressForm.lon = res.lon
                 this.streetQuery = this.addressForm.street
+                this.centerMap()
             } catch (error) {
                 console.error(`AddressForm - onClickedSuggestion - ${error}`)
             }
@@ -166,6 +266,29 @@ export default {
                         <span class="suggestion-main">{{ item.main_text || item.label }}</span>
                         <span v-if="item.secondary_text" class="suggestion-sub">{{ item.secondary_text }}</span>
                     </span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Hidden (not destroyed) while suggestions are listed so the Leaflet instance survives -->
+        <div v-show="!suggestions.length" class="field">
+            <button class="use-location" type="button" :disabled="isLocating" @click="onClickedUseLocation">
+                <BaseIcon name="map-pin" :size="20" />
+                <span>{{ isLocating ? $t('account_v2.address_form_locating') : $t('account_v2.address_form_use_location') }}</span>
+            </button>
+            <div class="map">
+                <div ref="mapContainer" class="map-canvas"></div>
+                <div class="pin">
+                    <BaseIcon :name="pinIcon" :size="20" />
+                </div>
+                <button
+                    class="locate-btn"
+                    type="button"
+                    :disabled="isLocating"
+                    :aria-label="$t('account_v2.address_form_use_location')"
+                    @click="onClickedUseLocation"
+                >
+                    <BaseIcon name="map-pin" :size="20" />
                 </button>
             </div>
         </div>
@@ -295,6 +418,83 @@ p {
     font-size: var(--font-size-xs);
     line-height: var(--font-line-height-16);
     color: var(--text-secondary);
+}
+
+.use-location {
+    align-self: flex-start;
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--icon-default);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    line-height: var(--font-line-height-24);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+}
+
+.use-location span {
+    color: var(--text-link);
+}
+
+.use-location:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/* isolation keeps Leaflet's z-indexed panes below the sticky save bar */
+.map {
+    position: relative;
+    isolation: isolate;
+    height: 200px;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    background: var(--secondary);
+}
+
+.map-canvas {
+    width: 100%;
+    height: 100%;
+    background: var(--secondary);
+}
+
+.pin {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 1000;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--card);
+    border-radius: var(--radius-full);
+    background: var(--primary);
+    color: var(--primary-foreground);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.locate-btn {
+    position: absolute;
+    right: var(--space-16);
+    bottom: var(--space-16);
+    z-index: 1000;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-full);
+    background: var(--card);
+    color: var(--icon-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
 }
 
 .default-row {

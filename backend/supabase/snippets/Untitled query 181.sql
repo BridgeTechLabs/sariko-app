@@ -1,0 +1,1 @@
+select * from public.user_addresses;

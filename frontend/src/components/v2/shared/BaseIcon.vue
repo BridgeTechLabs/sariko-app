@@ -5,7 +5,7 @@ import {
     MessageCircle, Minus, Info, Utensils, Package, Check, CreditCard, Banknote, Calendar, Phone,
     Truck, X, RefreshCw, Trash2, Lock, Camera, CircleHelp, Send, Globe, Moon, LogOut, Pencil,
     Shield, Cake, Snowflake, Plane, Sparkles, Shirt, Baby, Leaf, Lamp, Copy, TriangleAlert,
-    Volume2, Eye,
+    Volume2, Eye, EyeOff,
 } from 'lucide-vue-next';
 
 // Figma "🎨 System / Icons" → lucide. Keys are the Figma names without the "icon/" prefix.
@@ -65,6 +65,7 @@ const ICONS = {
     'alert-triangle': TriangleAlert,
     'volume': Volume2,
     'eye': Eye,
+    'eye-off': EyeOff,
 }
 
 // Color comes from `color` (currentColor) of the parent
