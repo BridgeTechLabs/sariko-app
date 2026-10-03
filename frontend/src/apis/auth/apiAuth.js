@@ -33,7 +33,13 @@ export const apiAuth = {
         const { data, error } = await supabase.auth.signOut()
         if (error) throw error
         return data
-    } 
+    },
+
+    authUpdatePassword: async(password) => {
+        const { data, error } = await supabase.auth.updateUser({ password })
+        if (error) throw error
+        return data
+    }
 }
 
 export default apiAuth;

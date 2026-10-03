@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import apiUsers from '@/apis/users/apiUsers'
+import apiUserAddresses from '@/apis/users/apiUserAddresses'
+import apiAuth from '@/apis/auth/apiAuth'
 import { i18n } from '@/plugins/i18n'
 
 // Address form keeps phone as E.164 (+84 + 9 digits). Accepts local "0903…", "84903…" or "+84903…" input
@@ -10,6 +12,13 @@ export const toPhoneE164VN = (value) => {
     digits = digits.replace(/^0+/, '')
     return digits ? `+84${digits}` : ''
 }
+
+const PASSWORD_MIN_LENGTH = 6
+
+const emptyPasswordForm = () => ({
+    newPassword: '',
+    confirmPassword: '',
+})
 
 const emptyAddressForm = () => ({
     label: null,
@@ -23,19 +32,19 @@ const emptyAddressForm = () => ({
     isDefault: false,
 })
 
-// Backend stores address_details in `label` ("Home" when empty) — map it onto the v2 label set
-const toAddressV2 = (address, profile) => {
-    const raw = (address.label || '').trim()
-    const label = ['home', 'work'].includes(raw.toLowerCase()) ? raw.toLowerCase() : 'other'
+// `label` stores home/work/other; legacy rows (v1 put address_details there, "Home" when empty) fall back to 'other'
+const toAddressV2 = (address) => {
+    const raw = (address.label || '').trim().toLowerCase()
     return {
         id: address.id,
-        label,
-        receiverName: profile.name,
-        phone: profile.phone,
+        label: ['home', 'work', 'other'].includes(raw) ? raw : 'other',
+        receiverName: address.receiver_name,
+        phone: address.phone_number,
         address: address.address,
         lat: address.lat,
         lon: address.lon,
-        building: label === 'other' ? raw : '',
+        building: address.street_name || '',
+        note: address.note || '',
         isDefault: address.is_default,
     }
 }
@@ -81,6 +90,12 @@ export const useAccountV2Store = defineStore('accountV2Store', {
         addressForm: emptyAddressForm(),
         // Set when Save is pressed — shows every field error, not only the touched ones
         addressFormSubmitted: false,
+        // Change password form draft — errors only show after Update is pressed
+        passwordForm: emptyPasswordForm(),
+        passwordFormSubmitted: false,
+        // Set when a filled field loses focus — its error then shows live
+        passwordNewTouched: false,
+        passwordConfirmTouched: false,
     }),
 
     getters: {
@@ -108,6 +123,20 @@ export const useAccountV2Store = defineStore('accountV2Store', {
                 && form.lon != null
         },
 
+        isPasswordLengthValid: (state) => state.passwordForm.newPassword.length >= PASSWORD_MIN_LENGTH,
+
+        isPasswordConfirmValid: (state) => state.passwordForm.confirmPassword === state.passwordForm.newPassword,
+
+        // Gates the Update button — length/mismatch errors are shown on Update instead of disabling it
+        isPasswordFormReady: (state) => state.passwordForm.newPassword !== ''
+            && state.passwordForm.confirmPassword !== '',
+
+        isPasswordFormValid() {
+            return this.isPasswordFormReady
+                && this.isPasswordLengthValid
+                && this.isPasswordConfirmValid
+        },
+
         isAddressFormValid() {
             return this.isAddressFormReady
                 && this.isAddressReceiverValid
@@ -116,12 +145,12 @@ export const useAccountV2Store = defineStore('accountV2Store', {
     },
 
     actions: {
-        // Backend only exposes the default address (GET /users/me/address), so the list has at most one item
+        // Addresses come from GET /user_addresses (default first, then newest)
         async fetchAccount() {
             try {
                 const [profileRes, addressRes] = await Promise.all([
                     apiUsers.getProfile(),
-                    apiUsers.getDefaultAddress(),
+                    apiUserAddresses.list(),
                 ])
                 const user = profileRes?.user || {}
                 this.profile = {
@@ -130,7 +159,7 @@ export const useAccountV2Store = defineStore('accountV2Store', {
                     district: '',
                 }
                 this.selectedLanguage = toLanguageId(user.preferred_language)
-                this.addresses = addressRes?.address ? [toAddressV2(addressRes.address, this.profile)] : []
+                this.addresses = (addressRes?.addresses || []).map(toAddressV2)
             } catch (error) {
                 console.error(`accountV2Store - fetchAccount - ${error}`)
             }
@@ -183,16 +212,40 @@ export const useAccountV2Store = defineStore('accountV2Store', {
             return true
         },
 
-        // Backend keeps a single default address (PATCH /users/me/profile upserts it) — same payload as v1 AddressForm.
-        // receiverName / phone / note / label / isDefault have no column yet, so they are not sent.
+        // POST /user_addresses for a new address, PATCH /user_addresses/{id} when editing.
+        // Backend makes the first address default and clears the old default when another is set.
         async saveAddressForm() {
             const form = this.addressForm
-            await apiUsers.updateProfile({
+            const data = {
+                label: form.label,
                 address: form.street.trim(),
-                address_details: form.building.trim() || null,
+                street_name: form.building.trim() || null,
                 lat: form.lat,
                 lon: form.lon,
-            })
+                receiver_name: form.receiverName.trim(),
+                phone_number: form.phone,
+                note: form.note.trim() || null,
+            }
+
+            if (this.editingAddressId === null) {
+                await apiUserAddresses.create({ ...data, is_default: form.isDefault })
+                return
+            }
+            // PATCH rejects is_default=false on the current default (400) — only send it when setting a new default
+            await apiUserAddresses.update(this.editingAddressId, form.isDefault ? { ...data, is_default: true } : data)
+        },
+
+        initPasswordForm() {
+            this.passwordForm = emptyPasswordForm()
+            this.passwordFormSubmitted = false
+            this.passwordNewTouched = false
+            this.passwordConfirmTouched = false
+        },
+
+        // Supabase auth updateUser — the session stays valid, so the form is just reset
+        async changePassword() {
+            await apiAuth.authUpdatePassword(this.passwordForm.newPassword)
+            this.initPasswordForm()
         },
     },
 })
