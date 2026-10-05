@@ -37,12 +37,17 @@ export default {
     <div class="header-wrap">
         <div class="header">
             <div class="profile">
-                <BaseAvatar :initials="initials" :size="64" />
+                <BaseAvatar :src="profile.avatarUrl || null" :initials="initials" :size="64" />
                 <div class="info">
                     <p class="name">{{ profile.name }}</p>
                     <p class="meta">{{ metaText }}</p>
                 </div>
-                <BaseIconButton icon="pencil" surface="photo" :label="$t('account_v2.edit_profile')" />
+                <BaseIconButton
+                    icon="pencil"
+                    surface="photo"
+                    :label="$t('account_v2.edit_profile')"
+                    @click="$router.push({ name: 'account-edit-profile-v2' })"
+                />
             </div>
         </div>
 
