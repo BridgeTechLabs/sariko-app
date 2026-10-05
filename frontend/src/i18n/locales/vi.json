@@ -108,6 +108,11 @@
             "pill_title": "Massage tại nhà",
             "pill_cta": "Đặt ngay →",
             "dismiss_aria": "Đóng quảng cáo Zen"
+        },
+        "section_footer": {
+            "label_tax_code": "MST",
+            "label_address": "Địa chỉ",
+            "label_email": "Email"
         }
     },
     "seller_page": {

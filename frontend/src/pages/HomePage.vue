@@ -8,6 +8,7 @@ import FeaturedDishes from '@/components/home-page/FeaturedDishes.vue';
 import Banner from '@/components/home-page/Banner.vue'
 import ZenPromoBanner from '@/components/home-page/ZenPromoBanner.vue'
 import ZenPromoFloating from '@/components/home-page/ZenPromoFloating.vue'
+import HomeFooter from '@/components/home-page/HomeFooter.vue'
 
 const ZEN_AD_VARIANT = import.meta.env.VITE_ZEN_AD_VARIANT || 'banner'
 
@@ -22,7 +23,8 @@ export default {
         FeaturedDishes,
         Banner,
         ZenPromoBanner,
-        ZenPromoFloating
+        ZenPromoFloating,
+        HomeFooter
     },
     computed: {
         showZenBanner() {
@@ -66,6 +68,10 @@ export default {
 
         <template #Banner>
             <Banner />
+        </template>
+
+        <template #Footer>
+            <HomeFooter />
         </template>
 
     </LayoutBaseHomePage>
