@@ -52,9 +52,6 @@ export default {
                 <ChevronRight size="16" class="menu-arrow" />
             </a>
         </div>
-        <a href="https://online.gov.vn/nen-tang/1929fbb4-3ace-4ebf-920e-1520195f0f37" target="_blank" rel="noopener" title="Đã xác nhận với Bộ Công Thương" class="moit-badge">
-            <img src="https://fileserver.online.gov.vn/uploads/Resources/iconxacnhan/DaThongBao.png" alt="Đã xác nhận" />
-        </a>
         <div class="app-version">{{ $t('account_page.app_version') }}</div>
     </div>
 </template>
@@ -115,17 +112,6 @@ export default {
 
 .menu-arrow {
     color: var(--text-muted);
-}
-
-.moit-badge {
-    display: block;
-    width: fit-content;
-    margin: 16px auto 0;
-}
-
-.moit-badge img {
-    height: 44px;
-    display: block;
 }
 
 .app-version {

@@ -46,6 +46,10 @@ export default {
                 <slot name="Banner" />
             </div>
 
+            <div class="footer-section">
+                <slot name="Footer" />
+            </div>
+
         </div>
     </div>
 </template>
@@ -87,6 +91,10 @@ export default {
 
 .featured-dishes-section {
     margin-bottom: 32px;
+}
+
+.footer-section {
+    margin-top: 24px;
 }
 
 </style>
