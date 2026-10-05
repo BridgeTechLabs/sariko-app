@@ -108,6 +108,11 @@
             "pill_title": "Massage at home",
             "pill_cta": "Book now →",
             "dismiss_aria": "Dismiss Zen promotion"
+        },
+        "section_footer": {
+            "label_tax_code": "Tax code",
+            "label_address": "Address",
+            "label_email": "Email"
         }
     },
     "seller_page": {
