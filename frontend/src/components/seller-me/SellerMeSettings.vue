@@ -1,10 +1,25 @@
 <script>
-import { User, MapPin, Globe, FileText, Shield, Lock, ChevronRight } from 'lucide-vue-next';
+import { mapState, mapActions } from 'pinia';
+import { User, MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight } from 'lucide-vue-next';
+import { useAccountV2Store } from '@/stores/v2/account/accountStore';
+import BaseSwitch from '@/components/v2/shared/BaseSwitch.vue';
 
 export default {
     name: 'SellerMeSettings',
 
-    components: { User, MapPin, Globe, FileText, Shield, Lock, ChevronRight },
+    components: { User, MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, BaseSwitch },
+
+    computed: {
+        ...mapState(useAccountV2Store, ['notifications']),
+    },
+
+    methods: {
+        ...mapActions(useAccountV2Store, ['togglePush', 'syncPushState']),
+    },
+
+    mounted() {
+        this.syncPushState()
+    },
 }
 </script>
 
@@ -12,6 +27,13 @@ export default {
     <div>
         <div class="section-title">{{ $t('seller_me.section_title_settings') }}</div>
         <div class="menu-group">
+
+            <div class="menu-item" @click="togglePush">
+                <div class="menu-icon"><Bell size="18" /></div>
+                <span class="menu-label">{{ $t('seller_me.menu_label_new_order_alerts') }}</span>
+                <!-- No v-model: the click bubbles up to the row, which toggles -->
+                <BaseSwitch :model-value="notifications.orderUpdates" :label="$t('seller_me.menu_label_new_order_alerts')" />
+            </div>
 
             <router-link to="/account/profile" class="menu-item">
                 <div class="menu-icon"><User size="18" /></div>

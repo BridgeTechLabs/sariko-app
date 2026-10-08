@@ -19,8 +19,12 @@ export default {
     },
 
     methods: {
-        ...mapActions(useAccountV2Store, ['toggleNotification']),
+        ...mapActions(useAccountV2Store, ['toggleNotification', 'syncPushState']),
         ...mapActions(useThemeStore, ['toggleTheme']),
+    },
+
+    mounted() {
+        this.syncPushState()
     },
 }
 </script>

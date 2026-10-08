@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
+import { Notify } from 'quasar'
 import apiUsers from '@/apis/users/apiUsers'
 import { i18n } from '@/plugins/i18n'
+import { enablePush, disablePush, getPushSubscription } from '@/composables/pushNotifications'
 
 // Address form keeps phone as E.164 (+84 + 9 digits). Accepts local "0903…", "84903…" or "+84903…" input
 // and strips spaces/leading zeros so the field only ever holds the 9-digit national part.
@@ -70,7 +72,8 @@ export const useAccountV2Store = defineStore('accountV2Store', {
         deliveryFeeEstimate: 12000,
         defaultPayment: 'VNPay',
         notifications: {
-            orderUpdates: true,
+            // Mirrors this device's push subscription — set by syncPushState(), not a saved preference
+            orderUpdates: false,
             sellerNews: false,
         },
         foundingSlotsLeft: 7,
@@ -153,8 +156,35 @@ export const useAccountV2Store = defineStore('accountV2Store', {
             }
         },
 
-        toggleNotification(key) {
+        async toggleNotification(key) {
+            if (key === 'orderUpdates') return this.togglePush()
             this.notifications[key] = !this.notifications[key]
+        },
+
+        async syncPushState() {
+            this.notifications.orderUpdates = !!(await getPushSubscription())
+        },
+
+        async togglePush() {
+            try {
+                if (this.notifications.orderUpdates) {
+                    await disablePush()
+                    this.notifications.orderUpdates = false
+                    return
+                }
+                const result = await enablePush()
+                this.notifications.orderUpdates = result === 'enabled'
+                if (result !== 'enabled') {
+                    Notify.create({
+                        classes: 'quasar-notify-negative',
+                        message: i18n.global.t(`account_v2.push_${result}`),
+                        progress: true,
+                        position: 'bottom',
+                    })
+                }
+            } catch (error) {
+                console.warn(`accountV2Store - togglePush - ${error}`)
+            }
         },
 
         // Returns false when the id doesn't match a saved address

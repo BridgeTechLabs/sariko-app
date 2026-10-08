@@ -19,6 +19,7 @@ from schemas.request_set_pinned import RequestSetPinned
 
 # User Profile API
 from schemas.request_update_profile import RequestUpdateProfile
+from schemas.request_create_push_subscription import RequestCreatePushSubscription
 
 # Order API
 from schemas.request_create_order import RequestCreateOrder
@@ -57,6 +58,7 @@ class Schema:
     RequestSetPinned = RequestSetPinned
 
     RequestUpdateProfile = RequestUpdateProfile
+    RequestCreatePushSubscription = RequestCreatePushSubscription
 
     RequestCreateOrder = RequestCreateOrder
 

@@ -15,6 +15,7 @@ from dao.dao_orders import DAOOrders
 from dao.dao_order_items import DAOOrderItems
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
+from services import push_service
 from utils.pricing import cart_item_unit_price
 
 router = APIRouter(prefix="/orders")
@@ -175,7 +176,9 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
         if (appt - now).total_seconds() < 86400:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể hủy đơn trong vòng 24 giờ trước giờ hẹn")
 
-    dao_orders.update_order_status(order_id=order_id, status="cancelled")
+    updated = dao_orders.update_order_status(order_id=order_id, status="cancelled")
+    if updated:
+        push_service.notify_buyer_cancelled(updated)
 
     if order.get("payment_status") == "paid":
         from dao.dao_refunds import DAORefunds
