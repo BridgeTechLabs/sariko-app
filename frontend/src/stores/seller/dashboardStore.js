@@ -233,10 +233,6 @@ export const useDashboardStore = defineStore("dashboardStore", {
             }
         },
 
-        setDeliveryStatus(orderId, statusObj) {
-            this.deliveryStatuses = { ...this.deliveryStatuses, [orderId]: statusObj }
-        },
-
         updateOrderLocally(orderId, newStatus) {
             const order = this.orders.find(o => o.id === orderId)
             if (order) order.status = newStatus

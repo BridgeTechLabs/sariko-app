@@ -1,0 +1,52 @@
+on:
+  push:
+    branches:
+      - main
+jobs:
+  test:
+    name: build-test-deploy
+    runs-on:
+      labels: ec2-sariko-app
+    environment:
+      name: production
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Build image (local only, not pushed)
+        run: docker build --platform linux/amd64 -t sariko/sariko-backend:${GITHUB_SHA::7} backend
+
+      - name: Test inside that image
+        run: |
+          docker run --rm \
+            -v "$PWD/tests:/tests:ro" \
+            -e PYTHONPATH=/www \
+            -w /tests/backend \
+            sariko/sariko-backend:${GITHUB_SHA::7} \
+            pytest -v -p no:cacheprovider
+
+      - name: Push docker image
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd backend
+          ./docker_build_and_push.sh
+
+      - name: Deploy app
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          export IMAGE_TAG=${GITHUB_SHA::7}
+          cd ~/deploy
+          ./get_prev_image_tag.sh
+          docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_TOKEN
+          docker compose pull
+          docker compose up -d
+
+      - name: check readiness and rollback
+        run: |
+          cd ~/deploy
+          ./check_readiness_and_rollback.sh
