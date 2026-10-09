@@ -13,8 +13,6 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v4
 
-      # Build locally first, test that exact image, and only then push it —
-      # an image that fails tests never reaches Docker Hub or the server.
       - name: Build image (local only, not pushed)
         run: docker build --platform linux/amd64 -t sariko/sariko-backend:${GITHUB_SHA::7} backend
 
@@ -27,7 +25,6 @@ jobs:
             sariko/sariko-backend:${GITHUB_SHA::7} \
             pytest -v -p no:cacheprovider
 
-      # Rebuild is all cache hits → the same image that was just tested
       - name: Push docker image
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
