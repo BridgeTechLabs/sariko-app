@@ -25,6 +25,17 @@ jobs:
             sariko/sariko-backend:${GITHUB_SHA::7} \
             pytest -v -p no:cacheprovider
 
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply DB migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          cd backend
+          supabase db push --db-url "$SUPABASE_DB_URL" --include-all --yes
+
       - name: Push docker image
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
