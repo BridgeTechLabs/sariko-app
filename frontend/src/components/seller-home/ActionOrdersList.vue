@@ -2,7 +2,6 @@
 import { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin } from 'lucide-vue-next';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
-import apiDeliveries from '@/apis/deliveries/apiDeliveries';
 
 const STATUS_DISPLAY_KEY = {
     pending:          'seller_home.status_new',
@@ -174,17 +173,12 @@ export default {
             this.rebookErrors = { ...this.rebookErrors, [order.id]: null }
             this.rebookingOrders = { ...this.rebookingOrders, [order.id]: true }
             try {
-                await apiDeliveries.rebookDelivery(order.id)
-                const prev = useDashboardStore().deliveryStatuses[order.id]
-                useDashboardStore().setDeliveryStatus(order.id, {
-                    status: 'ASSIGNING_DRIVER',
-                    rebook_count: (prev?.rebook_count || 0) + 1,
-                })
+                await useDashboardStore().doRebookDelivery(order.id)
                 this.$q.notify({ classes: 'quasar-notify-positive', message: this.$t('seller_home.toast_rebook_success'), position: 'bottom', timeout: 1500 })
             } catch (e) {
                 console.error('ActionOrdersList - onRebook -', e)
                 const detail = e?.response?.data?.detail || ''
-                const errorType = detail.includes('rebook_count') ? 'max_attempts' : 'error'
+                const errorType = detail.includes('Max rebook') ? 'max_attempts' : 'error'
                 this.rebookErrors = { ...this.rebookErrors, [order.id]: errorType }
             } finally {
                 const { [order.id]: _, ...rest } = this.rebookingOrders

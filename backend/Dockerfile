@@ -15,6 +15,9 @@ FROM python:3.11-slim AS runtime
 WORKDIR /www
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+# Safe default: main.py treats a missing ENV as "local" and mounts the /dev router
+# (force-pay, force-status). The dev server overrides this with ENV=dev.
+ENV ENV=prd
 
 COPY src/ .
 

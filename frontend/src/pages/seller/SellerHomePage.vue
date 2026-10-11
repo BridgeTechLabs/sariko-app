@@ -24,7 +24,7 @@ export default {
             return useDashboardStore().orders.filter(o =>
                 o.status === 'pending' ||
                 o.status === 'confirmed' ||
-                (o.status === 'ready' && o.delivery_method === 'delivery')
+                o.status === 'delivery_failed'
             )
         },
 
