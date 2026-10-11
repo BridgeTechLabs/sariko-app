@@ -11,6 +11,7 @@ export default {
             orderId: '',
             loading: false,
             log: [],
+            orders: [],
         }
     },
 
@@ -27,7 +28,27 @@ export default {
             if (e.ctrlKey && e.shiftKey && e.key === 'Q') {
                 e.preventDefault()
                 this.show = !this.show
+                if (this.show) this.loadOrders()
             }
+        },
+
+        // Own buyer orders (incl. unpaid) + own shop's orders (paid only). _silent: a buyer gets 403/404 on the seller list.
+        async loadOrders() {
+            const [buyer, seller] = await Promise.allSettled([
+                apiClient.get('/v1/orders', { _silent: true }),
+                apiClient.get('/v1/sellers/me/orders', { _silent: true }),
+            ])
+            const all = [
+                ...(buyer.value?.data?.orders || []),
+                ...(seller.value?.data?.orders || []),
+            ]
+            const byId = new Map(all.map((o) => [o.id, o]))
+            this.orders = [...byId.values()].sort((a, b) => b.created_at.localeCompare(a.created_at))
+        },
+
+        orderLabel(o) {
+            const time = new Date(o.created_at).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+            return `#${o.id.slice(0, 8)} · ${o.status} · ${o.payment_status} · ${o.total_amount}₫ · ${time}`
         },
 
         addLog(msg, type = 'info') {
@@ -36,15 +57,16 @@ export default {
             if (this.log.length > 50) this.log.pop()
         },
 
-        async forcePaymentPaid() {
+        // action: 'force-pay' → paid, 'force-unpay' → pending
+        async forcePaymentPaid(action = 'force-pay') {
             if (!this.orderId.trim() || this.loading) return
             const id = this.orderId.trim()
             this.loading = true
-            this.addLog(`> force-pay ${id}`)
+            this.addLog(`> ${action} ${id}`)
             try {
-                const res = await apiClient.patch(`/v1/dev/orders/${id}/force-pay`)
+                const res = await apiClient.patch(`/v1/dev/orders/${id}/${action}`)
                 if (res.data?.success) {
-                    this.addLog(`✔ order ${id} → payment_status=paid`, 'success')
+                    this.addLog(`✔ order ${id} → payment_status=${action === 'force-pay' ? 'paid' : 'pending'}`, 'success')
                 } else {
                     this.addLog(`✘ ${JSON.stringify(res.data)}`, 'error')
                 }
@@ -53,6 +75,7 @@ export default {
                 this.addLog(`✘ ${detail}`, 'error')
             } finally {
                 this.loading = false
+                this.loadOrders()
             }
         },
 
@@ -73,6 +96,7 @@ export default {
                 this.addLog(`✘ ${detail}`, 'error')
             } finally {
                 this.loading = false
+                this.loadOrders()
             }
         },
 
@@ -95,6 +119,15 @@ export default {
                         <button class="close-btn" @click="close"><X :size="14" /></button>
                     </div>
 
+                    <!-- Order picker -->
+                    <div class="input-row picker-row">
+                        <select v-model="orderId" class="order-input">
+                            <option value="">{{ orders.length ? 'pick an order...' : 'no orders found' }}</option>
+                            <option v-for="o in orders" :key="o.id" :value="o.id">{{ orderLabel(o) }}</option>
+                        </select>
+                        <button class="action-btn" :disabled="loading" @click="loadOrders">↻</button>
+                    </div>
+
                     <!-- Order ID input -->
                     <div class="input-row">
                         <input
@@ -102,15 +135,16 @@ export default {
                             class="order-input"
                             placeholder="paste order_id..."
                             spellcheck="false"
-                            @keydown.enter="forcePaymentPaid"
+                            @keydown.enter="forcePaymentPaid()"
                         />
                     </div>
 
                     <!-- Quick actions -->
                     <div class="actions">
-                        <button class="action-btn pay" :disabled="loading" @click="forcePaymentPaid">
+                        <button class="action-btn pay" :disabled="loading" @click="forcePaymentPaid('force-pay')">
                             <Zap :size="12" /> force-pay
                         </button>
+                        <button class="action-btn" :disabled="loading" @click="forcePaymentPaid('force-unpay')">unpay</button>
                         <button class="action-btn" :disabled="loading" @click="forceOrderStatus('pending')">pending</button>
                         <button class="action-btn" :disabled="loading" @click="forceOrderStatus('confirmed')">confirmed</button>
                         <button class="action-btn" :disabled="loading" @click="forceOrderStatus('ready')">ready</button>
@@ -183,6 +217,11 @@ export default {
 
 .input-row {
     margin-bottom: 10px;
+}
+
+.picker-row {
+    display: flex;
+    gap: 6px;
 }
 
 .order-input {

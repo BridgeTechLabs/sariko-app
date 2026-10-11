@@ -22,6 +22,15 @@ def force_pay(order_id: str, user=Depends(verify_token)):
     return {"success": True}
 
 
+@router.patch("/orders/{order_id}/force-unpay")
+def force_unpay(order_id: str, user=Depends(verify_token)):
+    """Force-set payment_status back to 'pending' (unpaid)."""
+    dao_orders = DAOOrders()
+    dao_orders.update_payment_status(order_id, "pending")
+    logger.warning(f"[DEV] force-unpay order {order_id} by user {user['id']}")
+    return {"success": True}
+
+
 @router.patch("/orders/{order_id}/force-status")
 def force_status(order_id: str, body: dict, user=Depends(verify_token)):
     """Force-set order status to any value."""
