@@ -22,6 +22,11 @@ export const apiUsers = {
         return response.data
     },
 
+    createPushSubscription: async (subscription) => {
+        const response = await apiClient.post('/v1/users/me/push-subscriptions', subscription)
+        return response.data
+    },
+
 }
 
 export default apiUsers

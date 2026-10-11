@@ -5,6 +5,7 @@ from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
 from core.sariko_cache import cache
 from dao.dao_base import DAOBase
+from services import push_service
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +205,9 @@ class DAOOrders(DAOBase):
                 # The updated row carries seller_id, so the cache drop costs
                 # nothing extra here.
                 _invalidate_seller_orders(result.data[0].get("seller_id"))
+                # Every status change funnels through here (seller, Lalamove
+                # webhook, auto-cancel, dev panel), so this is the one hook.
+                push_service.notify_order_status(result.data[0])
                 return result.data[0]
 
             return None
@@ -217,7 +221,7 @@ class DAOOrders(DAOBase):
         """Read order by ID without user scoping (for IPN server-to-server)."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, payment_status, status, total_amount") \
+                .select("id, seller_user_id, payment_status, status, total_amount") \
                 .eq("id", order_id) \
                 .maybe_single() \
                 .execute()
@@ -261,6 +265,16 @@ class DAOOrders(DAOBase):
             # returns void, so seller_id costs one primary-key read — once per
             # payment, against a cache that serves every poll tick in between.
             self._invalidate_cache_for_order(order_id)
+
+            # Same rule as the cache drop: the payment is already written, so a
+            # failed push lookup must not turn the IPN into an error.
+            if payment_status == "paid":
+                try:
+                    order = self.read_order_by_id_raw(order_id)
+                    if order:
+                        push_service.notify_new_order(order)
+                except Exception as e:
+                    logger.warning(f"new-order push skipped for order {order_id}: {e}")
             return True
 
         except PostgrestExceptionAPIError as e:

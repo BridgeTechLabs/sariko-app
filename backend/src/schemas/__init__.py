@@ -19,6 +19,7 @@ from schemas.request_set_pinned import RequestSetPinned
 
 # User Profile API
 from schemas.request_update_profile import RequestUpdateProfile
+from schemas.request_create_push_subscription import RequestCreatePushSubscription
 
 # User Addresses API
 from schemas.request_create_user_address import RequestCreateUserAddress
@@ -61,6 +62,7 @@ class Schema:
     RequestSetPinned = RequestSetPinned
 
     RequestUpdateProfile = RequestUpdateProfile
+    RequestCreatePushSubscription = RequestCreatePushSubscription
 
     RequestCreateUserAddress = RequestCreateUserAddress
     RequestUpdateUserAddress = RequestUpdateUserAddress

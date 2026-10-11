@@ -21,6 +21,7 @@ from core.phone import to_e164_vn
 from dao.dao_users import DAOUsers
 from dao.dao_seller_profiles import DAOSellerProfiles
 from dao.dao_user_addresses import DAOUserAddresses
+from dao.dao_push_subscriptions import DAOPushSubscriptions
 from schemas import Schema
 from utils.storage import upload_image_base64
 
@@ -144,6 +145,26 @@ def get_default_address(user=Depends(verify_token)):
         return {"success": True, "address": address}
     except Exception as e:
         logger.exception(f"Exception in GET /users/me/address: {repr(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"{repr(e)}",
+        )
+
+
+@router.post("/me/push-subscriptions")
+def create_push_subscription(body: Schema.RequestCreatePushSubscription, user=Depends(verify_token)):
+    # No DELETE: the browser unsubscribes on toggle-off / sign-out, the push
+    # service then answers 410 and push_service drops the row.
+    try:
+        DAOPushSubscriptions().upsert_subscription(
+            user_id=user["id"],
+            endpoint=body.endpoint,
+            p256dh=body.keys.p256dh,
+            auth=body.keys.auth,
+        )
+        return {"success": True}
+    except Exception as e:
+        logger.exception(f"Exception in POST /users/me/push-subscriptions: {repr(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"{repr(e)}",
