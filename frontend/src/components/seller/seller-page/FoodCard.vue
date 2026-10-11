@@ -1,4 +1,5 @@
 <script>
+import { blockedByClosedStore } from '@/utils/storeOpen';
 import { Star } from 'lucide-vue-next';
 import { mapState } from 'pinia';
 import { useSellerStore } from '@/stores/seller/sellerStore';
@@ -59,6 +60,9 @@ export default {
         ...mapState(useSellerStore, ['seller']),
         // Nothing is shown until a dish has been rated — an empty star row reads as
         // "rated badly" rather than "not rated yet".
+        storeClosed() {
+            return blockedByClosedStore(this.seller, this.preorderDay)
+        },
         hasRating() {
             return this.ratingCount > 0 && this.ratingAvg != null
         }
@@ -83,9 +87,9 @@ export default {
             if (this.loading) return
             this.loading = true
             const cartStore = useCartStore()
-            await cartStore.addItem(this.seller.id, this.itemId, this.seller.store_name)
+            const added = await cartStore.addItem(this.seller.id, this.itemId, this.seller.store_name)
             this.loading = false
-            if (!cartStore.isShowModalCartConflict) {
+            if (added && !cartStore.isShowModalCartConflict) {
                 this.$q.notify({
                     classes: 'quasar-notify-positive',
                     message: `✔️ ${this.name} added to cart`,
@@ -133,7 +137,7 @@ export default {
                     <div class="food-price">₫{{ price }}</div>
                     <div v-if="unitLabel" class="unit-label">/ {{ unitLabel }}</div>
                 </div>
-                <q-btn flat dense no-caps :loading="loading" @click="handleAddToCart">
+                <q-btn flat dense no-caps :loading="loading" :disable="storeClosed" @click="handleAddToCart">
                     <q-icon name="fa-solid fa-circle-plus" size="26px" style="color: #f5A623" />
                     <template #loading>
                         <q-spinner-dots color="orange" size="20px" />

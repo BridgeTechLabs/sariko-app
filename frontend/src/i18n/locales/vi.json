@@ -116,6 +116,7 @@
         }
     },
     "seller_page": {
+        "closed_notice": "Cửa hàng đang đóng · chỉ nhận đặt trước",
         "section_banner": {
             "banner_card_rating_subtitle": "Đánh giá",
             "banner_card_orders_subtitle": "Món ăn",
@@ -143,9 +144,11 @@
         "btn_view_cart": "Xem giỏ hàng"
     },
     "seller_card": {
+        "closed": "Đã đóng",
         "coming_soon": "Sắp mở bán"
     },
     "food_detail_page": {
+        "button_store_closed": "Cửa hàng đang đóng",
         "label_price": "Giá",
         "label_total_price": "Tổng tiền",
         "label_quantity": "Số lượng",
@@ -162,6 +165,7 @@
         "label_choose_option": "Chọn mức giá"
     },
     "cart_page": {
+        "store_closed_same_day": "Cửa hàng đang đóng: món giao ngay tạm ngưng, món đặt trước vẫn đặt được.",
         "section_delivery_address": {
             "title": "GIAO ĐẾN {name}",
             "button_label_text_edit": "Thay đổi",
@@ -419,6 +423,17 @@
         "track_rider": "Theo dõi tài xế"
     },
     "seller_home": {
+        "hours_label": "Giờ mở cửa",
+        "hours_all_day": "Cả ngày",
+        "hours_edit": "Sửa",
+        "hours_open_at": "Mở lúc",
+        "hours_close_at": "Đóng lúc",
+        "hours_overnight_note": "Áp dụng mọi ngày. Đóng sớm hơn giờ mở = mở qua đêm (VD 18:00–02:00).",
+        "hours_outside_hint": "Ngoài giờ mở cửa: khách đang thấy cửa hàng Đã đóng (vẫn nhận đặt trước).",
+        "store_open": "Đang mở cửa",
+        "store_closed": "Đã đóng cửa",
+        "close_confirm_title": "Đóng cửa hàng?",
+        "close_confirm_body": "Bạn còn {count} đơn cần xử lý. Đóng cửa chỉ dừng nhận đơn giao ngay mới, đơn hiện tại và đơn đặt trước vẫn tiếp tục.",
         "greeting_morning": "Chào buổi sáng, {name}! 👋",
         "greeting_afternoon": "Chào buổi chiều, {name}! 👋",
         "greeting_evening": "Chào buổi tối, {name}! 👋",
@@ -699,6 +714,7 @@
         "seller_news": "Tin tức và khuyến mãi từ người bán",
         "push_unsupported": "Trình duyệt này không nhận được thông báo. Trên iPhone, hãy thêm Sariko vào Màn hình chính trước.",
         "push_blocked": "Thông báo đang bị chặn. Hãy cho phép Sariko trong cài đặt trình duyệt.",
+        "push_failed": "Không bật được thông báo trên trình duyệt này. Nếu dùng Brave: bật \"Use Google services for push messaging\" trong Cài đặt → Quyền riêng tư, rồi thử lại.",
         "become_seller_eyebrow": "Nấu cho kababayan",
         "become_seller_title": "Bán món lutong bahay từ bếp nhà bạn",
         "become_seller_desc": "Còn {count} suất người bán sáng lập. Miễn phí 3 tháng, sau đó giữ mức phí thấp cố định.",

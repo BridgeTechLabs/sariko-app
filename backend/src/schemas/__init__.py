@@ -34,6 +34,8 @@ from schemas.request_create_review import RequestCreateReview
 
 # Seller Order API
 from schemas.request_update_order_status import RequestUpdateOrderStatus
+from schemas.request_set_store_open import RequestSetStoreOpen
+from schemas.request_set_store_hours import RequestSetStoreHours
 
 # Seller Menu — Categories
 from schemas.request_create_category import RequestCreateCategory
@@ -73,6 +75,8 @@ class Schema:
     RequestCreateReview = RequestCreateReview
 
     RequestUpdateOrderStatus = RequestUpdateOrderStatus
+    RequestSetStoreOpen = RequestSetStoreOpen
+    RequestSetStoreHours = RequestSetStoreHours
 
     RequestCreateCategory = RequestCreateCategory
     RequestUpdateCategory = RequestUpdateCategory

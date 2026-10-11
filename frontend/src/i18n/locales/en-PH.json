@@ -116,6 +116,7 @@
         }
     },
     "seller_page": {
+        "closed_notice": "Closed now · pre-orders only",
         "section_banner": {
             "banner_card_rating_subtitle": "Rating",
             "banner_card_orders_subtitle": "Items",
@@ -143,9 +144,11 @@
         "btn_view_cart": "View cart"
     },
     "seller_card": {
+        "closed": "Closed",
         "coming_soon": "Coming soon"
     },
     "food_detail_page": {
+        "button_store_closed": "Store closed",
         "label_price": "Price",
         "label_total_price": "Total price",
         "label_quantity": "Quantity",
@@ -162,6 +165,7 @@
         "label_choose_option": "Choose an option"
     },
     "cart_page": {
+        "store_closed_same_day": "This store is closed: same-day dishes are paused, pre-order dishes are still available.",
         "section_delivery_address": {
             "title": "DELIVERY TO {name}",
             "button_label_text_edit": "Change",
@@ -419,6 +423,17 @@
         "track_rider": "Track Rider"
     },
     "seller_home": {
+        "hours_label": "Opening hours",
+        "hours_all_day": "All day",
+        "hours_edit": "Edit",
+        "hours_open_at": "Opens at",
+        "hours_close_at": "Closes at",
+        "hours_overnight_note": "Applies every day. Closing before opening = overnight (e.g. 18:00–02:00).",
+        "hours_outside_hint": "Outside opening hours: customers see your store as Closed (pre-orders still OK).",
+        "store_open": "Open",
+        "store_closed": "Closed",
+        "close_confirm_title": "Close your store?",
+        "close_confirm_body": "You still have {count} order(s) to handle. Closing only stops new same-day orders; current orders and pre-orders continue.",
         "greeting_morning": "Good morning, {name}! 👋",
         "greeting_afternoon": "Good afternoon, {name}! 👋",
         "greeting_evening": "Good evening, {name}! 👋",
@@ -696,6 +711,7 @@
         "seller_news": "Seller news and promos",
         "push_unsupported": "This browser can't receive notifications. On iPhone, add Sariko to your Home Screen first.",
         "push_blocked": "Notifications are blocked. Allow them for Sariko in your browser settings.",
+        "push_failed": "Couldn't turn on notifications in this browser. On Brave, enable \"Use Google services for push messaging\" in Settings → Privacy, then try again.",
         "become_seller_eyebrow": "Cook for kababayan",
         "become_seller_title": "Sell lutong bahay from your kitchen",
         "become_seller_desc": "{count} founding seller slots left. 3 months free, then a low fee locked in.",

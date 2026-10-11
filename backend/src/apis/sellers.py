@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
+from core.store_hours import is_open_now
+
 from dao.dao_seller_profiles import DAOSellerProfiles
 from dao.dao_food_items import DAOFoodItems
 from dao.dao_menu_categories import DAOMenuCategories
@@ -79,6 +81,10 @@ def get_seller_info(user=Depends(verify_token)):
             "phone": profile.get("phone"),
             "has_address": bool(profile.get("address") and profile.get("lat") and profile.get("lon")),
             "has_phone": bool(profile.get("phone")),
+            "is_open": profile.get("is_open") is not False,   # the switch itself
+            "opening_time": profile.get("opening_time"),
+            "closing_time": profile.get("closing_time"),
+            "open_now": is_open_now(profile.get("is_open"), profile.get("opening_time"), profile.get("closing_time")),
         }
     except HTTPException:
         raise
@@ -86,6 +92,50 @@ def get_seller_info(user=Depends(verify_token)):
         logger.exception(f"Exception in GET /sellers/me: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))\
         
+
+@router.patch("/me/open")
+def set_store_open(body: Schema.RequestSetStoreOpen, user=Depends(verify_token)):
+    """Open/close the store. Closing only stops new same-day orders; existing orders still
+    need handling, and pre-orders stay possible (see apis/orders.py STORE_CLOSED_DETAIL)."""
+    try:
+        updated = DAOSellerProfiles().update_seller_profile_info(user["id"], {"is_open": body.is_open})
+        if not updated:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not a seller")
+        return {
+            "success": True,
+            "is_open": updated["is_open"],
+            "open_now": is_open_now(updated["is_open"], updated.get("opening_time"), updated.get("closing_time")),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Exception in PATCH /sellers/me/open: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/me/hours")
+def set_store_hours(body: Schema.RequestSetStoreHours, user=Depends(verify_token)):
+    """Daily opening hours (same every day); both null = all day. The open switch still wins."""
+    try:
+        fields = {
+            "opening_time": body.opening_time.isoformat() if body.opening_time else None,
+            "closing_time": body.closing_time.isoformat() if body.closing_time else None,
+        }
+        updated = DAOSellerProfiles().update_seller_profile_info(user["id"], fields)
+        if not updated:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not a seller")
+        return {
+            "success": True,
+            "opening_time": updated["opening_time"],
+            "closing_time": updated["closing_time"],
+            "open_now": is_open_now(updated["is_open"], updated["opening_time"], updated["closing_time"]),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Exception in PATCH /sellers/me/hours: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/me/orders")
 def get_seller_orders(user=Depends(verify_token)):
