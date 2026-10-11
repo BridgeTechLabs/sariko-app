@@ -46,6 +46,10 @@ MESSAGES = {
         "en": ("Delivery failed", "A delivery couldn't be completed. Tap to rebook a driver."),
         "vi": ("Giao hàng thất bại", "Một đơn không giao được. Nhấn để đặt lại tài xế."),
     },
+    "seller_driver_assigned": {
+        "en": ("Driver on the way", "A driver accepted the delivery and is coming to pick up the order."),
+        "vi": ("Đã có tài xế", "Tài xế đã nhận đơn và đang đến lấy hàng."),
+    },
     "seller_delivered": {
         "en": ("Order delivered", "The driver has delivered the order to the customer."),
         "vi": ("Đã giao hàng thành công", "Tài xế đã giao đơn hàng đến khách."),
@@ -82,6 +86,11 @@ def notify_buyer_cancelled(order: dict):
     if order.get("payment_status") != "paid":
         return
     _send_async(order.get("seller_user_id"), "seller_buyer_cancelled", f"/seller/orders/{order['id']}")
+
+
+def notify_seller_driver_assigned(order: dict):
+    """Seller side: Lalamove assigned a driver (again, if the first one cancelled). Called from the webhook."""
+    _send_async(order.get("seller_user_id"), "seller_driver_assigned", f"/seller/orders/{order['id']}")
 
 
 def notify_seller_delivered(order: dict):

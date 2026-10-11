@@ -11,7 +11,7 @@ Bugs found during manual testing. Newest at the bottom.
 | 2 | Seed `'vi'` ≠ `'Tiếng Việt'` → English pushes | ⬜ Open | — |
 | 3 | VNPay "Sai chữ ký" (`vnp_IpnUrl`) | ⬜ Open | — |
 | 4 | Push enable fails silently (Brave) | ⬜ Open | — |
-| 5 | DEV pushes 403: VAPID key pair mismatch | 🔧 Keys rotated + backend redeployed; phone must re-subscribe | DEV backend `e6aac52` |
+| 5 | DEV pushes 403: VAPID key pair mismatch | ✅ Verified on DEV: keys rotated, seller re-subscribed, notifications arrive (FCM 201) | DEV backend `e6aac52`+ |
 | 6 | Lalamove can't register webhook ("Destination host unreachable") | ✅ Verified on DEV: webhook `COMPLETED` → order `21939402` done (20:18 UTC) | DEV backend `29be3bd` |
 
 ---
