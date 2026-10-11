@@ -205,7 +205,9 @@ Prod migration history ≠ repo (only `20260916144935` recorded), so **never `su
 **Before release:**
 - [ ] #15 fix merged to `develop` and deployed to DEV
 - [ ] UI checklist on DEV passed (all 🔧 → ✅)
-- [ ] Prod VAPID pair: private → prod backend env `VAPID_PRIVATE_KEY`; public → prod frontend build `VITE_VAPID_PUBLIC_KEY` (the two halves MUST match, see #5)
+- [x] Prod backend already has its own `VAPID_PRIVATE_KEY` (in `~/deploy/.env`, a different pair from DEV/local, checked 2026-10-12)
+- [ ] Prod frontend build: `VITE_VAPID_PUBLIC_KEY=BOqom0UmgeisCjX6R2NuVpN-RC-9BurXpMkMEz9rHQwkzTF37xPfIlpxucOthIXz_QeRzTuDZxSngZJOU7NsaPA` (derived from the prod private key; a mismatch = 403 on every push, see #5)
+- [ ] `prd-deploy-pipeline.yml` now writes running tags to `~/deploy/image_tags.env` (**not** `.env`: on prod that file is the backend env_file with all secrets) and cleans old images; no migration step
 - [ ] Lalamove: webhook URL `https://api.sariko.store/rest/v1/deliveries/webhook` registered for the **production** API key
 - [ ] Prod env must NOT contain `VNPAY_IPN_URL` (#3)
 
@@ -217,3 +219,9 @@ Prod migration history ≠ repo (only `20260916144935` recorded), so **never `su
 - [ ] Buyer login: no address error toast; new buyer onboarding saves an address
 - [ ] Enable push on Chrome → row in `push_subscriptions`; force a paid order → seller notified
 - [ ] Seller open/closed switch + hours visible on seller Home
+
+**Prod server notes (seen 2026-10-12, not changed):**
+- `~/deploy/compose.yaml` on prod has no `restart: unless-stopped` (dev has it). After an EC2 reboot the backend, nginx and certbot won't come back by themselves.
+- Prod backend publishes `"5000:5000"` (dev binds `127.0.0.1:5000`). It's not reachable from outside today (Security Group blocks it). Binding to 127.0.0.1 would keep it that way even if the SG changes.
+- Disk 55% (10G/19G), 6 backend images, 3.3 GB build cache (2.2 GB reclaimable). The new cleanup step handles this from the next deploy.
+- `VNPAY_IPN_WHITELIST` comment in prod `.env` says "Sandbox IPs below": check before VNPay go-live.
