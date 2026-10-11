@@ -66,6 +66,7 @@ class _FakeOrderDAO:
         self.last_status = status
         if self._order:
             self._order["status"] = status
+        return self._order
 
 
 # ─── Tests ───────────────────────────────────────────────────────────────────
@@ -82,6 +83,8 @@ def test_webhook_completed_marks_order_done(fastapi_client, lalamove_secret, lal
     fake_ord = _FakeOrderDAO(order)
     monkeypatch.setattr("apis.deliveries.DAODeliveries", lambda: fake_del)
     monkeypatch.setattr("apis.deliveries.DAOOrders", lambda: fake_ord)
+    notified = []
+    monkeypatch.setattr("apis.deliveries.push_service.notify_seller_delivered", notified.append)
 
     body, raw = _make_webhook_body(
         lalamove_api_key, lalamove_secret,
@@ -98,6 +101,7 @@ def test_webhook_completed_marks_order_done(fastapi_client, lalamove_secret, lal
     assert res.json()["success"] is True
     assert fake_del.last_update["status"] == "COMPLETED"
     assert fake_ord.last_status == "done"
+    assert [o["id"] for o in notified] == ["ord-uuid"], "Seller must be told the driver delivered"
 
 
 def test_webhook_terminal_status_clears_driver_and_marks_failed(

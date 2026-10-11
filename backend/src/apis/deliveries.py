@@ -11,6 +11,7 @@ from dao.dao_deliveries import DAODeliveries
 from dao.dao_orders import DAOOrders
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
+from services import push_service
 from services.lalamove_service import get_lalamove_service
 
 router = APIRouter(prefix="/deliveries")
@@ -207,7 +208,9 @@ async def delivery_webhook(request: Request):
 
         dao_orders = DAOOrders()
         if new_status == "COMPLETED":
-            dao_orders.update_order_status(delivery["order_id"], "done")
+            updated = dao_orders.update_order_status(delivery["order_id"], "done")
+            if updated:
+                push_service.notify_seller_delivered(updated)
         elif new_status in TERMINAL_STATUSES:
             order = dao_orders.read_order_by_id_raw(delivery["order_id"])
             if order and order["status"] == "ready":
