@@ -11,6 +11,7 @@ Bugs found during manual testing. Newest at the bottom.
 | 2 | Seed `'vi'` ≠ `'Tiếng Việt'` → English pushes | ⬜ Open | — |
 | 3 | VNPay "Sai chữ ký" (`vnp_IpnUrl`) | ⬜ Open | — |
 | 4 | Push enable fails silently (Brave) | ⬜ Open | — |
+| 5 | DEV pushes 403: VAPID key pair mismatch | ⬜ Open | — |
 
 ---
 
@@ -62,3 +63,17 @@ Bugs found during manual testing. Newest at the bottom.
 - **Cause (very likely, not yet confirmed in console):** Brave disables Web Push by default (Chromium push goes through Google FCM). `pushManager.subscribe()` throws, and `togglePush` in `frontend/src/stores/v2/account/accountStore.js` (~L243-262) only `console.warn`s inside `catch`. Only the `unsupported`/`blocked` results show a toast.
 - **Fix idea:** In the `catch`, show the same negative Notify (e.g. reuse `account_v2.push_unsupported` or add a "couldn't enable, check browser settings" message).
 - **Workaround for testing on Brave:** `brave://settings/privacy` → enable "Use Google services for push messaging" → restart Brave.
+
+---
+
+## #5 — No push arrives on DEV: VAPID key pair mismatch (403)
+- **Found:** 2026-10-12. `seller@dev.local` subscribed on Android Chrome (3 rows in `push_subscriptions`); force-pay on order `21939402` at 19:43 UTC → no notification
+- **Evidence (dev EC2 backend log):** `push_service - webpush failed for user 33333333-…: 403 Forbidden — the VAPID credentials in the authorization header do not correspond to the credentials used to create the subscriptions.`
+- **Cause (confirmed):** the frontend and the backend on DEV use keys from **different pairs**.
+  - Deployed frontend `VITE_VAPID_PUBLIC_KEY` = `frontend/.env.development` value (`BPulOHH…`)
+  - Dev backend `VAPID_PRIVATE_KEY` (`~/deploy/.env.dev` on EC2 = `infra/deploy-dev/.env.dev`) does **not** derive that public key
+  - `backend/src/envs/.env.local` **does** match it, which is why it worked locally
+- **Fix options:**
+  - Fastest: put the `.env.local` VAPID private key into `~/deploy/.env.dev` (and `infra/deploy-dev/.env.dev`), then `docker compose up -d`. Existing subscriptions start working right away
+  - Or: generate the frontend public key from the dev private key, then rebuild the frontend. Every device must toggle push off/on again, because subscriptions are bound to the old key
+- **Side note:** 403 responses aren't cleaned up (only 404/410 are), so subscriptions made with a wrong key stay in the table and fail on every event.
