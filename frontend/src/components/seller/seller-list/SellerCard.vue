@@ -43,6 +43,7 @@ export default {
 
     methods: {
         onClicked() {
+            if (this.isComingSoon) return
             this.$router.push(`/seller/${this.sellerSlugName}`)
         }
     }
@@ -154,10 +155,11 @@ export default {
     background-color: #4a391f;
 }
 
-// Coming-soon kitchens stay tappable (they open the coming-soon page) but read as not orderable yet
+// Coming-soon kitchens aren't tappable from the lists (the page still works by direct link)
 .muted {
-    opacity: 0.5;
+    opacity: 0.3;
     filter: grayscale(1);
+    cursor: default;
 }
 
 .badge-coming-soon {

@@ -21,7 +21,8 @@ Bugs found during manual testing. Newest at the bottom.
 | 12 | Seller Me page: "Edit Profile" and "My Profile" duplicate | 🔧 Fix in `fix/common-bugs`: removed the Settings row, kept the header button + avatar | DEV `5067e95` (2026-10-12) |
 | 13 | Coming-soon kitchens look the same as open ones in seller lists | 🔧 Fix in `fix/common-bugs`: muted (50% + grayscale) card | DEV `5067e95` (2026-10-12) |
 | 14 | Seller can't open/close their store | 🔧 Built in `fix/common-bugs`: switch + daily hours on seller Home; closed/outside hours blocks same-day only; lists Open → Closed → Coming soon | DEV `5067e95` (2026-10-12) |
-| 15 | Onboarding / legacy address form: saving a first address → 500 (NOT NULL receiver) | 🔧 Fix in `fix/common-bugs`: insert defaults receiver to account holder | — |
+| 15 | Onboarding / legacy address form: saving a first address → 500 (NOT NULL receiver) | 🔧 Fix in `fix/common-bugs`: insert defaults receiver to account holder | DEV `820ac47` (2026-10-12) |
+| 16 | Prod deploy never runs: prod runner registered to the old repo; DEV runner also carries the prod label | ✅ Runner re-registered + DEV label removed; run attempt 3 on `ec2-sariko-app` → prod `1f9f04f` | PROD `1f9f04f` (2026-10-12) |
 
 ---
 
@@ -167,6 +168,7 @@ Bugs found during manual testing. Newest at the bottom.
 - **Found:** 2026-10-12
 - **Order:** already correct. `DAOSellerProfiles.read_founding_sellers` orders by `status` (`active` < `coming_soon`), then `display_order`, then `created_at`. On DEV: Rosa (active) is before Ben (coming_soon).
 - **Fix:** `components/seller/seller-list/SellerCard.vue` adds a `.muted` class (opacity 0.5 + grayscale) when `status === 'coming_soon'`. The card stays tappable and opens the coming-soon page.
+- **Follow-up (2026-10-12, Jack):** dimmer (opacity 0.3) and **not tappable** from the lists (`onClicked` returns early, default cursor). The coming-soon page still opens from a direct link.
 
 ---
 
@@ -203,17 +205,17 @@ Prod migration history ≠ repo (only `20260916144935` recorded), so **never `su
 - [x] `push_subscriptions` already exists on prod, created by hand identical to DEV → `20261009…` not needed
 
 **Before release:**
-- [ ] #15 fix merged to `develop` and deployed to DEV
+- [x] #15 fix merged to `develop` (PR #36) and deployed to DEV `820ac47`
 - [ ] UI checklist on DEV passed (all 🔧 → ✅)
 - [x] Prod backend already has its own `VAPID_PRIVATE_KEY` (in `~/deploy/.env`, a different pair from DEV/local, checked 2026-10-12)
-- [ ] Prod frontend build: `VITE_VAPID_PUBLIC_KEY=BOqom0UmgeisCjX6R2NuVpN-RC-9BurXpMkMEz9rHQwkzTF37xPfIlpxucOthIXz_QeRzTuDZxSngZJOU7NsaPA` (derived from the prod private key; a mismatch = 403 on every push, see #5)
-- [ ] `prd-deploy-pipeline.yml` now writes running tags to `~/deploy/image_tags.env` (**not** `.env`: on prod that file is the backend env_file with all secrets) and cleans old images; no migration step
+- [x] (superseded: Jack generated a new prod pair) Prod frontend build: `VITE_VAPID_PUBLIC_KEY=BOqom0UmgeisCjX6R2NuVpN-RC-9BurXpMkMEz9rHQwkzTF37xPfIlpxucOthIXz_QeRzTuDZxSngZJOU7NsaPA` (derived from the prod private key; a mismatch = 403 on every push, see #5)
+- [x] `prd-deploy-pipeline.yml` now writes running tags to `~/deploy/image_tags.env` (**not** `.env`: on prod that file is the backend env_file with all secrets) and cleans old images; no migration step
 - [ ] Lalamove: webhook URL `https://api.sariko.store/rest/v1/deliveries/webhook` registered for the **production** API key
 - [ ] Prod env must NOT contain `VNPAY_IPN_URL` (#3)
 
 **Release (back to back):**
-1. [ ] Prod SQL editor: run `backend/supabase/migrations/20261003015158_add_new_columns_to_user_addresses.sql` wrapped in `begin; … commit;`
-2. [ ] Immediately merge `develop` → `main` (prod pipeline deploys the backend). The old prod backend can't create first addresses on the new schema (#15).
+1. [x] Prod SQL editor: ran `20261003015158_add_new_columns_to_user_addresses.sql` in a transaction (2026-10-12, Jack). Verified: 15 addresses, 0 empty receivers
+2. [x] Merged (PR #37). After fixing #16, attempt 3 deployed on the prod runner (22:36 UTC). The window with the new schema + old backend lasted roughly 22:30–22:36 UTC.
 
 **After release (smoke):**
 - [ ] Buyer login: no address error toast; new buyer onboarding saves an address
@@ -225,3 +227,21 @@ Prod migration history ≠ repo (only `20260916144935` recorded), so **never `su
 - Prod backend publishes `"5000:5000"` (dev binds `127.0.0.1:5000`). It's not reachable from outside today (Security Group blocks it). Binding to 127.0.0.1 would keep it that way even if the SG changes.
 - Disk 55% (10G/19G), 6 backend images, 3.3 GB build cache (2.2 GB reclaimable). The new cleanup step handles this from the next deploy.
 - `VNPAY_IPN_WHITELIST` comment in prod `.env` says "Sandbox IPs below": check before VNPay go-live.
+
+---
+
+## #16 — Prod pipeline never runs: self-hosted runner registered to the old repo
+- **Found:** 2026-10-12, after PR #37 (develop → main) merged. Prod still ran `1e62d29` (Oct 8) and had no `image_tags.env`.
+- **Cause (confirmed):** prod EC2 `~/actions-runner/.runner` → `gitHubUrl: https://github.com/yellowchicken2111/sariko-app` (service `actions.runner.yellowchicken2111-sariko-app.ec2-sariko-app`). The repo now lives at `BridgeTechLabs/sariko-app`. The DEV runner was re-registered there, but prod wasn't. The job (`runs-on: ec2-sariko-app`) waits in Queued with no runner to take it. The last job the prod runner ran was 2026-10-08 15:10.
+- **Fix:** re-register the prod runner to `BridgeTechLabs/sariko-app` with label `ec2-sariko-app` (token from GitHub → repo Settings → Actions → Runners → New self-hosted runner). Then re-run the queued workflow. Also check that the `production` environment in the BridgeTechLabs repo has `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`.
+- **Update (2026-10-12):** prod runner re-registered to BridgeTechLabs (service `actions.runner.BridgeTechLabs-sariko-app.ec2-sariko-app`, online). But GitHub had **already run the prod job (run for `1f9f04f`, "success") on the DEV runner `ec2-sariko-app-dev`**, because that runner also carries the label `ec2-sariko-app`. Effects on DEV: backend redeployed as `1f9f04f` (same backend code as `820ac47`, healthy), `.env.dev` intact, a stray `~/deploy/image_tags.env` written, and old dev images cleaned. Prod untouched (still `1e62d29`). Luckily the prod pipeline has no migration step.
+- **Must fix before re-running:** GitHub → Settings → Actions → Runners → `ec2-sariko-app-dev` → remove the label `ec2-sariko-app`, so it keeps only `ec2-sariko-app-dev` (+ default self-hosted labels). Otherwise any prod job can land on DEV again.
+
+**Post-release verification (2026-10-12 22:40 UTC, Claude, read-only):**
+- Prod backend `1f9f04f` healthy, `/health` 200, no exceptions in the logs since start
+- `~/deploy/image_tags.env` = `PREV_IMAGE_TAG=1e62d29` / `IMAGE_TAG=1f9f04f`; `~/deploy/.env` intact (20 keys, no `VNPAY_IPN_URL`)
+- Cleanup ran: backend images 6 → 2, disk 55% → 45%, build cache 3.3 → 1.7 GB
+- `/sellers/founding` returns `is_open` (3 sellers, all open)
+- VAPID: the `app.sariko.store` bundle key `BFHAUE9N…` **matches** the running prod backend private key
+- ⚠️ `https://sariko.store` (apex) fails the TLS handshake (`sslv3 alert handshake failure`), while `www.sariko.store` → 200 and `app.sariko.store` serves today's build. Check the Cloudflare SSL/DNS setup for the apex (LINKS.md lists sariko.store as the marketplace PWA).
+- [ ] Still to smoke-test by hand on prod: new buyer onboarding saves an address (#15), push on Chrome, seller open/closed + hours
