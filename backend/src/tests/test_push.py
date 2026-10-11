@@ -74,3 +74,8 @@ def test_endpoint_accepts_push_services():
 def test_endpoint_rejects_others(endpoint):
     with pytest.raises(ValidationError):
         _sub(endpoint)
+
+
+def test_seller_delivered_goes_to_seller(sent):
+    push_service.notify_seller_delivered(_order("done"))
+    assert sent == [("seller", "seller_delivered", "/seller/orders/o1")]

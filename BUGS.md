@@ -12,7 +12,7 @@ Bugs found during manual testing. Newest at the bottom.
 | 3 | VNPay "Sai chữ ký" (`vnp_IpnUrl`) | ⬜ Open | — |
 | 4 | Push enable fails silently (Brave) | ⬜ Open | — |
 | 5 | DEV pushes 403: VAPID key pair mismatch | 🔧 Keys rotated + backend redeployed; phone must re-subscribe | DEV backend `e6aac52` |
-| 6 | Lalamove can't register webhook ("Destination host unreachable") | 🔧 Fix in `fix/common-bugs`: 200 for unsigned verification ping | — (re-register URL on Portal after deploy) |
+| 6 | Lalamove can't register webhook ("Destination host unreachable") | ✅ Verified on DEV: webhook `COMPLETED` → order `21939402` done (20:18 UTC) | DEV backend `29be3bd` |
 
 ---
 
