@@ -11,7 +11,8 @@ Bugs found during manual testing. Newest at the bottom.
 | 2 | Seed `'vi'` ≠ `'Tiếng Việt'` → English pushes | ⬜ Open | — |
 | 3 | VNPay "Sai chữ ký" (`vnp_IpnUrl`) | ⬜ Open | — |
 | 4 | Push enable fails silently (Brave) | ⬜ Open | — |
-| 5 | DEV pushes 403: VAPID key pair mismatch | ⬜ Open | — |
+| 5 | DEV pushes 403: VAPID key pair mismatch | 🔧 Keys rotated + backend redeployed; phone must re-subscribe | DEV backend `e6aac52` |
+| 6 | Lalamove can't register webhook ("Destination host unreachable") | 🔧 Fix in `fix/common-bugs`: 200 for unsigned verification ping | — (re-register URL on Portal after deploy) |
 
 ---
 
@@ -77,3 +78,12 @@ Bugs found during manual testing. Newest at the bottom.
   - Fastest: put the `.env.local` VAPID private key into `~/deploy/.env.dev` (and `infra/deploy-dev/.env.dev`), then `docker compose up -d`. Existing subscriptions start working right away
   - Or: generate the frontend public key from the dev private key, then rebuild the frontend. Every device must toggle push off/on again, because subscriptions are bound to the old key
 - **Side note:** 403 responses aren't cleaned up (only 404/410 are), so subscriptions made with a wrong key stay in the table and fail on every event.
+
+---
+
+## #6 — Lalamove Portal: "Destination host unreachable" when registering the webhook
+- **Found:** 2026-10-12, registering `https://api-dev.sariko.store/rest/v1/deliveries/webhook` for the sandbox key
+- **Actual:** Portal says "Destination host unreachable". No delivery status ever reaches DEV (order `21939402` auto-booked at 20:06, no webhook followed)
+- **Cause (confirmed from dev logs):** the host *is* reachable. nginx shows `POST /rest/v1/deliveries/webhook` from `52.76.164.226` with UA `LalamoveAPI/3.0` at 20:10:19 and 20:10:35, both **401**. The backend logs `Webhook: apiKey mismatch (...)` with an empty apiKey. Lalamove's verification request carries no `apiKey`/`signature`, and `backend/src/apis/deliveries.py` (~L122) rejects it with 401. Lalamove needs a 200 to accept the URL and reports anything else as "unreachable".
+- **Fix idea:** before the apiKey check, return 200 without touching the DB when the body has no `apiKey` and no `signature` (the verification ping). Real events still need a valid apiKey + HMAC.
+- **Note:** `CLAUDE.md` still mentions `LALAMOVE_MODE (mock|live)`. The mock is gone, and DEV calls the real Lalamove sandbox.

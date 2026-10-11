@@ -119,6 +119,10 @@ async def delivery_webhook(request: Request):
             logger.error("Webhook: LALAMOVE_API_SECRET/API_KEY not configured — rejecting")
             raise HTTPException(status_code=503, detail="Webhook not configured")
 
+        # Lalamove's URL verification (on webhook registration) has no apiKey/signature and must get a 200.
+        if not api_key and not signature:
+            return {"success": True}
+
         if api_key != api_key_env:
             logger.warning(f"Webhook: apiKey mismatch ({api_key[:10]}...)")
             raise HTTPException(status_code=401, detail="Invalid apiKey")

@@ -191,3 +191,18 @@ def test_webhook_unknown_lalamove_order_silently_ok(
     assert res.json()["success"] is True
     assert fake_del.last_update is None
     assert fake_ord.last_status is None
+
+
+def test_webhook_registration_ping_ok_without_db_write(fastapi_client, monkeypatch):
+    """Lalamove's URL verification has no apiKey/signature → 200, so the Portal accepts the URL.
+    Even if it carries event data, nothing is written."""
+    fake_del = _FakeDeliveryDAO({"id": "del-uuid", "order_id": "ord-uuid", "lalamove_order_id": "LM12345", "status": "PICKED_UP"})
+    fake_ord = _FakeOrderDAO({"id": "ord-uuid", "status": "ready"})
+    monkeypatch.setattr("apis.deliveries.DAODeliveries", lambda: fake_del)
+    monkeypatch.setattr("apis.deliveries.DAOOrders", lambda: fake_ord)
+
+    for body in ({}, {"eventType": "ORDER_STATUS_CHANGED", "data": {"order": {"orderId": "LM12345", "status": "REJECTED"}}}):
+        res = fastapi_client.post("/deliveries/webhook", json=body)
+        assert res.status_code == 200
+        assert fake_del.last_update is None, "Unsigned request must NOT update the delivery"
+        assert fake_ord.last_status is None
