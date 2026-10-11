@@ -7,20 +7,21 @@ Bugs found during manual testing. Newest at the bottom.
 
 | # | Bug | Status | Deployed |
 |---|-----|--------|----------|
-| 1 | Buyer address toast on login (DEV missing migration) | 🔧 Migrations `20261003…` + `20261009…` applied on DEV by pipeline, columns exist. UI check pending (no toast on login) | DEV via pipeline `db push` |
-| 2 | Seed `'vi'` ≠ `'Tiếng Việt'` → English pushes | 🔧 Seed fixed in `fix/common-bugs` ('English' / 'Tiếng Việt'); existing DEV rows need the one-off SQL below | — |
-| 3 | VNPay "Sai chữ ký" (`vnp_IpnUrl`) | 🔧 DEV env fixed (verified code 24 = buyer cancel); code trap removed in `fix/common-bugs` (`vnp_IpnUrl` + `VNPAY_IPN_URL` deleted) | DEV env |
-| 4 | Push enable fails silently (Brave) | 🔧 Fix in `fix/common-bugs`: toast `account_v2.push_failed` with the Brave hint | — |
+| 1 | Buyer address toast on login (DEV missing migration) | 🔧 Migrations `20261003…` + `20261009…` applied on DEV by pipeline, columns exist. UI check pending (no toast on login) | DEV `5067e95` (2026-10-12) |
+| 2 | Seed `'vi'` ≠ `'Tiếng Việt'` → English pushes | 🔧 Seed fixed in `fix/common-bugs` ('English' / 'Tiếng Việt'); existing DEV rows need the one-off SQL below | DEV `5067e95` (2026-10-12) |
+| 3 | VNPay "Sai chữ ký" (`vnp_IpnUrl`) | 🔧 DEV env fixed (verified code 24 = buyer cancel); code trap removed in `fix/common-bugs` (`vnp_IpnUrl` + `VNPAY_IPN_URL` deleted) | DEV `5067e95` (2026-10-12) |
+| 4 | Push enable fails silently (Brave) | 🔧 Fix in `fix/common-bugs`: toast `account_v2.push_failed` with the Brave hint | DEV `5067e95` (2026-10-12) |
 | 5 | DEV pushes 403: VAPID key pair mismatch | ✅ Verified on DEV: keys rotated, seller re-subscribed, notifications arrive (FCM 201) | DEV backend `e6aac52`+ |
 | 6 | Lalamove can't register webhook ("Destination host unreachable") | ✅ Verified on DEV: webhook `COMPLETED` → order `21939402` done (20:18 UTC) | DEV backend `29be3bd` |
-| 7 | Order list badges ignore Lalamove delivery status (buyer + seller) | 🔧 Fix in `fix/common-bugs`: lists embed `deliveries(status)`, webhook touches order + drops seller cache, `/seller/orders` now polls | — |
-| 8 | Seller order detail: back button does nothing | 🔧 Fix in `fix/common-bugs`: `backTo="/seller/orders"` (same as buyer detail) | — |
-| 9 | "Ready for delivery" gated to delivery time + countdown (seller request) | 🔧 Built in `fix/common-bugs`: 45 min window, FE disabled + "Ready in 1h 20m", BE 400 if early, no override | — |
-| 10 | Menu management: can't switch a dish from pre-order to instant | 🔧 Redesigned in `fix/common-bugs`: Pre-order switch (off = instant 0, on = days ≥ 1, default 1) | — |
-| 11 | Seller can't rename their store | 🔧 Built in `fix/common-bugs`: "Tên cửa hàng" in Hồ sơ (sellers only), slug unchanged, 1–50 chars | — |
-| 12 | Seller Me page: "Edit Profile" and "My Profile" duplicate | 🔧 Fix in `fix/common-bugs`: removed the Settings row, kept the header button + avatar | — |
-| 13 | Coming-soon kitchens look the same as open ones in seller lists | 🔧 Fix in `fix/common-bugs`: muted (50% + grayscale) card | — |
-| 14 | Seller can't open/close their store | 🔧 Built in `fix/common-bugs`: switch + daily hours on seller Home; closed/outside hours blocks same-day only; lists Open → Closed → Coming soon | — |
+| 7 | Order list badges ignore Lalamove delivery status (buyer + seller) | 🔧 Fix in `fix/common-bugs`: lists embed `deliveries(status)`, webhook touches order + drops seller cache, `/seller/orders` now polls | DEV `5067e95` (2026-10-12) |
+| 8 | Seller order detail: back button does nothing | 🔧 Fix in `fix/common-bugs`: `backTo="/seller/orders"` (same as buyer detail) | DEV `5067e95` (2026-10-12) |
+| 9 | "Ready for delivery" gated to delivery time + countdown (seller request) | 🔧 Built in `fix/common-bugs`: 45 min window, FE disabled + "Ready in 1h 20m", BE 400 if early, no override | DEV `5067e95` (2026-10-12) |
+| 10 | Menu management: can't switch a dish from pre-order to instant | 🔧 Redesigned in `fix/common-bugs`: Pre-order switch (off = instant 0, on = days ≥ 1, default 1) | DEV `5067e95` (2026-10-12) |
+| 11 | Seller can't rename their store | 🔧 Built in `fix/common-bugs`: "Tên cửa hàng" in Hồ sơ (sellers only), slug unchanged, 1–50 chars | DEV `5067e95` (2026-10-12) |
+| 12 | Seller Me page: "Edit Profile" and "My Profile" duplicate | 🔧 Fix in `fix/common-bugs`: removed the Settings row, kept the header button + avatar | DEV `5067e95` (2026-10-12) |
+| 13 | Coming-soon kitchens look the same as open ones in seller lists | 🔧 Fix in `fix/common-bugs`: muted (50% + grayscale) card | DEV `5067e95` (2026-10-12) |
+| 14 | Seller can't open/close their store | 🔧 Built in `fix/common-bugs`: switch + daily hours on seller Home; closed/outside hours blocks same-day only; lists Open → Closed → Coming soon | DEV `5067e95` (2026-10-12) |
+| 15 | Onboarding / legacy address form: saving a first address → 500 (NOT NULL receiver) | 🔧 Fix in `fix/common-bugs`: insert defaults receiver to account holder | — |
 
 ---
 
@@ -181,3 +182,38 @@ Bugs found during manual testing. Newest at the bottom.
 - **Opening hours (2026-10-12):** one daily window for every day, switch = master. No scheduler: "open now" is computed on read in `backend/src/core/store_hours.py` `is_open_now()` (VN time, UTC+7 fixed; overnight windows; same open/close = 24h; no hours = all day; tests `tests/backend/unit/test_store_hours.py`). Buyer-facing reads (`read_founding_sellers`, `read_seller_by_slug_name`) replace `is_open` with the computed value, so the buyer frontend didn't change. Cart/order gates use it too. Seller: `PATCH /sellers/me/hours` (`RequestSetStoreHours`, both-or-neither), and `GET /sellers/me` returns the raw switch + hours + `open_now`. Hours editor and an "outside hours" hint live in `SellerGreeting.vue`.
 - **Prod check (2026-10-12, Jack):** no seller has `opening_time` set, and no active seller has `is_open = false`. Deploy changes no store's visible state.
 - **Known limit:** the seller's own "outside hours" hint uses `open_now` from the last fetch, so it updates on reload, not exactly at opening time. Buyers are always computed live.
+
+---
+
+## #15 — First address save fails after migration 20261003 (NOT NULL receiver fields)
+- **Found:** 2026-10-12, while reviewing the migration before applying it to prod. Not reported by a user. No DEV buyer was affected (none signed up since the migration ran).
+- **Cause:** `20261003015158_add_new_columns_to_user_addresses.sql` makes `receiver_name` / `phone_number` NOT NULL. `PATCH /users/me/profile` with `address` (buyer onboarding `components/onboarding/buyer/ButtonGroup.vue`, legacy `components/account/AddressForm.vue`) → `DAOUserAddresses.upsert_default_address` inserts **without** them → 500. Onboarding swallows the error and moves on, so the buyer finishes onboarding with **no saved address**.
+- **Fix:** the insert branch of `upsert_default_address` defaults both fields to the account holder's `users.name` / `users.phone` (same rule as the migration backfill). `users.py` also passes `body.name` / `body.phone`, since onboarding sends the phone in the same request, before `users` is updated. Tests: `tests/backend/unit/test_default_address_insert.py`.
+- **Prod:** must ship together with the prod migration (see the release notes in chat). The old prod backend has this same bug once the migration is applied.
+
+---
+
+# Prod release checklist (develop → main)
+
+Prod migration history ≠ repo (only `20260916144935` recorded), so **never `supabase db push` prod**. Apply migrations by hand.
+
+**Pre-checks done (2026-10-12, Jack, on prod):**
+- [x] No `opening_time` set on any seller; no active seller with `is_open = false` → deploy changes no store's visible state
+- [x] `user_addresses` has none of `receiver_name/phone_number/note/street_name/updated_at`; 0 orphan addresses → `20261003…` will apply cleanly
+- [x] `push_subscriptions` already exists on prod, created by hand identical to DEV → `20261009…` not needed
+
+**Before release:**
+- [ ] #15 fix merged to `develop` and deployed to DEV
+- [ ] UI checklist on DEV passed (all 🔧 → ✅)
+- [ ] Prod VAPID pair: private → prod backend env `VAPID_PRIVATE_KEY`; public → prod frontend build `VITE_VAPID_PUBLIC_KEY` (the two halves MUST match, see #5)
+- [ ] Lalamove: webhook URL `https://api.sariko.store/rest/v1/deliveries/webhook` registered for the **production** API key
+- [ ] Prod env must NOT contain `VNPAY_IPN_URL` (#3)
+
+**Release (back to back):**
+1. [ ] Prod SQL editor: run `backend/supabase/migrations/20261003015158_add_new_columns_to_user_addresses.sql` wrapped in `begin; … commit;`
+2. [ ] Immediately merge `develop` → `main` (prod pipeline deploys the backend). The old prod backend can't create first addresses on the new schema (#15).
+
+**After release (smoke):**
+- [ ] Buyer login: no address error toast; new buyer onboarding saves an address
+- [ ] Enable push on Chrome → row in `push_subscriptions`; force a paid order → seller notified
+- [ ] Seller open/closed switch + hours visible on seller Home

@@ -67,6 +67,20 @@ class DAOUserAddresses(DAOBase):
                     .execute()
                 )
             else:
+                # receiver_name/phone_number are NOT NULL (migration 20261003): a new row defaults
+                # them to the account holder, the same rule that migration's backfill used.
+                if "receiver_name" not in data or "phone_number" not in data:
+                    owner = (
+                        self._supabase_client
+                        .table("users")
+                        .select("name, phone")
+                        .eq("id", user_id)
+                        .maybe_single()
+                        .execute()
+                    )
+                    owner = (owner.data if owner else None) or {}
+                    data.setdefault("receiver_name", owner.get("name") or "")
+                    data.setdefault("phone_number", owner.get("phone") or "")
                 result = (
                     self._supabase_client
                     .table(self._table_name)
