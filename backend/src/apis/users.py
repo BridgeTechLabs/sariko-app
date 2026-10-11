@@ -101,6 +101,9 @@ def update_current_user_profile(body: Schema.RequestUpdateProfile, user=Depends(
                     address_details=body.address_details,
                     lat=body.lat,
                     lon=body.lon,
+                    # Onboarding sends name/phone in the same request, before users is updated below
+                    receiver_name=body.name,
+                    phone_number=body.phone,
                 )
             for field in ("address", "address_details", "lat", "lon"):
                 data.pop(field, None)
