@@ -2,6 +2,7 @@
 import { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin } from 'lucide-vue-next';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
+import { minutesUntilReady, formatWait } from '@/utils/readyWindow';
 
 const STATUS_DISPLAY_KEY = {
     pending:          'seller_home.status_new',
@@ -46,6 +47,7 @@ export default {
             rebookErrors: {},     // { [orderId]: 'max_attempts'|'error' }
             activeTab: 'today',
             copiedKey: null,
+            now: Date.now(),      // ticks every minute for the "Ready in …" countdown
         }
     },
 
@@ -94,6 +96,7 @@ export default {
                     totalText: new Intl.NumberFormat('vi-VN').format(order.total_amount || 0) + ' ₫',
                     time: new Date(/[Z+]/.test(order.created_at) ? order.created_at : order.created_at + 'Z').toLocaleString(this.$i18n.locale === 'vi' ? 'vi-VN' : 'en-PH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', hour12: false }),
                     nextLabel: STATUS_NEXT[order.status] === 'confirmed' ? this.$t('seller_home.action_accept') : this.$t('seller_home.action_ready_delivery'),
+                    readyWaitMinutes: minutesUntilReady(order, this.now),
                     appointmentText: order.delivery_appointment ? this.formatAppointment(order.delivery_appointment) : null,
                 }))
         },
@@ -130,7 +133,17 @@ export default {
         },
     },
 
+    mounted() {
+        this._clock = setInterval(() => { this.now = Date.now() }, 60_000)
+    },
+
+    beforeUnmount() {
+        clearInterval(this._clock)
+    },
+
     methods: {
+        formatWait,
+
         t(key, fallback) {
             if (typeof this.$t === 'function') return this.$t(key)
             return fallback || key
@@ -397,8 +410,8 @@ export default {
                         <q-btn flat dense no-caps class="btn-reject" :disable="!!loadingOrders[order.id]" @click="openRejectDialog(order)">
                             <X :size="14" style="margin-right: 4px;" /> {{ $t('seller_home.action_reject') }}
                         </q-btn>
-                        <q-btn unelevated dense no-caps class="btn-accept" :loading="!!loadingOrders[order.id]" @click="onAccept(order)">
-                            <Check :size="14" style="margin-right: 4px;" /> {{ order.nextLabel }}
+                        <q-btn unelevated dense no-caps class="btn-accept" :loading="!!loadingOrders[order.id]" :disable="order.readyWaitMinutes > 0" @click="onAccept(order)">
+                            <Check :size="14" style="margin-right: 4px;" /> {{ order.readyWaitMinutes ? $t('seller_order_detail.ready_available_in', { time: formatWait(order.readyWaitMinutes) }) : order.nextLabel }}
                         </q-btn>
                     </div>
                 </div>

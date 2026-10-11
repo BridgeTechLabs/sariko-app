@@ -38,7 +38,7 @@ export default {
 
         <template #Header>
             <div class="page-header">
-                <PageBreadcrumbs :title="$t('seller_order_detail.page_title')" />
+                <PageBreadcrumbs :title="$t('seller_order_detail.page_title')" backTo="/seller/orders" />
             </div>
         </template>
 

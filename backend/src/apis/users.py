@@ -86,7 +86,7 @@ def update_current_user_profile(body: Schema.RequestUpdateProfile, user=Depends(
 
         if is_seller:
             seller_fields = {}
-            for field in ("phone", "address", "lat", "lon"):
+            for field in ("phone", "address", "lat", "lon", "store_name"):
                 if field in data:
                     seller_fields[field] = data.pop(field)
             data.pop("address_details", None)

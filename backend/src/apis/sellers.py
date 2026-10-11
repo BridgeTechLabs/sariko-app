@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta, timezone
 
 from dao.dao_seller_profiles import DAOSellerProfiles
 from dao.dao_food_items import DAOFoodItems
@@ -26,6 +27,16 @@ VALID_STATUS_TRANSITIONS = {
     "ready":            ["done", "cancelled"],  # delivery_failed is set by webhook only, not by seller
     "delivery_failed":  ["done", "cancelled"],
 }
+
+# Marking "ready" books Lalamove right away, so a scheduled order may only go
+# ready this long before its delivery_appointment. Frontend mirrors this (READY_WINDOW_MINUTES).
+READY_WINDOW = timedelta(minutes=45)
+
+
+def ready_opens_at(order: dict):
+    """When a scheduled order may be marked ready; None = any time (no appointment)."""
+    appointment = order.get("delivery_appointment")
+    return datetime.fromisoformat(appointment) - READY_WINDOW if appointment else None
 
 
 @router.get("/")
@@ -151,6 +162,10 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                 status_code=400,
                 detail=f"Cannot transition from '{order['status']}' to '{body.status}'"
             )
+
+        opens_at = ready_opens_at(order) if body.status == "ready" else None
+        if opens_at and datetime.now(timezone.utc) < opens_at:
+            raise HTTPException(status_code=400, detail=f"Too early to mark ready: available from {opens_at.isoformat()}")
 
         # Pass cancellation_reason when rejecting
         cancellation_reason = body.cancellation_reason if body.status == "cancelled" else None

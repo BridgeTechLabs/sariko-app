@@ -126,7 +126,7 @@ class DAOSellerProfiles(DAOBase):
 
     def update_seller_profile_info(self, user_id: str, data: dict):
         try:
-            allowed = {"phone", "address", "lat", "lon"}
+            allowed = {"phone", "address", "lat", "lon", "store_name"}
             update_fields = {k: v for k, v in data.items() if k in allowed}
             if not update_fields:
                 return None

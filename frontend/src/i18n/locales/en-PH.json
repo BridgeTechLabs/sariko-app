@@ -128,7 +128,7 @@
             "banner_text_line_2": "· 17% commission · Founding Seller"
         },
         "section_food_cards": {
-            "label_item_available": "Available",
+            "label_item_instant": "Same-day",
             "lable_item_pre_order": "Pre-order",
             "lable_item_pre_order_unit_day": "days"
         },
@@ -239,7 +239,12 @@
         "error_avatar_size": "Image must be under 2MB",
         "error_avatar_upload": "Failed to upload photo, please try again",
         "validation_name_required": "Please enter your name",
-        "validation_phone_invalid": "Invalid phone number format"
+        "validation_phone_invalid": "Invalid phone number format",
+        "label_store_name": "Store name",
+        "placeholder_store_name": "e.g. Rosa's Home Kitchen",
+        "helper_store_name": "Your shop link stays the same after renaming",
+        "validation_store_name_required": "Please enter your store name",
+        "validation_store_name_too_long": "Max 50 characters"
     },
     "change_password_page": {
         "label_new": "New password",
@@ -515,6 +520,7 @@
         "timeline_delivered": "Delivered",
         "action_accept_order": "Accept Order",
         "action_mark_ready": "Mark Ready for Delivery",
+        "ready_available_in": "Ready in {time}",
         "action_mark_done": "Mark as Done",
         "action_reject": "Reject",
         "action_bar_driver_on_way": "🚴 Driver is on the way",
@@ -551,7 +557,6 @@
         "seller_badge": "Seller",
         "edit_profile": "Edit Profile",
         "section_title_settings": "Settings",
-        "menu_label_profile": "My Profile",
         "menu_label_store_address": "Store Address",
         "menu_label_language": "Language",
         "menu_label_terms": "Terms of Service",
@@ -609,8 +614,9 @@
         "item_unit_label_placeholder": "E.g. serving",
         "item_min_quantity": "Min Qty",
         "item_quantity_step": "Step",
+        "item_preorder": "Pre-order",
         "item_preorder_day": "Preorder (days)",
-        "item_available": "Available",
+        "item_available": "On sale",
         "item_featured": "Featured",
         "image_pick": "Pick Photo",
         "uploading": "Uploading...",

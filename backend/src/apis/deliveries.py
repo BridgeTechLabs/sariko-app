@@ -207,6 +207,9 @@ async def delivery_webhook(request: Request):
         logger.warning(f"[Webhook] {event_type} → order={lalamove_order_id} status={new_status}")
 
         dao_orders = DAOOrders()
+        # Order list badges show the delivery status: move the seller's list signature too
+        dao_orders.touch_order(delivery["order_id"])
+
         if event_type == "DRIVER_ASSIGNED":
             order = dao_orders.read_order_by_id_raw(delivery["order_id"])
             if order:

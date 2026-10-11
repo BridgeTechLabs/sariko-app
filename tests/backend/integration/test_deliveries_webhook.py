@@ -62,6 +62,9 @@ class _FakeOrderDAO:
             return self._order
         return None
 
+    def touch_order(self, order_id):
+        self.touched = order_id
+
     def update_order_status(self, order_id, status):
         self.last_status = status
         if self._order:
@@ -233,4 +236,5 @@ def test_webhook_driver_assigned_notifies_seller(
     assert res.status_code == 200
     assert [o["id"] for o in notified] == ["ord-uuid"]
     assert fake_ord.last_status is None, "Driver assignment must not change the order status"
+    assert fake_ord.touched == "ord-uuid", "Seller list signature must move on a delivery-only change"
     assert fake_del.last_update["driver_name"] == "Tran Van A"

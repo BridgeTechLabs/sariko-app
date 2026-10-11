@@ -128,7 +128,7 @@
             "banner_text_line_2": "· Hoa hồng 17% · Người bán sáng lập"
         },
         "section_food_cards": {
-            "label_item_available": "Có sẵn",
+            "label_item_instant": "Giao ngay",
             "lable_item_pre_order": "Cần đặt trước",
             "lable_item_pre_order_unit_day": "ngày"
         },
@@ -239,7 +239,12 @@
         "error_avatar_size": "Ảnh phải nhỏ hơn 2MB",
         "error_avatar_upload": "Tải ảnh thất bại, vui lòng thử lại",
         "validation_name_required": "Vui lòng nhập tên",
-        "validation_phone_invalid": "Số điện thoại không hợp lệ"
+        "validation_phone_invalid": "Số điện thoại không hợp lệ",
+        "label_store_name": "Tên cửa hàng",
+        "placeholder_store_name": "VD: Bếp nhà Rosa",
+        "helper_store_name": "Đường link cửa hàng giữ nguyên khi đổi tên",
+        "validation_store_name_required": "Vui lòng nhập tên cửa hàng",
+        "validation_store_name_too_long": "Tối đa 50 ký tự"
     },
     "change_password_page": {
         "label_new": "Mật khẩu mới",
@@ -515,6 +520,7 @@
         "timeline_delivered": "Đã giao",
         "action_accept_order": "Nhận đơn",
         "action_mark_ready": "Sẵn sàng giao hàng",
+        "ready_available_in": "Sẵn sàng sau {time}",
         "action_mark_done": "Đánh dấu hoàn tất",
         "action_reject": "Từ chối",
         "action_rebook_delivery": "Đặt lại giao hàng",
@@ -551,7 +557,6 @@
         "seller_badge": "Người bán",
         "edit_profile": "Chỉnh sửa hồ sơ",
         "section_title_settings": "Cài đặt",
-        "menu_label_profile": "Hồ sơ của tôi",
         "menu_label_store_address": "Địa chỉ cửa hàng",
         "menu_label_language": "Ngôn ngữ",
         "menu_label_terms": "Điều khoản dịch vụ",
@@ -612,6 +617,7 @@
         "item_unit_label_placeholder": "VD: phần",
         "item_min_quantity": "SL tối thiểu",
         "item_quantity_step": "Bước tăng",
+        "item_preorder": "Đặt trước",
         "item_preorder_day": "Đặt trước (ngày)",
         "item_available": "Đang bán",
         "item_featured": "Nổi bật",
