@@ -1,5 +1,5 @@
-from typing import Optional
-from pydantic import BaseModel
+from typing import Annotated, Optional
+from pydantic import BaseModel, StringConstraints
 
 
 class RequestUpdateProfile(BaseModel):
@@ -11,3 +11,5 @@ class RequestUpdateProfile(BaseModel):
     address_details: Optional[str] = None
     lat: Optional[float] = None
     lon: Optional[float] = None
+    # Sellers only (ignored for buyers). Display name only, the slug never changes, so shared links keep working.
+    store_name: Optional[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]] = None

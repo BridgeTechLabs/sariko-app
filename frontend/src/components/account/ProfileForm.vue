@@ -1,11 +1,12 @@
 <script>
-import { User, Phone, Camera } from 'lucide-vue-next';
+import { User, Phone, Camera, Store } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth/authStore';
+import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiUsers from '@/apis/users/apiUsers';
 import { fileToBase64 } from '@/utils/fileToBase64';
 
 export default {
-    components: { User, Phone, Camera },
+    components: { User, Phone, Camera, Store },
 
     data() {
         return {
@@ -17,6 +18,8 @@ export default {
             saving: false,
             nameError: null,
             phoneError: null,
+            storeName: '',
+            storeNameError: null,
         }
     },
 
@@ -27,6 +30,12 @@ export default {
         user() {
             return this.authStore.user
         },
+        isSeller() {
+            return !!this.user?.isSeller
+        },
+        sellerInfo() {
+            return useDashboardStore().sellerInfo
+        },
         initials() {
             if (!this.name) return '?'
             return this.name.trim().charAt(0).toUpperCase()
@@ -35,18 +44,23 @@ export default {
             return (
                 this.name !== (this.user?.fullName || '') ||
                 this.phone !== (this.user?.phone || '') ||
-                this.avatarUrl !== (this.user?.avatarUrl || '')
+                this.avatarUrl !== (this.user?.avatarUrl || '') ||
+                (this.isSeller && this.storeName !== (this.sellerInfo?.store_name || ''))
             )
         },
         canSave() {
-            return this.isDirty && !this.saving && !this.nameError && !this.phoneError && !this.uploadingAvatar
+            return this.isDirty && !this.saving && !this.nameError && !this.phoneError && !this.storeNameError && !this.uploadingAvatar
         }
     },
 
-    mounted() {
+    async mounted() {
         this.name = this.user?.fullName || ''
         this.phone = this.user?.phone || ''
         this.avatarUrl = this.user?.avatarUrl || ''
+        if (this.isSeller) {
+            if (!this.sellerInfo) await useDashboardStore().fetchSellerInfo()
+            this.storeName = this.sellerInfo?.store_name || ''
+        }
     },
 
     methods: {
@@ -92,6 +106,15 @@ export default {
             return true
         },
 
+        // Mirrors backend RequestUpdateProfile.store_name: required, ≤ 50 chars after trim
+        validateStoreName() {
+            const value = this.storeName.trim()
+            this.storeNameError = !value ? this.$t('edit_profile_page.validation_store_name_required')
+                : value.length > 50 ? this.$t('edit_profile_page.validation_store_name_too_long')
+                : null
+            return !this.storeNameError
+        },
+
         validatePhone() {
             if (!this.phone) {
                 this.phoneError = null
@@ -111,6 +134,7 @@ export default {
         async onSave() {
             if (!this.validateName()) return
             if (!this.validatePhone()) return
+            if (this.isSeller && !this.validateStoreName()) return
 
             this.saving = true
             try {
@@ -118,7 +142,9 @@ export default {
                     name: this.name.trim(),
                     phone: this.phone ? this.phone.trim() : null,
                     avatar_url: this.avatarUrl ? this.avatarUrl.trim() : null,
+                    store_name: this.isSeller ? this.storeName.trim() : undefined,
                 })
+                if (this.isSeller && this.sellerInfo) this.sellerInfo.store_name = this.storeName.trim()
 
                 // Update local store state
                 if (this.user) {
@@ -166,6 +192,25 @@ export default {
                 :error="!!nameError"
                 :error-message="nameError"
                 @blur="validateName"
+            />
+        </div>
+
+        <!-- Store name (sellers only; the shop link/slug stays the same) -->
+        <div v-if="isSeller" class="form-field">
+            <label class="field-label">
+                <Store :size="16" /> {{ $t('edit_profile_page.label_store_name') }}
+            </label>
+            <q-input
+                v-model="storeName"
+                dense
+                outlined
+                dark
+                maxlength="50"
+                :placeholder="$t('edit_profile_page.placeholder_store_name')"
+                :hint="$t('edit_profile_page.helper_store_name')"
+                :error="!!storeNameError"
+                :error-message="storeNameError"
+                @blur="validateStoreName"
             />
         </div>
 

@@ -3,6 +3,8 @@ import BaseIcon from '@/components/v2/shared/BaseIcon.vue';
 
 // Labeled text input, use with v-model. Extra attrs (type, inputmode, autocomplete, @blur...)
 // go to the <input>/<textarea>. A non-empty `error` switches to the error state and replaces `hint`.
+// `size` lg = taller field with body text (Edit profile / Change password); `trailing` slot sits after the input,
+// `leading` slot before it (e.g. BaseCountryCodeSelect in place of a fixed `prefix`).
 export default {
     components: { BaseIcon },
 
@@ -53,12 +55,17 @@ export default {
             type: Boolean,
             default: false,
         },
+        size: {
+            type: String,
+            default: 'sm',
+            validator: (value) => ['sm', 'lg'].includes(value),
+        },
     },
 }
 </script>
 
 <template>
-    <label class="base-text-field">
+    <label class="base-text-field" :class="`size-${size}`">
         <span class="label">
             {{ label }}
             <span v-if="required" class="required">*</span>
@@ -68,6 +75,7 @@ export default {
         <span class="input" :class="{ error: !!error, multiline }">
             <BaseIcon v-if="icon" class="input-icon" :name="icon" :size="20" />
             <span v-if="prefix" class="prefix">{{ prefix }}</span>
+            <slot name="leading" />
             <textarea
                 v-if="multiline"
                 v-bind="$attrs"
@@ -82,9 +90,13 @@ export default {
                 :placeholder="placeholder"
                 @input="$emit('update:modelValue', $event.target.value)"
             />
+            <slot name="trailing" />
         </span>
 
-        <span v-if="error" class="helper error-text">{{ error }}</span>
+        <span v-if="error" class="helper error-text">
+            <BaseIcon v-if="size === 'lg'" name="alert-triangle" :size="16" />
+            {{ error }}
+        </span>
         <span v-else-if="hint" class="helper">{{ hint }}</span>
     </label>
 </template>
@@ -193,5 +205,39 @@ textarea::placeholder {
 
 .helper.error-text {
     color: var(--status-error-foreground);
+}
+.size-lg .label {
+    color: var(--text-secondary);
+}
+
+.size-lg .input {
+    height: auto;
+    gap: var(--space-8);
+    padding: var(--space-16);
+    background: var(--background);
+}
+
+/* 2px border in error/focus — shrink padding by 1px so content doesn't shift */
+.size-lg .input.error {
+    border-width: var(--border-strong);
+    border-color: var(--status-error);
+}
+
+.size-lg .input.error,
+.size-lg .input:focus-within {
+    padding: calc(var(--space-16) - 1px);
+}
+
+.size-lg input {
+    font-size: var(--font-size-base);
+    line-height: var(--font-line-height-24);
+    font-weight: var(--font-weight-regular);
+}
+
+.size-lg .helper.error-text {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    color: var(--status-error);
 }
 </style>

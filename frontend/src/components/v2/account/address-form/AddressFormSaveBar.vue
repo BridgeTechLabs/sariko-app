@@ -29,10 +29,11 @@ export default {
             try {
                 await this.saveAddressForm()
                 this.$q.notify({
-                    classes: 'quasar-notify-positive',
-                    message: `✔️ ${this.$t('common.toast_update_success')}`,
+                    classes: 'notify-v2-success',
+                    icon: 'fa-solid fa-check',
+                    message: this.$t('account_v2.address_saved'),
                     position: 'bottom',
-                    timeout: 1500,
+                    timeout: 2000,
                 })
                 this.$router.push({ name: 'account-addresses-v2' })
             } catch (error) {

@@ -7,6 +7,7 @@ import apiUsers from "@/apis/users/apiUsers";
 import { useCartStore } from "@/stores/cart/cartStore";
 import { useOrderStore } from "@/stores/order/orderStore";
 import { i18n } from "@/plugins/i18n";
+import { disablePush } from "@/composables/pushNotifications";
 
 const LANG_MAP = { 'Tiếng Việt': 'vi', 'English': 'en_ph', 'Fillipino': 'en_ph' };
 
@@ -403,6 +404,8 @@ export const useAuthStore = defineStore("authStore", {
 
         async onClickedSignout() {
             try {
+                // Shared phone: stop this device getting the old account's order pushes
+                await disablePush().catch((error) => console.warn(`authStore - disablePush - ${error}`));
                 await apiAuth.authSignout();
                 this.session = null;
                 this.user = null;

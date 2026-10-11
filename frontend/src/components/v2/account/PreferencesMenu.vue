@@ -19,8 +19,12 @@ export default {
     },
 
     methods: {
-        ...mapActions(useAccountV2Store, ['toggleNotification']),
+        ...mapActions(useAccountV2Store, ['toggleNotification', 'syncPushState']),
         ...mapActions(useThemeStore, ['toggleTheme']),
+    },
+
+    mounted() {
+        this.syncPushState()
     },
 }
 </script>
@@ -36,6 +40,7 @@ export default {
         <AccountMenuRow
             icon="lock"
             :label="$t('account_v2.change_password')"
+            @click="$router.push({ name: 'account-change-password-v2' })"
         />
         <AccountMenuRow
             icon="moon"

@@ -24,6 +24,10 @@ export default {
         sellerStatus: {
             type: String,
             default: 'active'
+        },
+        sellerIsOpen: {
+            type: Boolean,
+            default: true
         }
     },
 
@@ -47,7 +51,7 @@ export default {
 
 <template>
 
-    <div v-on:click="onClicked" :class="sellerIndex == 1 ? 'container-1st' : 'container'">
+    <div v-on:click="onClicked" :class="[sellerIndex == 1 ? 'container-1st' : 'container', { muted: isComingSoon }]">
 
         <div class="seller-avatar">
             <q-avatar v-if="sellerAvatarImageURL" size="48px">
@@ -73,6 +77,11 @@ export default {
                 rounded
                 class="badge badge-coming-soon"
                 :label="$t('seller_card.coming_soon')"/>
+                <q-badge
+                v-else-if="!sellerIsOpen"
+                rounded
+                class="badge badge-coming-soon"
+                :label="$t('seller_card.closed')"/>
                 <q-badge
                 v-else
                 rounded
@@ -143,6 +152,12 @@ export default {
     font-size: 9px;
     color: #facc15;
     background-color: #4a391f;
+}
+
+// Coming-soon kitchens stay tappable (they open the coming-soon page) but read as not orderable yet
+.muted {
+    opacity: 0.5;
+    filter: grayscale(1);
 }
 
 .badge-coming-soon {

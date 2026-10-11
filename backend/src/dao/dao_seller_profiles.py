@@ -3,6 +3,7 @@ import logging
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
+from core.store_hours import is_open_now, with_open_now
 from dao.dao_base import DAOBase
 
 logger = logging.getLogger(__name__)
@@ -17,14 +18,16 @@ class DAOSellerProfiles(DAOBase):
     def read_founding_sellers(self):
         try:
             query = self._supabase_client.table(self._table_name)
-            query = query.select("id, user_id, store_name, slug, avatar_url, status")
+            query = query.select("id, user_id, store_name, slug, avatar_url, status, is_open, opening_time, closing_time")
             query = query.eq("is_listed", True)
             query = query.order("status").order("display_order").order("created_at")
 
             result = query.execute()
             
             if result and result.data:
-                return result.data
+                sellers = [with_open_now(s) for s in result.data]
+                # active before coming_soon, then open-now before closed; stable, so display_order holds within each block
+                return sorted(sellers, key=lambda s: (s["status"] != "active", not s["is_open"]))
                 
             return None
             
@@ -44,7 +47,7 @@ class DAOSellerProfiles(DAOBase):
             result = query.execute()
             
             if result and result.data:
-                return result.data
+                return with_open_now(result.data)
                 
             return None
             
@@ -60,7 +63,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("id, store_name, slug, avatar_url, address, phone, lat, lon, rating_avg, rating_count")
+                .select("id, store_name, slug, avatar_url, address, phone, lat, lon, rating_avg, rating_count, is_open, opening_time, closing_time")
                 .eq("user_id", user_id)
                 .maybe_single()
                 .execute()
@@ -126,7 +129,7 @@ class DAOSellerProfiles(DAOBase):
 
     def update_seller_profile_info(self, user_id: str, data: dict):
         try:
-            allowed = {"phone", "address", "lat", "lon"}
+            allowed = {"phone", "address", "lat", "lon", "store_name", "is_open", "opening_time", "closing_time"}
             update_fields = {k: v for k, v in data.items() if k in allowed}
             if not update_fields:
                 return None
@@ -160,7 +163,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("user_id, commission_rate_override, admin_tier_config(commission_rate)")
+                .select("user_id, is_open, opening_time, closing_time, commission_rate_override, admin_tier_config(commission_rate)")
                 .eq("id", seller_id)
                 .maybe_single()
                 .execute()
@@ -172,6 +175,7 @@ class DAOSellerProfiles(DAOBase):
             effective_rate = row["commission_rate_override"] if row["commission_rate_override"] is not None else tier_rate
             return {
                 "user_id": row["user_id"],
+                "is_open": is_open_now(row["is_open"], row["opening_time"], row["closing_time"]),
                 "commission_rate": float(effective_rate),
             }
         except PostgrestExceptionAPIError as e:

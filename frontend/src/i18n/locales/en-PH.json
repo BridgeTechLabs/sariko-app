@@ -116,6 +116,7 @@
         }
     },
     "seller_page": {
+        "closed_notice": "Closed now · pre-orders only",
         "section_banner": {
             "banner_card_rating_subtitle": "Rating",
             "banner_card_orders_subtitle": "Items",
@@ -128,7 +129,7 @@
             "banner_text_line_2": "· 17% commission · Founding Seller"
         },
         "section_food_cards": {
-            "label_item_available": "Available",
+            "label_item_instant": "Same-day",
             "lable_item_pre_order": "Pre-order",
             "lable_item_pre_order_unit_day": "days"
         },
@@ -143,9 +144,11 @@
         "btn_view_cart": "View cart"
     },
     "seller_card": {
+        "closed": "Closed",
         "coming_soon": "Coming soon"
     },
     "food_detail_page": {
+        "button_store_closed": "Store closed",
         "label_price": "Price",
         "label_total_price": "Total price",
         "label_quantity": "Quantity",
@@ -162,6 +165,7 @@
         "label_choose_option": "Choose an option"
     },
     "cart_page": {
+        "store_closed_same_day": "This store is closed: same-day dishes are paused, pre-order dishes are still available.",
         "section_delivery_address": {
             "title": "DELIVERY TO {name}",
             "button_label_text_edit": "Change",
@@ -239,7 +243,12 @@
         "error_avatar_size": "Image must be under 2MB",
         "error_avatar_upload": "Failed to upload photo, please try again",
         "validation_name_required": "Please enter your name",
-        "validation_phone_invalid": "Invalid phone number format"
+        "validation_phone_invalid": "Invalid phone number format",
+        "label_store_name": "Store name",
+        "placeholder_store_name": "e.g. Rosa's Home Kitchen",
+        "helper_store_name": "Your shop link stays the same after renaming",
+        "validation_store_name_required": "Please enter your store name",
+        "validation_store_name_too_long": "Max 50 characters"
     },
     "change_password_page": {
         "label_new": "New password",
@@ -414,6 +423,17 @@
         "track_rider": "Track Rider"
     },
     "seller_home": {
+        "hours_label": "Opening hours",
+        "hours_all_day": "All day",
+        "hours_edit": "Edit",
+        "hours_open_at": "Opens at",
+        "hours_close_at": "Closes at",
+        "hours_overnight_note": "Applies every day. Closing before opening = overnight (e.g. 18:00–02:00).",
+        "hours_outside_hint": "Outside opening hours: customers see your store as Closed (pre-orders still OK).",
+        "store_open": "Open",
+        "store_closed": "Closed",
+        "close_confirm_title": "Close your store?",
+        "close_confirm_body": "You still have {count} order(s) to handle. Closing only stops new same-day orders; current orders and pre-orders continue.",
         "greeting_morning": "Good morning, {name}! 👋",
         "greeting_afternoon": "Good afternoon, {name}! 👋",
         "greeting_evening": "Good evening, {name}! 👋",
@@ -515,6 +535,7 @@
         "timeline_delivered": "Delivered",
         "action_accept_order": "Accept Order",
         "action_mark_ready": "Mark Ready for Delivery",
+        "ready_available_in": "Ready in {time}",
         "action_mark_done": "Mark as Done",
         "action_reject": "Reject",
         "action_bar_driver_on_way": "🚴 Driver is on the way",
@@ -551,11 +572,11 @@
         "seller_badge": "Seller",
         "edit_profile": "Edit Profile",
         "section_title_settings": "Settings",
-        "menu_label_profile": "My Profile",
         "menu_label_store_address": "Store Address",
         "menu_label_language": "Language",
         "menu_label_terms": "Terms of Service",
         "menu_label_privacy": "Privacy Policy",
+        "menu_label_new_order_alerts": "New order notifications",
         "section_title_promote": "Promote Your Store",
         "promote_subtitle": "Share your shop link or QR code with customers",
         "promote_copy": "Copy Link",
@@ -608,8 +629,9 @@
         "item_unit_label_placeholder": "E.g. serving",
         "item_min_quantity": "Min Qty",
         "item_quantity_step": "Step",
+        "item_preorder": "Pre-order",
         "item_preorder_day": "Preorder (days)",
-        "item_available": "Available",
+        "item_available": "On sale",
         "item_featured": "Featured",
         "image_pick": "Pick Photo",
         "uploading": "Uploading...",
@@ -663,6 +685,18 @@
         "stat_reviews": "Reviews",
         "stat_following": "Following",
         "edit_profile": "Edit profile",
+        "edit_profile_photo_hint": "Tap to change photo · max 2 MB",
+        "edit_profile_photo_size_error": "Image must be under 2 MB. Try another photo.",
+        "edit_profile_photo_type_error": "Please choose an image file.",
+        "edit_profile_name": "Full name",
+        "edit_profile_name_placeholder": "Your full name",
+        "edit_profile_name_error": "Please enter your name",
+        "edit_profile_phone": "Phone number",
+        "edit_profile_phone_placeholder": "903 059 993",
+        "edit_profile_phone_hint": "Sellers and riders use this to reach you",
+        "edit_profile_phone_error": "Enter a 9-digit phone number",
+        "edit_profile_save": "Save changes",
+        "edit_profile_saved": "Profile updated",
         "saved_addresses": "Saved addresses",
         "saved_count": "{count} saved",
         "default_payment": "Default payment",
@@ -675,6 +709,9 @@
         "theme_dark": "Dark",
         "order_updates": "Order updates",
         "seller_news": "Seller news and promos",
+        "push_unsupported": "This browser can't receive notifications. On iPhone, add Sariko to your Home Screen first.",
+        "push_blocked": "Notifications are blocked. Allow them for Sariko in your browser settings.",
+        "push_failed": "Couldn't turn on notifications in this browser. On Brave, enable \"Use Google services for push messaging\" in Settings → Privacy, then try again.",
         "become_seller_eyebrow": "Cook for kababayan",
         "become_seller_title": "Sell lutong bahay from your kitchen",
         "become_seller_desc": "{count} founding seller slots left. 3 months free, then a low fee locked in.",
@@ -703,6 +740,9 @@
         "address_form_street": "Street address",
         "address_form_street_placeholder": "Search a street or building",
         "address_form_street_hint": "Start typing and pick from the list so the rider finds you",
+        "address_form_use_location": "Use current location",
+        "address_form_locating": "Getting location…",
+        "address_form_locate_error": "Couldn't get your location",
         "address_form_building": "Building, floor, unit",
         "address_form_building_placeholder": "e.g. Tower B, floor 8, unit 802",
         "address_form_receiver": "Receiver name",
@@ -717,6 +757,17 @@
         "address_form_set_default": "Set as default address",
         "address_form_save": "Save address",
         "address_form_save_changes": "Save changes",
+        "password_new": "New password",
+        "password_new_placeholder": "At least 6 characters",
+        "password_new_hint": "Use at least 6 characters",
+        "password_new_error": "Password must be at least 6 characters",
+        "password_confirm": "Confirm password",
+        "password_confirm_placeholder": "Re-enter new password",
+        "password_confirm_error": "Passwords do not match",
+        "password_show": "Show password",
+        "password_hide": "Hide password",
+        "password_update": "Update password",
+        "password_updated": "Password updated successfully",
         "language_title": "Language",
         "language_subtitle": "Changes the language across the app",
         "language_en_name": "English",
@@ -724,6 +775,22 @@
         "language_tl_name": "Tagalog",
         "language_tl_desc": "Filipino",
         "language_vi_name": "Tiếng Việt",
-        "language_vi_desc": "Vietnamese"
+        "language_vi_desc": "Vietnamese",
+        "terms_last_updated": "Last updated 1 Sep 2026",
+        "terms_using_title": "Using SariKo",
+        "terms_using_body": "SariKo connects you with Filipino home cooks and small sellers in Ho Chi Minh City. You need an account to order, chat with sellers and leave reviews.",
+        "terms_orders_title": "Orders and payment",
+        "terms_orders_body": "Your order goes to the seller once it is placed. Pay online or with cash on delivery, depending on what the seller accepts.",
+        "terms_delivery_title": "Delivery",
+        "terms_delivery_body": "Delivery fees are estimated at checkout and confirmed by the seller. Pre-order dishes are delivered on the date shown.",
+        "terms_refunds_title": "Refunds and disputes",
+        "terms_refunds_body": "If something is wrong with your order, contact us within 48 hours of delivery so we can help.",
+        "terms_placeholder_note": "Placeholder copy. Replace with the approved legal text. Privacy policy, Shipping policy, Payment methods and About SariKo use this same page layout.",
+        "address_saved": "Address saved",
+        "phone_country_unsupported": "Only Vietnamese numbers (+84) are supported for now",
+        "country_code_title": "Country code",
+        "country_code_search": "Search country or code",
+        "country_code_empty": "No matching country",
+        "country_code_close": "Close"
     }
 }

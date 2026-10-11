@@ -62,9 +62,9 @@ export default {
             if (this.loading) return
             this.loading = true
             const cartStore = useCartStore()
-            await cartStore.addItem(this.sellerId, this.itemId, this.sellerName)
+            const added = await cartStore.addItem(this.sellerId, this.itemId, this.sellerName)
             this.loading = false
-            if (!cartStore.isShowModalCartConflict) {
+            if (added && !cartStore.isShowModalCartConflict) {
                 this.$q.notify({
                     classes: 'quasar-notify-positive',
                     message: `✔️ ${this.name} added to cart`,

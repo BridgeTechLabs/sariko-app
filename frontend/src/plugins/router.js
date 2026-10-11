@@ -226,6 +226,24 @@ const routes = [
         meta: { requiresAuth: true }
     },
     {
+        path: '/v2/account/change-password',
+        name: 'account-change-password-v2',
+        component: () => import('@/pages/v2/account/ChangePasswordPage.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/v2/account/edit-profile',
+        name: 'account-edit-profile-v2',
+        component: () => import('@/pages/v2/account/EditProfilePage.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/v2/account/terms',
+        name: 'account-terms-v2',
+        component: () => import('@/pages/v2/account/TermsPage.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/pages/NotFoundPage.vue'),

@@ -12,6 +12,11 @@ export const apiAddress = {
         return response.data
     },
 
+    reverse: async (lat, lon) => {
+        const response = await apiClient.get('/v1/address/reverse', { params: { lat, lon } })
+        return response.data
+    },
+
 }
 
 export default apiAddress

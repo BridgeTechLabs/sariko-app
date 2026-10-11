@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import apiCarts from "@/apis/cart/apiCart";
+import { Notify } from "quasar";
+import { i18n } from "@/plugins/i18n";
 
 export const useCartStore = defineStore("cartStore", {
     state() {
@@ -78,6 +80,7 @@ export const useCartStore = defineStore("cartStore", {
             try {
                 await apiCarts.addItem(sellerId, foodItemId, quantity, variantId)
                 await this.refreshCart()
+                return true
             } catch (e) {
                 if (e.message === 'another seller') {
                     this.pendingSellerId = sellerId
@@ -85,9 +88,12 @@ export const useCartStore = defineStore("cartStore", {
                     this.pendingVariantId = variantId
                     this.pendingSellerName = newSellerName
                     this.showConflictModal(e.currentSellerName || '', newSellerName || '')
+                } else if (e.message.includes('store is closed')) {
+                    Notify.create({ classes: 'quasar-notify-negative', message: i18n.global.t('cart_page.store_closed_same_day'), position: 'bottom', timeout: 3000 })
                 } else {
                     console.error(`cartStore - addItem - ${e}`)
                 }
+                return false
             }
         },
 

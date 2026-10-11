@@ -118,3 +118,27 @@ html, body {
     color: white;
     font-weight: 600;
 }
+/* v2 toast (Figma "Molecules/toast") — sits 24px above the 96px bottom bar */
+.notify-v2-success {
+    width: calc(100% - 2 * var(--space-24));
+    min-height: 52px;
+    margin: 0 var(--space-24) calc(96px + var(--space-24) + env(safe-area-inset-bottom, 0px));
+    padding: var(--space-16);
+    gap: var(--space-16);
+    background: var(--foreground) !important;
+    color: var(--background) !important;
+    border-radius: var(--radius-lg);
+    box-shadow:
+        0 2px 4px color-mix(in srgb, var(--brand-navy) 8%, transparent),
+        0 16px 40px -8px color-mix(in srgb, var(--brand-navy) 16%, transparent);
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-xs);
+    line-height: var(--font-line-height-16);
+    font-weight: var(--font-weight-semibold);
+}
+
+.notify-v2-success .q-notification__icon {
+    margin-right: 0;
+    font-size: 20px;
+    color: var(--status-success);
+}

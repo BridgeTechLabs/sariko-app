@@ -1,10 +1,12 @@
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
 from core.sariko_cache import cache
 from dao.dao_base import DAOBase
+from services import push_service
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +98,7 @@ class DAOOrders(DAOBase):
     def read_orders_by_user_id(self, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), reviews(id)") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), reviews(id), deliveries(status)") \
                 .eq("user_id", user_id) \
                 .order("created_at", desc=True) \
                 .limit(1, foreign_table="reviews") \
@@ -134,7 +136,7 @@ class DAOOrders(DAOBase):
     def read_orders_by_seller_id(self, seller_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, created_at, users(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity)") \
+                .select("id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, created_at, users(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status)") \
                 .eq("seller_id", seller_id) \
                 .eq("payment_status", "paid") \
                 .order("created_at", desc=True) \
@@ -204,6 +206,9 @@ class DAOOrders(DAOBase):
                 # The updated row carries seller_id, so the cache drop costs
                 # nothing extra here.
                 _invalidate_seller_orders(result.data[0].get("seller_id"))
+                # Every status change funnels through here (seller, Lalamove
+                # webhook, auto-cancel, dev panel), so this is the one hook.
+                push_service.notify_order_status(result.data[0])
                 return result.data[0]
 
             return None
@@ -217,7 +222,7 @@ class DAOOrders(DAOBase):
         """Read order by ID without user scoping (for IPN server-to-server)."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, payment_status, status, total_amount") \
+                .select("id, seller_user_id, payment_status, status, total_amount") \
                 .eq("id", order_id) \
                 .maybe_single() \
                 .execute()
@@ -261,12 +266,35 @@ class DAOOrders(DAOBase):
             # returns void, so seller_id costs one primary-key read — once per
             # payment, against a cache that serves every poll tick in between.
             self._invalidate_cache_for_order(order_id)
+
+            # Same rule as the cache drop: the payment is already written, so a
+            # failed push lookup must not turn the IPN into an error.
+            if payment_status == "paid":
+                try:
+                    order = self.read_order_by_id_raw(order_id)
+                    if order:
+                        push_service.notify_new_order(order)
+                except Exception as e:
+                    logger.warning(f"new-order push skipped for order {order_id}: {e}")
             return True
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - update_payment_status: {e}")
         except Exception as e:
             raise Exception(f"error update_payment_status: {e}")
+
+    def touch_order(self, order_id: str):
+        """Bump orders.updated_at (the on_orders_update trigger sets it) and drop the
+        seller's cached signature. The order lists show the delivery status, so a
+        delivery-only change must still move the list signature the seller polls."""
+        try:
+            self._supabase_client.table(self._table_name) \
+                .update({"updated_at": datetime.now(timezone.utc).isoformat()}) \
+                .eq("id", order_id) \
+                .execute()
+            self._invalidate_cache_for_order(order_id)
+        except Exception as e:
+            logger.warning(f"touch_order failed for {order_id}: {e}")
 
     def _invalidate_cache_for_order(self, order_id: str):
         """Drop the owning seller's cached signature for a write that did not

@@ -7,6 +7,17 @@ export const apiSellerDashboard = {
         return response.data
     },
 
+    setStoreOpen: async (isOpen) => {
+        const response = await apiClient.patch('/v1/sellers/me/open', { is_open: isOpen })
+        return response.data
+    },
+
+    // "HH:MM" strings, or both null for open all day
+    setStoreHours: async (openingTime, closingTime) => {
+        const response = await apiClient.patch('/v1/sellers/me/hours', { opening_time: openingTime, closing_time: closingTime })
+        return response.data
+    },
+
     getOrders: async () => {
         const response = await apiClient.get('/v1/sellers/me/orders')
         return response.data

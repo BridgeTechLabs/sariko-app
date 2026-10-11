@@ -19,6 +19,11 @@ from schemas.request_set_pinned import RequestSetPinned
 
 # User Profile API
 from schemas.request_update_profile import RequestUpdateProfile
+from schemas.request_create_push_subscription import RequestCreatePushSubscription
+
+# User Addresses API
+from schemas.request_create_user_address import RequestCreateUserAddress
+from schemas.request_update_user_address import RequestUpdateUserAddress
 
 # Order API
 from schemas.request_create_order import RequestCreateOrder
@@ -29,6 +34,8 @@ from schemas.request_create_review import RequestCreateReview
 
 # Seller Order API
 from schemas.request_update_order_status import RequestUpdateOrderStatus
+from schemas.request_set_store_open import RequestSetStoreOpen
+from schemas.request_set_store_hours import RequestSetStoreHours
 
 # Seller Menu — Categories
 from schemas.request_create_category import RequestCreateCategory
@@ -57,6 +64,10 @@ class Schema:
     RequestSetPinned = RequestSetPinned
 
     RequestUpdateProfile = RequestUpdateProfile
+    RequestCreatePushSubscription = RequestCreatePushSubscription
+
+    RequestCreateUserAddress = RequestCreateUserAddress
+    RequestUpdateUserAddress = RequestUpdateUserAddress
 
     RequestCreateOrder = RequestCreateOrder
 
@@ -64,6 +75,8 @@ class Schema:
     RequestCreateReview = RequestCreateReview
 
     RequestUpdateOrderStatus = RequestUpdateOrderStatus
+    RequestSetStoreOpen = RequestSetStoreOpen
+    RequestSetStoreHours = RequestSetStoreHours
 
     RequestCreateCategory = RequestCreateCategory
     RequestUpdateCategory = RequestUpdateCategory

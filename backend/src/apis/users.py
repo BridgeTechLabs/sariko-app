@@ -21,6 +21,7 @@ from core.phone import to_e164_vn
 from dao.dao_users import DAOUsers
 from dao.dao_seller_profiles import DAOSellerProfiles
 from dao.dao_user_addresses import DAOUserAddresses
+from dao.dao_push_subscriptions import DAOPushSubscriptions
 from schemas import Schema
 from utils.storage import upload_image_base64
 
@@ -85,7 +86,7 @@ def update_current_user_profile(body: Schema.RequestUpdateProfile, user=Depends(
 
         if is_seller:
             seller_fields = {}
-            for field in ("phone", "address", "lat", "lon"):
+            for field in ("phone", "address", "lat", "lon", "store_name"):
                 if field in data:
                     seller_fields[field] = data.pop(field)
             data.pop("address_details", None)
@@ -100,6 +101,9 @@ def update_current_user_profile(body: Schema.RequestUpdateProfile, user=Depends(
                     address_details=body.address_details,
                     lat=body.lat,
                     lon=body.lon,
+                    # Onboarding sends name/phone in the same request, before users is updated below
+                    receiver_name=body.name,
+                    phone_number=body.phone,
                 )
             for field in ("address", "address_details", "lat", "lon"):
                 data.pop(field, None)
@@ -144,6 +148,26 @@ def get_default_address(user=Depends(verify_token)):
         return {"success": True, "address": address}
     except Exception as e:
         logger.exception(f"Exception in GET /users/me/address: {repr(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"{repr(e)}",
+        )
+
+
+@router.post("/me/push-subscriptions")
+def create_push_subscription(body: Schema.RequestCreatePushSubscription, user=Depends(verify_token)):
+    # No DELETE: the browser unsubscribes on toggle-off / sign-out, the push
+    # service then answers 410 and push_service drops the row.
+    try:
+        DAOPushSubscriptions().upsert_subscription(
+            user_id=user["id"],
+            endpoint=body.endpoint,
+            p256dh=body.keys.p256dh,
+            auth=body.keys.auth,
+        )
+        return {"success": True}
+    except Exception as e:
+        logger.exception(f"Exception in POST /users/me/push-subscriptions: {repr(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"{repr(e)}",

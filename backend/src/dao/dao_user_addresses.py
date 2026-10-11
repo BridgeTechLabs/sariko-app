@@ -18,7 +18,7 @@ class DAOUserAddresses(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("id, label, address, lat, lon, is_default")
+                .select("id, label, address, lat, lon, is_default, receiver_name, phone_number, note, updated_at")
                 .eq("user_id", user_id)
                 .eq("is_default", True)
                 .maybe_single()
@@ -31,7 +31,8 @@ class DAOUserAddresses(DAOBase):
         except Exception as e:
             raise Exception(f"error read_default_address: {e}")
 
-    def upsert_default_address(self, user_id: str, address: str, address_details: str = None, lat: float = None, lon: float = None):
+    def upsert_default_address(self, user_id: str, address: str, address_details: str = None, lat: float = None, lon: float = None,
+                               receiver_name: str = None, phone_number: str = None, note: str = None):
         try:
             existing = (
                 self._supabase_client
@@ -51,6 +52,11 @@ class DAOUserAddresses(DAOBase):
                 "lon": lon,
                 "is_default": True,
             }
+            # Only send receiver fields the caller provided, so an address-only
+            # update doesn't wipe them. updated_at is set by trigger.
+            for field, value in (("receiver_name", receiver_name), ("phone_number", phone_number), ("note", note)):
+                if value is not None:
+                    data[field] = value
 
             if existing and existing.data:
                 result = (
@@ -61,6 +67,20 @@ class DAOUserAddresses(DAOBase):
                     .execute()
                 )
             else:
+                # receiver_name/phone_number are NOT NULL (migration 20261003): a new row defaults
+                # them to the account holder, the same rule that migration's backfill used.
+                if "receiver_name" not in data or "phone_number" not in data:
+                    owner = (
+                        self._supabase_client
+                        .table("users")
+                        .select("name, phone")
+                        .eq("id", user_id)
+                        .maybe_single()
+                        .execute()
+                    )
+                    owner = (owner.data if owner else None) or {}
+                    data.setdefault("receiver_name", owner.get("name") or "")
+                    data.setdefault("phone_number", owner.get("phone") or "")
                 result = (
                     self._supabase_client
                     .table(self._table_name)

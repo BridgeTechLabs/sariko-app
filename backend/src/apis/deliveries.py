@@ -11,6 +11,7 @@ from dao.dao_deliveries import DAODeliveries
 from dao.dao_orders import DAOOrders
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
+from services import push_service
 from services.lalamove_service import get_lalamove_service
 
 router = APIRouter(prefix="/deliveries")
@@ -119,6 +120,10 @@ async def delivery_webhook(request: Request):
             logger.error("Webhook: LALAMOVE_API_SECRET/API_KEY not configured — rejecting")
             raise HTTPException(status_code=503, detail="Webhook not configured")
 
+        # Lalamove's URL verification (on webhook registration) has no apiKey/signature and must get a 200.
+        if not api_key and not signature:
+            return {"success": True}
+
         if api_key != api_key_env:
             logger.warning(f"Webhook: apiKey mismatch ({api_key[:10]}...)")
             raise HTTPException(status_code=401, detail="Invalid apiKey")
@@ -202,8 +207,18 @@ async def delivery_webhook(request: Request):
         logger.warning(f"[Webhook] {event_type} → order={lalamove_order_id} status={new_status}")
 
         dao_orders = DAOOrders()
+        # Order list badges show the delivery status: move the seller's list signature too
+        dao_orders.touch_order(delivery["order_id"])
+
+        if event_type == "DRIVER_ASSIGNED":
+            order = dao_orders.read_order_by_id_raw(delivery["order_id"])
+            if order:
+                push_service.notify_seller_driver_assigned(order)
+
         if new_status == "COMPLETED":
-            dao_orders.update_order_status(delivery["order_id"], "done")
+            updated = dao_orders.update_order_status(delivery["order_id"], "done")
+            if updated:
+                push_service.notify_seller_delivered(updated)
         elif new_status in TERMINAL_STATUSES:
             order = dao_orders.read_order_by_id_raw(delivery["order_id"])
             if order and order["status"] == "ready":

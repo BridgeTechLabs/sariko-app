@@ -8,17 +8,35 @@ jobs:
     runs-on:
       labels: ec2-sariko-app-dev
     environment:
-      name: developement
+      name: development
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
 
-      - name: Test
-        run: |
-          source /home/ubuntu/venv-app-sariko/bin/activate
-          pytest tests/backend -v
+      - name: Build image
+        run: docker build --platform linux/amd64 -t sariko/sariko-backend:${GITHUB_SHA::7} backend
 
-      - name: Build and push docker image
+      - name: Test inside that image
+        run: |
+          docker run --rm \
+            -v "$PWD/tests:/tests:ro" \
+            -e PYTHONPATH=/www \
+            -w /tests/backend \
+            sariko/sariko-backend:${GITHUB_SHA::7} \
+            pytest -v -p no:cacheprovider
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply DB migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          cd backend
+          supabase db push --db-url "$SUPABASE_DB_URL" --include-all --yes
+
+      - name: Push docker image
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -35,6 +53,8 @@ jobs:
           export IMAGE_TAG=${GITHUB_SHA::7}
           cd ~/deploy
           ./get_prev_image_tag.sh
+          # ~/deploy/.env: what's running, and docker compose reads it, so a manual `docker compose up -d` keeps the tag
+          printf 'PREV_IMAGE_TAG=%s\nIMAGE_TAG=%s\n' "$(cat /tmp/previous_tag.txt)" "$IMAGE_TAG" > .env
           docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_TOKEN
           docker compose pull
           docker compose up -d
@@ -42,4 +62,15 @@ jobs:
       - name: check readiness and rollback
         run: |
           cd ~/deploy
-          ./check_readiness_and_rollback.sh
+          ./check_readiness_and_rollback.sh || {
+            printf 'IMAGE_TAG=%s\nROLLED_BACK_FROM=%s\n' "$(cat /tmp/previous_tag.txt)" "${GITHUB_SHA::7}" > .env
+            exit 1
+          }
+
+      # Only after a healthy deploy (skipped on rollback). Keeps current + previous tag for the next rollback.
+      - name: Clean up old images
+        run: |
+          cd ~/deploy
+          ./cleanup_docker_images.sh
+          docker image prune -f
+          docker builder prune -f --filter until=72h

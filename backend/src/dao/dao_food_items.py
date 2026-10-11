@@ -70,6 +70,17 @@ class DAOFoodItems(DAOBase):
         )
         return result.data[0] if result.data else None
 
+    def read_order_gate(self, item_id: str):
+        """preorder_day + the seller's switch and hours: enough to decide if the dish can be ordered now."""
+        result = (
+            self._supabase_client.table(self._table_name)
+            .select("preorder_day, seller_profiles(is_open, opening_time, closing_time)")
+            .eq("id", item_id)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+
     def read_owned_by_seller(self, item_id: str, seller_id: str):
         result = (
             self._supabase_client.table(self._table_name)

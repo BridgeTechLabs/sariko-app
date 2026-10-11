@@ -116,6 +116,7 @@
         }
     },
     "seller_page": {
+        "closed_notice": "Cửa hàng đang đóng · chỉ nhận đặt trước",
         "section_banner": {
             "banner_card_rating_subtitle": "Đánh giá",
             "banner_card_orders_subtitle": "Món ăn",
@@ -128,7 +129,7 @@
             "banner_text_line_2": "· Hoa hồng 17% · Người bán sáng lập"
         },
         "section_food_cards": {
-            "label_item_available": "Có sẵn",
+            "label_item_instant": "Giao ngay",
             "lable_item_pre_order": "Cần đặt trước",
             "lable_item_pre_order_unit_day": "ngày"
         },
@@ -143,9 +144,11 @@
         "btn_view_cart": "Xem giỏ hàng"
     },
     "seller_card": {
+        "closed": "Đã đóng",
         "coming_soon": "Sắp mở bán"
     },
     "food_detail_page": {
+        "button_store_closed": "Cửa hàng đang đóng",
         "label_price": "Giá",
         "label_total_price": "Tổng tiền",
         "label_quantity": "Số lượng",
@@ -162,6 +165,7 @@
         "label_choose_option": "Chọn mức giá"
     },
     "cart_page": {
+        "store_closed_same_day": "Cửa hàng đang đóng: món giao ngay tạm ngưng, món đặt trước vẫn đặt được.",
         "section_delivery_address": {
             "title": "GIAO ĐẾN {name}",
             "button_label_text_edit": "Thay đổi",
@@ -239,7 +243,12 @@
         "error_avatar_size": "Ảnh phải nhỏ hơn 2MB",
         "error_avatar_upload": "Tải ảnh thất bại, vui lòng thử lại",
         "validation_name_required": "Vui lòng nhập tên",
-        "validation_phone_invalid": "Số điện thoại không hợp lệ"
+        "validation_phone_invalid": "Số điện thoại không hợp lệ",
+        "label_store_name": "Tên cửa hàng",
+        "placeholder_store_name": "VD: Bếp nhà Rosa",
+        "helper_store_name": "Đường link cửa hàng giữ nguyên khi đổi tên",
+        "validation_store_name_required": "Vui lòng nhập tên cửa hàng",
+        "validation_store_name_too_long": "Tối đa 50 ký tự"
     },
     "change_password_page": {
         "label_new": "Mật khẩu mới",
@@ -414,6 +423,17 @@
         "track_rider": "Theo dõi tài xế"
     },
     "seller_home": {
+        "hours_label": "Giờ mở cửa",
+        "hours_all_day": "Cả ngày",
+        "hours_edit": "Sửa",
+        "hours_open_at": "Mở lúc",
+        "hours_close_at": "Đóng lúc",
+        "hours_overnight_note": "Áp dụng mọi ngày. Đóng sớm hơn giờ mở = mở qua đêm (VD 18:00–02:00).",
+        "hours_outside_hint": "Ngoài giờ mở cửa: khách đang thấy cửa hàng Đã đóng (vẫn nhận đặt trước).",
+        "store_open": "Đang mở cửa",
+        "store_closed": "Đã đóng cửa",
+        "close_confirm_title": "Đóng cửa hàng?",
+        "close_confirm_body": "Bạn còn {count} đơn cần xử lý. Đóng cửa chỉ dừng nhận đơn giao ngay mới, đơn hiện tại và đơn đặt trước vẫn tiếp tục.",
         "greeting_morning": "Chào buổi sáng, {name}! 👋",
         "greeting_afternoon": "Chào buổi chiều, {name}! 👋",
         "greeting_evening": "Chào buổi tối, {name}! 👋",
@@ -515,6 +535,7 @@
         "timeline_delivered": "Đã giao",
         "action_accept_order": "Nhận đơn",
         "action_mark_ready": "Sẵn sàng giao hàng",
+        "ready_available_in": "Sẵn sàng sau {time}",
         "action_mark_done": "Đánh dấu hoàn tất",
         "action_reject": "Từ chối",
         "action_rebook_delivery": "Đặt lại giao hàng",
@@ -551,11 +572,11 @@
         "seller_badge": "Người bán",
         "edit_profile": "Chỉnh sửa hồ sơ",
         "section_title_settings": "Cài đặt",
-        "menu_label_profile": "Hồ sơ của tôi",
         "menu_label_store_address": "Địa chỉ cửa hàng",
         "menu_label_language": "Ngôn ngữ",
         "menu_label_terms": "Điều khoản dịch vụ",
         "menu_label_privacy": "Chính sách bảo mật",
+        "menu_label_new_order_alerts": "Thông báo đơn hàng mới",
         "menu_label_about": "Về Sariko",
         "menu_label_shipping": "Chính sách vận chuyển",
         "menu_label_payment_methods": "Phương thức thanh toán",
@@ -611,6 +632,7 @@
         "item_unit_label_placeholder": "VD: phần",
         "item_min_quantity": "SL tối thiểu",
         "item_quantity_step": "Bước tăng",
+        "item_preorder": "Đặt trước",
         "item_preorder_day": "Đặt trước (ngày)",
         "item_available": "Đang bán",
         "item_featured": "Nổi bật",
@@ -666,6 +688,18 @@
         "stat_reviews": "Đánh giá",
         "stat_following": "Đang theo dõi",
         "edit_profile": "Sửa hồ sơ",
+        "edit_profile_photo_hint": "Chạm để đổi ảnh · tối đa 2 MB",
+        "edit_profile_photo_size_error": "Ảnh phải nhỏ hơn 2 MB. Hãy thử ảnh khác.",
+        "edit_profile_photo_type_error": "Vui lòng chọn tệp hình ảnh.",
+        "edit_profile_name": "Họ và tên",
+        "edit_profile_name_placeholder": "Họ và tên của bạn",
+        "edit_profile_name_error": "Vui lòng nhập tên của bạn",
+        "edit_profile_phone": "Số điện thoại",
+        "edit_profile_phone_placeholder": "903 059 993",
+        "edit_profile_phone_hint": "Người bán và tài xế dùng số này để liên hệ bạn",
+        "edit_profile_phone_error": "Nhập số điện thoại 9 chữ số",
+        "edit_profile_save": "Lưu thay đổi",
+        "edit_profile_saved": "Đã cập nhật hồ sơ",
         "saved_addresses": "Địa chỉ đã lưu",
         "saved_count": "{count} địa chỉ",
         "default_payment": "Thanh toán mặc định",
@@ -678,6 +712,9 @@
         "theme_dark": "Tối",
         "order_updates": "Cập nhật đơn hàng",
         "seller_news": "Tin tức và khuyến mãi từ người bán",
+        "push_unsupported": "Trình duyệt này không nhận được thông báo. Trên iPhone, hãy thêm Sariko vào Màn hình chính trước.",
+        "push_blocked": "Thông báo đang bị chặn. Hãy cho phép Sariko trong cài đặt trình duyệt.",
+        "push_failed": "Không bật được thông báo trên trình duyệt này. Nếu dùng Brave: bật \"Use Google services for push messaging\" trong Cài đặt → Quyền riêng tư, rồi thử lại.",
         "become_seller_eyebrow": "Nấu cho kababayan",
         "become_seller_title": "Bán món lutong bahay từ bếp nhà bạn",
         "become_seller_desc": "Còn {count} suất người bán sáng lập. Miễn phí 3 tháng, sau đó giữ mức phí thấp cố định.",
@@ -706,6 +743,9 @@
         "address_form_street": "Địa chỉ",
         "address_form_street_placeholder": "Tìm tên đường hoặc toà nhà",
         "address_form_street_hint": "Gõ và chọn từ danh sách để tài xế tìm thấy bạn",
+        "address_form_use_location": "Dùng vị trí hiện tại",
+        "address_form_locating": "Đang lấy vị trí…",
+        "address_form_locate_error": "Không lấy được vị trí của bạn",
         "address_form_building": "Toà nhà, tầng, căn hộ",
         "address_form_building_placeholder": "VD: Toà B, tầng 8, căn 802",
         "address_form_receiver": "Tên người nhận",
@@ -720,6 +760,17 @@
         "address_form_set_default": "Đặt làm địa chỉ mặc định",
         "address_form_save": "Lưu địa chỉ",
         "address_form_save_changes": "Lưu thay đổi",
+        "password_new": "Mật khẩu mới",
+        "password_new_placeholder": "Ít nhất 6 ký tự",
+        "password_new_hint": "Dùng ít nhất 6 ký tự",
+        "password_new_error": "Mật khẩu phải có ít nhất 6 ký tự",
+        "password_confirm": "Xác nhận mật khẩu",
+        "password_confirm_placeholder": "Nhập lại mật khẩu mới",
+        "password_confirm_error": "Mật khẩu không khớp",
+        "password_show": "Hiện mật khẩu",
+        "password_hide": "Ẩn mật khẩu",
+        "password_update": "Cập nhật mật khẩu",
+        "password_updated": "Đổi mật khẩu thành công",
         "language_title": "Ngôn ngữ",
         "language_subtitle": "Thay đổi ngôn ngữ trong toàn bộ ứng dụng",
         "language_en_name": "English",
@@ -727,6 +778,22 @@
         "language_tl_name": "Tagalog",
         "language_tl_desc": "Tiếng Philippines",
         "language_vi_name": "Tiếng Việt",
-        "language_vi_desc": "Tiếng Việt"
+        "language_vi_desc": "Tiếng Việt",
+        "terms_last_updated": "Cập nhật lần cuối 01/09/2026",
+        "terms_using_title": "Sử dụng SariKo",
+        "terms_using_body": "SariKo kết nối bạn với các đầu bếp tại gia và người bán nhỏ người Philippines ở TP. Hồ Chí Minh. Bạn cần có tài khoản để đặt món, nhắn tin với người bán và để lại đánh giá.",
+        "terms_orders_title": "Đơn hàng và thanh toán",
+        "terms_orders_body": "Đơn hàng sẽ được gửi đến người bán ngay khi bạn đặt. Thanh toán trực tuyến hoặc tiền mặt khi nhận hàng, tuỳ theo hình thức người bán chấp nhận.",
+        "terms_delivery_title": "Giao hàng",
+        "terms_delivery_body": "Phí giao hàng được ước tính khi thanh toán và do người bán xác nhận. Món đặt trước sẽ được giao vào ngày đã hiển thị.",
+        "terms_refunds_title": "Hoàn tiền và khiếu nại",
+        "terms_refunds_body": "Nếu đơn hàng có vấn đề, hãy liên hệ với chúng tôi trong vòng 48 giờ sau khi giao để được hỗ trợ.",
+        "terms_placeholder_note": "Nội dung tạm thời. Sẽ thay bằng văn bản pháp lý đã được duyệt. Chính sách bảo mật, Chính sách giao hàng, Phương thức thanh toán và Giới thiệu SariKo dùng chung bố cục trang này.",
+        "address_saved": "Đã lưu địa chỉ",
+        "phone_country_unsupported": "Hiện chỉ hỗ trợ số điện thoại Việt Nam (+84)",
+        "country_code_title": "Mã quốc gia",
+        "country_code_search": "Tìm quốc gia hoặc mã",
+        "country_code_empty": "Không tìm thấy quốc gia",
+        "country_code_close": "Đóng"
     }
 }

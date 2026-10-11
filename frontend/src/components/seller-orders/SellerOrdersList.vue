@@ -1,6 +1,7 @@
 <script>
 import { mapState, mapActions } from 'pinia';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
+import { liveDeliveryKey } from '@/utils/deliveryBadge';
 
 const FILTER_KEYS = ['all', 'new', 'preparing', 'ready', 'delivery_failed', 'done', 'cancelled']
 
@@ -81,7 +82,7 @@ export default {
                 if (!groups[label]) groups[label] = []
                 groups[label].push({
                     ...order,
-                    displayStatus: STATUS_DISPLAY_KEY[order.status] ? this.$t(STATUS_DISPLAY_KEY[order.status]) : order.status,
+                    displayStatus: this.$t(liveDeliveryKey(order) || STATUS_DISPLAY_KEY[order.status] || order.status),
                     statusClass:   STATUS_CLASS[order.status] || '',
                     customerName:  order.users?.name || order.users?.email || 'Customer',
                     itemCount:     (order.order_items || []).length,
@@ -98,7 +99,7 @@ export default {
     },
 
     methods: {
-        ...mapActions(useDashboardStore, ['fetchOrders']),
+        ...mapActions(useDashboardStore, ['fetchOrders', 'startWatchingOrders', 'stopWatchingOrders']),
 
         goToDetail(orderId) {
             this.$router.push({ name: 'seller-order-detail', params: { orderId } })
@@ -107,6 +108,12 @@ export default {
 
     async mounted() {
         await this.fetchOrders()
+        // Keep badges live (incl. Lalamove steps); refcounted with the seller home page
+        this.startWatchingOrders()
+    },
+
+    beforeUnmount() {
+        this.stopWatchingOrders()
     },
 }
 </script>
