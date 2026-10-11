@@ -40,13 +40,14 @@ on conflict (id) do nothing;
 -- ── Users ───────────────────────────────────────────────────────────────────
 -- The on_auth_user_created trigger has already created these rows from the insert
 -- above, but it only knows what auth carries: it cannot set role, phone or
--- preferred_language. Hence an upsert rather than "do nothing" — the latter would
+-- preferred_language (values the app writes: 'English' / 'Tiếng Việt', see
+-- frontend composables/setLanguage.js). Hence an upsert rather than "do nothing" — the latter would
 -- silently keep the trigger's sparser row.
 insert into public.users (id, email, name, phone, role, is_seller, preferred_language) values
-  ('11111111-1111-1111-1111-111111111111', 'buyer@dev.local',   'Mai Buyer', '+84900000001', 'customer', false, 'vi'),
-  ('22222222-2222-2222-2222-222222222222', 'buyer2@dev.local',  'Nam Buyer', '+84900000002', 'customer', false, 'en-PH'),
-  ('33333333-3333-3333-3333-333333333333', 'seller@dev.local',  'Ate Rosa',  '+84900000003', 'seller',   true,  'en-PH'),
-  ('44444444-4444-4444-4444-444444444444', 'seller2@dev.local', 'Kuya Ben',  '+84900000004', 'seller',   true,  'vi')
+  ('11111111-1111-1111-1111-111111111111', 'buyer@dev.local',   'Mai Buyer', '+84900000001', 'customer', false, 'Tiếng Việt'),
+  ('22222222-2222-2222-2222-222222222222', 'buyer2@dev.local',  'Nam Buyer', '+84900000002', 'customer', false, 'English'),
+  ('33333333-3333-3333-3333-333333333333', 'seller@dev.local',  'Ate Rosa',  '+84900000003', 'seller',   true,  'English'),
+  ('44444444-4444-4444-4444-444444444444', 'seller2@dev.local', 'Kuya Ben',  '+84900000004', 'seller',   true,  'Tiếng Việt')
 on conflict (id) do update set
   email = excluded.email, name = excluded.name, phone = excluded.phone,
   role = excluded.role, is_seller = excluded.is_seller,

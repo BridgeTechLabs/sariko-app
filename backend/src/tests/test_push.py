@@ -79,3 +79,8 @@ def test_endpoint_rejects_others(endpoint):
 def test_seller_delivered_goes_to_seller(sent):
     push_service.notify_seller_delivered(_order("done"))
     assert sent == [("seller", "seller_delivered", "/seller/orders/o1")]
+
+
+def test_seller_driver_assigned_goes_to_seller(sent):
+    push_service.notify_seller_driver_assigned(_order("ready"))
+    assert sent == [("seller", "seller_driver_assigned", "/seller/orders/o1")]

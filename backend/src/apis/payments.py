@@ -21,7 +21,6 @@ VNPAY_TMN_CODE = os.getenv("VNPAY_TMN_CODE", "YOUR_TMN_CODE")
 VNPAY_HASH_SECRET = os.getenv("VNPAY_HASH_SECRET", "YOUR_HASH_SECRET")
 VNPAY_URL = os.getenv("VNPAY_URL", "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html")
 VNPAY_RETURN_URL = os.getenv("VNPAY_RETURN_URL", "http://localhost:8081/payment/return")
-VNPAY_IPN_URL = os.getenv("VNPAY_IPN_URL", "")
 
 
 def _hmac_sha512(key: str, data: str) -> str:
@@ -97,10 +96,9 @@ def create_vnpay_payment(order_id: str, request: Request, user=Depends(verify_to
         "vnp_ExpireDate": expire_date,
         "vnp_CurrCode": "VND",
     }
+    # No vnp_IpnUrl: it is not a v2.1.0 pay param, VNPay leaves it out of its hash check
+    # and answers "Sai chữ ký" (code 70). The IPN URL is registered on the merchant portal.
 
-    if VNPAY_IPN_URL:
-        params["vnp_IpnUrl"] = VNPAY_IPN_URL
-        
     payment_url = _build_vnpay_url(params)
     dao_orders.update_payment_create_date(order_id=order_id, payment_create_date=create_date)
 

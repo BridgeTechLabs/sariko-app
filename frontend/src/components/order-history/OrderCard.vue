@@ -1,4 +1,5 @@
 <script>
+import { liveDeliveryKey } from '@/utils/deliveryBadge';
 import { Store, Truck, ChevronRight, Star } from 'lucide-vue-next';
 
 export default {
@@ -33,6 +34,8 @@ export default {
         },
         statusLabel() {
             if (this.isUnpaid) return this.$t('orders_page.status_unpaid')
+            const live = liveDeliveryKey(this.order)
+            if (live) return this.$t(live)
             const map = {
                 pending: this.$t('orders_page.status_pending'),
                 confirmed: this.$t('orders_page.status_confirmed'),

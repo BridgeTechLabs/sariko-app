@@ -7,12 +7,20 @@ Bugs found during manual testing. Newest at the bottom.
 
 | # | Bug | Status | Deployed |
 |---|-----|--------|----------|
-| 1 | Buyer address toast on login (DEV missing migration) | 🔧 Fix in `fix/common-bugs`: pipeline runs `supabase db push` | — (applies on next `develop` deploy) |
-| 2 | Seed `'vi'` ≠ `'Tiếng Việt'` → English pushes | ⬜ Open | — |
-| 3 | VNPay "Sai chữ ký" (`vnp_IpnUrl`) | ⬜ Open | — |
-| 4 | Push enable fails silently (Brave) | ⬜ Open | — |
-| 5 | DEV pushes 403: VAPID key pair mismatch | 🔧 Keys rotated + backend redeployed; phone must re-subscribe | DEV backend `e6aac52` |
+| 1 | Buyer address toast on login (DEV missing migration) | 🔧 Migrations `20261003…` + `20261009…` applied on DEV by pipeline, columns exist. UI check pending (no toast on login) | DEV via pipeline `db push` |
+| 2 | Seed `'vi'` ≠ `'Tiếng Việt'` → English pushes | 🔧 Seed fixed in `fix/common-bugs` ('English' / 'Tiếng Việt'); existing DEV rows need the one-off SQL below | — |
+| 3 | VNPay "Sai chữ ký" (`vnp_IpnUrl`) | 🔧 DEV env fixed (verified code 24 = buyer cancel); code trap removed in `fix/common-bugs` (`vnp_IpnUrl` + `VNPAY_IPN_URL` deleted) | DEV env |
+| 4 | Push enable fails silently (Brave) | 🔧 Fix in `fix/common-bugs`: toast `account_v2.push_failed` with the Brave hint | — |
+| 5 | DEV pushes 403: VAPID key pair mismatch | ✅ Verified on DEV: keys rotated, seller re-subscribed, notifications arrive (FCM 201) | DEV backend `e6aac52`+ |
 | 6 | Lalamove can't register webhook ("Destination host unreachable") | ✅ Verified on DEV: webhook `COMPLETED` → order `21939402` done (20:18 UTC) | DEV backend `29be3bd` |
+| 7 | Order list badges ignore Lalamove delivery status (buyer + seller) | 🔧 Fix in `fix/common-bugs`: lists embed `deliveries(status)`, webhook touches order + drops seller cache, `/seller/orders` now polls | — |
+| 8 | Seller order detail: back button does nothing | 🔧 Fix in `fix/common-bugs`: `backTo="/seller/orders"` (same as buyer detail) | — |
+| 9 | "Ready for delivery" gated to delivery time + countdown (seller request) | 🔧 Built in `fix/common-bugs`: 45 min window, FE disabled + "Ready in 1h 20m", BE 400 if early, no override | — |
+| 10 | Menu management: can't switch a dish from pre-order to instant | 🔧 Redesigned in `fix/common-bugs`: Pre-order switch (off = instant 0, on = days ≥ 1, default 1) | — |
+| 11 | Seller can't rename their store | 🔧 Built in `fix/common-bugs`: "Tên cửa hàng" in Hồ sơ (sellers only), slug unchanged, 1–50 chars | — |
+| 12 | Seller Me page: "Edit Profile" and "My Profile" duplicate | 🔧 Fix in `fix/common-bugs`: removed the Settings row, kept the header button + avatar | — |
+| 13 | Coming-soon kitchens look the same as open ones in seller lists | 🔧 Fix in `fix/common-bugs`: muted (50% + grayscale) card | — |
+| 14 | Seller can't open/close their store | 🔧 Built in `fix/common-bugs`: switch + daily hours on seller Home; closed/outside hours blocks same-day only; lists Open → Closed → Coming soon | — |
 
 ---
 
@@ -40,6 +48,8 @@ Bugs found during manual testing. Newest at the bottom.
 - **Impact:** DEV only. Real users store `'Tiếng Việt'` via the app
 - **Workaround:** Re-select Tiếng Việt in Account → Language before testing
 - **Fix options:** Make the seed use `'Tiếng Việt'`, or have push_service also accept `'vi'`
+- **Fixed (2026-10-12):** the seed now writes the app's values (`'English'` / `'Tiếng Việt'`, from `frontend/src/composables/setLanguage.js`). Seeds only run on `db reset`, so existing DEV rows (2× `vi`, 2× `en-PH`) need:
+  `update users set preferred_language = case preferred_language when 'vi' then 'Tiếng Việt' else 'English' end where preferred_language in ('vi','en-PH');`
 
 ---
 
@@ -54,6 +64,7 @@ Bugs found during manual testing. Newest at the bottom.
   - Code (recommended): delete the `if VNPAY_IPN_URL` block and the `VNPAY_IPN_URL` env var (not used anywhere else). The IPN URL is registered on the VNPay merchant portal, not sent per request.
   - Workaround with no deploy: remove `VNPAY_IPN_URL` from the env file on the dev EC2 (`~/deploy`), then `docker compose up -d`.
 - **Watch out:** Don't set `VNPAY_IPN_URL` on prod either, or prod checkout breaks the same way.
+- **Status (2026-10-12):** Jack removed `VNPAY_IPN_URL` from the dev env. Verified the container no longer has it, and nginx shows a VNPay return at 20:33 UTC with `vnp_ResponseCode=24` (buyer cancelled on the VNPay page), so the signature is accepted. The `if VNPAY_IPN_URL` lines in `payments.py` are still in the code: setting the variable anywhere breaks checkout again.
 
 ---
 
@@ -63,6 +74,7 @@ Bugs found during manual testing. Newest at the bottom.
 - **Expected:** A toast explaining that push couldn't be enabled on this browser
 - **Cause (very likely, not yet confirmed in console):** Brave disables Web Push by default (Chromium push goes through Google FCM). `pushManager.subscribe()` throws, and `togglePush` in `frontend/src/stores/v2/account/accountStore.js` (~L243-262) only `console.warn`s inside `catch`. Only the `unsupported`/`blocked` results show a toast.
 - **Fix idea:** In the `catch`, show the same negative Notify (e.g. reuse `account_v2.push_unsupported` or add a "couldn't enable, check browser settings" message).
+- **Status (2026-10-12):** push works end to end on Chrome. This entry is now only about the missing error message for browsers where subscribing throws.
 - **Workaround for testing on Brave:** `brave://settings/privacy` → enable "Use Google services for push messaging" → restart Brave.
 
 ---
@@ -87,3 +99,85 @@ Bugs found during manual testing. Newest at the bottom.
 - **Cause (confirmed from dev logs):** the host *is* reachable. nginx shows `POST /rest/v1/deliveries/webhook` from `52.76.164.226` with UA `LalamoveAPI/3.0` at 20:10:19 and 20:10:35, both **401**. The backend logs `Webhook: apiKey mismatch (...)` with an empty apiKey. Lalamove's verification request carries no `apiKey`/`signature`, and `backend/src/apis/deliveries.py` (~L122) rejects it with 401. Lalamove needs a 200 to accept the URL and reports anything else as "unreachable".
 - **Fix idea:** before the apiKey check, return 200 without touching the DB when the body has no `apiKey` and no `signature` (the verification ping). Real events still need a valid apiKey + HMAC.
 - **Note:** `CLAUDE.md` still mentions `LALAMOVE_MODE (mock|live)`. The mock is gone, and DEV calls the real Lalamove sandbox.
+
+---
+
+## #7 — Order list badges don't follow the Lalamove delivery status
+- **Found:** 2026-10-12, buyer order history + seller order list
+- **Actual:** The badge stays `Ready` while Lalamove goes ASSIGNING_DRIVER → ON_GOING → PICKED_UP, and only changes at `done` (COMPLETED)
+- **Expected:** The badge reflects delivery progress (e.g. "Finding driver", "Driver on the way", "Picked up")
+- **Cause (from code):** this is a missing feature, not a broken one. The badge only reads `orders.status` (`frontend/src/components/order-history/OrderCard.vue` L30-44, `components/seller-orders/SellerOrdersList.vue`). Lalamove progress lives in the `deliveries` table, which the list queries don't join (`backend/src/dao/dao_orders.py` `read_orders_by_user_id`, `read_orders_by_seller_id`). Only the order detail page (DeliveryTracker) shows it.
+- **Fix (2026-10-12):** list queries embed `deliveries(status)`; `frontend/src/utils/deliveryBadge.js` shows "Tìm tài xế / Đang đến / Đã lấy hàng" (`delivery_tracker.status_*`) while the order is `ready`; the webhook calls `DAOOrders.touch_order()` (bumps `updated_at` via the `on_orders_update` trigger + invalidates the seller cache); `SellerOrdersList` now starts the refcounted seller poller (before, `/seller/orders` fetched once and never refreshed).
+- **Watch out when fixing:** the seller list uses a HEAD/`updated_at` cache signature on `orders` (`read_orders_head_by_seller_id`). Webhook updates only touch `deliveries`, so the seller list would *not* refresh even after joining deliveries, unless the webhook also bumps `orders.updated_at` / invalidates the cache.
+
+---
+
+## #8 — Seller order detail: back button doesn't work
+- **Found:** 2026-10-12
+- **Where:** `frontend/src/pages/seller/SellerOrderDetailPage.vue` → `components/shared/PageBreadcrumbs.vue` `goBack()` → `$router.back()` (no `backTo` passed)
+- **Suspected cause (unverified):** the page was opened from a **push notification**. `push-sw.js` `notificationclick` navigates or opens the window straight at `/seller/orders/{id}`, so there is no previous in-app history entry and `router.back()` does nothing. Opening the page from the order list probably works.
+- **Repro to confirm:** open the detail from the list → back. Then open it from a notification → back.
+- **Fix idea:** pass `back-to="/seller/orders"`, or in `goBack()` fall back to a route when `window.history.state?.back` is null (Vue Router sets it). The same issue likely hits the buyer `/orders/{id}` page opened from a push.
+
+---
+
+## #9 — 💡 Seller request: "Ready for delivery" only when it's time, with a countdown
+- **Found:** 2026-10-12 (seller feedback)
+- **Today:** Ready is always clickable (`components/seller-order-detail/SellerOrderActionBar.vue`, `components/seller-home/ActionOrdersList.vue`). Marking Ready auto-books Lalamove immediately, so an early tap books a driver hours before a scheduled `delivery_appointment`.
+- **Request:** for orders with `delivery_appointment`, disable Ready until a window before the appointment and show the time remaining (e.g. "Available in 1h 20m").
+- **Decisions needed (Jack):**
+  - How early may the seller tap Ready (e.g. 30 / 45 / 60 min before)? It should cover cooking + Lalamove driver search time.
+  - Frontend-only gate, or also reject early `ready` in the backend (`PATCH /sellers/me/orders/{id}/status`)?
+  - Is an emergency override needed (the seller finished early, or the buyer asks for earlier)?
+- **Decided (2026-10-12):** 45 min · frontend + backend · no override · orders without an appointment are unchanged.
+- **Built:** `backend/src/apis/sellers.py` `READY_WINDOW` + `ready_opens_at()` (400 when early, test `tests/backend/unit/test_ready_window.py`); `frontend/src/utils/readyWindow.js` (`READY_WINDOW_MINUTES` must match the backend); button disabled with a countdown in `SellerOrderActionBar.vue` (detail) and `ActionOrdersList.vue` (seller home), refreshed every minute.
+
+---
+
+## #10 — Menu management: can't switch a dish from pre-order to instant
+- **Found:** 2026-10-12
+- **Where:** `frontend/src/components/seller-menu/ModalEditItem.vue` (`preorder_day` number input, L291-292; payload L134) → `PATCH` handler in `backend/src/apis/sellers.py` `update_food_item` (`model_dump(exclude_none=True)`)
+- **Not the cause:** the backend keeps `preorder_day = 0` (`exclude_none` only drops `None`), and the schema allows `ge=0`.
+- **Suspect (unverified):** if the seller *clears* the field instead of typing `0`, `v-model.number` sends `""`, so the backend returns 422 and nothing is saved. There is also no explicit "Instant" switch, so "instant = 0 pre-order days" isn't obvious.
+- **Repro needed:** what exactly did the seller do (clear the field / type 0 / another screen called "management")? Was there an error toast?
+- **Confirmed mechanism (2026-10-12):** `RequestUpdateFoodItem(preorder_day="")` → pydantic `int_parsing` error (422). Vue `.number` keeps a cleared input as `""`. Typing `0` saves fine. Fix: `preorder_day: Number(...) || 0` in the payload.
+- **Redesign (Jack, 2026-10-12):** replaced the raw "days" input with a **Pre-order switch**. Off = instant (`preorder_day = 0`, input hidden). On = days input shown, defaults to 1, payload clamps to ≥ 1. `is_preorder` is UI-only, derived from `preorder_day > 0`, and not sent to the API.
+- **Same risk, not fixed:** `min_quantity` and `quantity_step` in the same payload also send `""` when cleared → 422.
+
+---
+
+## #11 — 💡 Seller can't change their store name
+- **Found:** 2026-10-12
+- **Today:** nothing writes `seller_profiles.store_name` after onboarding. Seller "Hồ sơ của tôi" → `/account/profile` (`components/account/ProfileForm.vue`) → `PATCH /users/me/profile` (`backend/src/apis/users.py`) only syncs `phone/address/lat/lon` (+ avatar) to `seller_profiles` (`DAOSellerProfiles.update_seller_profile_info` allow-list).
+- **Watch out:** `slug` (unique, used in `/seller/:slug` and the seller share card/QR) is separate from `store_name`. Renaming must not silently change the slug, or shared links break.
+- **Decided (2026-10-12):** keep the slug · field in "Hồ sơ của tôi" · no approval, validate only (trimmed, 1–50 chars).
+- **Built:** `RequestUpdateProfile.store_name` (`StringConstraints`, test `tests/backend/unit/test_store_name.py`) → `users.py` routes it to `seller_profiles` with phone/address → `DAOSellerProfiles` allow-list. `ProfileForm.vue` shows the field only when `user.isSeller`, loads it from `dashboardStore.sellerInfo` (fetching if needed), and updates the store after saving. Buyers sending `store_name` are ignored (the users DAO uses an allow-list).
+
+---
+
+## #12 — Seller Me page: "Edit Profile" and "My Profile" are duplicates
+- **Found:** 2026-10-12
+- **Cause:** both open `/account/profile`: the header button + avatar (`components/seller-me/SellerMeHeader.vue`) and a Settings row (`components/seller-me/SellerMeSettings.vue`).
+- **Fix:** removed the Settings row, its `User` icon import and the now-unused `seller_me.menu_label_profile` i18n key. The header "Edit Profile" button (and avatar tap) stay as the single entry point.
+
+---
+
+## #13 — Coming-soon kitchens should look muted; open ones first
+- **Found:** 2026-10-12
+- **Order:** already correct. `DAOSellerProfiles.read_founding_sellers` orders by `status` (`active` < `coming_soon`), then `display_order`, then `created_at`. On DEV: Rosa (active) is before Ben (coming_soon).
+- **Fix:** `components/seller/seller-list/SellerCard.vue` adds a `.muted` class (opacity 0.5 + grayscale) when `status === 'coming_soon'`. The card stays tappable and opens the coming-soon page.
+
+---
+
+## #14 — 💡 Seller open/closed switch
+- **Found:** 2026-10-12
+- **Today:** `seller_profiles.is_open` (bool, default true), `opening_time`, `closing_time` exist since the initial schema, but nothing uses them. Only `GET /sellers/{slug}` selects them, and no UI reads them. Buyers can order from any active seller at any time.
+- **Decided (2026-10-12):** manual switch · closed blocks same-day dishes only (pre-orders still OK) · lists: open → closed (badge, not muted) → coming soon (muted) · closing only stops new orders, with a warning if orders are still active.
+- **Built:**
+  - Backend: `PATCH /sellers/me/open` (`RequestSetStoreOpen`), `GET /sellers/me` returns `is_open`; `/sellers/founding` orders by status, then `is_open` desc. Gate on `POST /cart/add` (`DAOFoodItems.read_order_gate`) **and** `POST /orders` (items added before closing), sharing `STORE_CLOSED_DETAIL` / `is_same_day` in `apis/orders.py`. Tests: `tests/backend/integration/test_store_closed.py`.
+  - Frontend: Open/Closed toggle in `SellerGreeting.vue` (confirm dialog when active orders exist); `utils/storeOpen.js` `blockedByClosedStore()` disables add in `FoodCard.vue` + `BottomActionBar.vue` ("Cửa hàng đang đóng"); `SellerInfo.vue` closed notice; `SellerCard.vue` "Đã đóng" badge.
+  - Side fix: `cartStore.addItem` now returns true/false. `FoodCard`, `FeaturedDishCard` and `BottomActionBar` used to show "added to cart" even when the add failed.
+- **Before prod deploy:** check `select store_name from seller_profiles where status='active' and is_open is false;` on prod. Any row becomes "closed" the moment this ships (the column was never shown before).
+- **Opening hours (2026-10-12):** one daily window for every day, switch = master. No scheduler: "open now" is computed on read in `backend/src/core/store_hours.py` `is_open_now()` (VN time, UTC+7 fixed; overnight windows; same open/close = 24h; no hours = all day; tests `tests/backend/unit/test_store_hours.py`). Buyer-facing reads (`read_founding_sellers`, `read_seller_by_slug_name`) replace `is_open` with the computed value, so the buyer frontend didn't change. Cart/order gates use it too. Seller: `PATCH /sellers/me/hours` (`RequestSetStoreHours`, both-or-neither), and `GET /sellers/me` returns the raw switch + hours + `open_now`. Hours editor and an "outside hours" hint live in `SellerGreeting.vue`.
+- **Prod check (2026-10-12, Jack):** no seller has `opening_time` set, and no active seller has `is_open = false`. Deploy changes no store's visible state.
+- **Known limit:** the seller's own "outside hours" hint uses `open_now` from the last fetch, so it updates on reload, not exactly at opening time. Buyers are always computed live.

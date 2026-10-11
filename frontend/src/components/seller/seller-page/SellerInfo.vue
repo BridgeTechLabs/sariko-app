@@ -159,6 +159,8 @@ export default {
                     </div>
                 </div>
 
+                <div v-if="seller && !isOpen" class="closed-notice">{{ $t('seller_page.closed_notice') }}</div>
+
                 <!-- Row 2: meta line (left) + chat button (right) -->
                 <div class="meta-row">
                     <div class="status-line">
@@ -467,5 +469,11 @@ export default {
         cursor: default;
         box-shadow: none;
     }
+}
+
+.closed-notice {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #f5A623;
 }
 </style>

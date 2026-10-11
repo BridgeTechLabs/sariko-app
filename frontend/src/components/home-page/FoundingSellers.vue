@@ -79,6 +79,7 @@ export default {
                 :seller-avatar-image-u-r-l="seller.avatar_url"
                 :seller-featured-category="'Exclusive Dishes'"
                 :seller-status="seller.status"
+                :seller-is-open="seller.is_open !== false"
             />
             <!-- See All tile -->
             <div v-if="hasMore" class="see-all-tile" @click="$router.push('/sellers')">

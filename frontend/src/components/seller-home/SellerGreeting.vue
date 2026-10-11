@@ -2,6 +2,10 @@
 import { User } from 'lucide-vue-next';
 import { mapState } from 'pinia';
 import { useAuthStore } from '@/stores/auth/authStore';
+import { useDashboardStore } from '@/stores/seller/dashboardStore';
+
+// Orders that still need the seller after closing: closing only stops new same-day orders
+const ACTIVE_STATUSES = ['pending', 'confirmed', 'ready', 'delivery_failed']
 
 export default {
     name: 'SellerGreeting',
@@ -12,11 +16,36 @@ export default {
         return {
             now: new Date(),
             ticker: null,
+            hoursDialog: false,
+            allDay: true,
+            draftOpen: '10:00',
+            draftClose: '20:00',
+            savingHours: false,
         }
     },
 
     computed: {
         ...mapState(useAuthStore, ['user']),
+        ...mapState(useDashboardStore, ['sellerInfo', 'orders']),
+
+        isOpen() {
+            return this.sellerInfo?.is_open !== false
+        },
+
+        // "10:00–20:00", or null when open all day
+        hoursText() {
+            const o = this.sellerInfo?.opening_time, c = this.sellerInfo?.closing_time
+            return o && c ? `${o.slice(0, 5)}–${c.slice(0, 5)}` : null
+        },
+
+        // Switch on but outside the hours: buyers see the store as closed
+        outsideHours() {
+            return this.isOpen && this.sellerInfo?.open_now === false
+        },
+
+        activeOrderCount() {
+            return this.orders.filter(o => ACTIVE_STATUSES.includes(o.status)).length
+        },
 
         greetingPrefix() {
             const hour = this.now.getHours()
@@ -62,6 +91,48 @@ export default {
     beforeUnmount() {
         clearInterval(this.ticker)
     },
+
+    methods: {
+        openHoursDialog() {
+            this.allDay = !this.hoursText
+            this.draftOpen = this.sellerInfo?.opening_time?.slice(0, 5) || '10:00'
+            this.draftClose = this.sellerInfo?.closing_time?.slice(0, 5) || '20:00'
+            this.hoursDialog = true
+        },
+
+        async saveHours() {
+            this.savingHours = true
+            try {
+                await useDashboardStore().setStoreHours(this.allDay ? null : this.draftOpen, this.allDay ? null : this.draftClose)
+                this.hoursDialog = false
+            } catch (e) {
+                console.error('SellerGreeting - saveHours -', e)
+                this.$q.notify({ classes: 'quasar-notify-negative', message: this.$t('common.toast_update_failed'), position: 'bottom' })
+            } finally {
+                this.savingHours = false
+            }
+        },
+
+        async onToggleOpen(open) {
+            if (!open && this.activeOrderCount) {
+                const confirmed = await new Promise(resolve => {
+                    this.$q.dialog({
+                        title: this.$t('seller_home.close_confirm_title'),
+                        message: this.$t('seller_home.close_confirm_body', { count: this.activeOrderCount }),
+                        cancel: true,
+                        dark: true,
+                    }).onOk(() => resolve(true)).onCancel(() => resolve(false))
+                })
+                if (!confirmed) return
+            }
+            try {
+                await useDashboardStore().setStoreOpen(open)
+            } catch (e) {
+                console.error('SellerGreeting - onToggleOpen -', e)
+                this.$q.notify({ classes: 'quasar-notify-negative', message: this.$t('common.toast_update_failed'), position: 'bottom' })
+            }
+        },
+    },
 }
 </script>
 
@@ -74,6 +145,40 @@ export default {
                 <span class="date-text">{{ dateText }}</span>
                 <span class="time-text">{{ timeText }}</span>
             </div>
+            <q-toggle
+                v-if="sellerInfo"
+                :model-value="isOpen"
+                :label="isOpen ? $t('seller_home.store_open') : $t('seller_home.store_closed')"
+                color="positive"
+                dense
+                class="open-toggle"
+                @update:model-value="onToggleOpen"
+            />
+            <div v-if="sellerInfo" class="hours-row">
+                <span>{{ $t('seller_home.hours_label') }}: {{ hoursText || $t('seller_home.hours_all_day') }}</span>
+                <button class="hours-edit" @click="openHoursDialog">{{ $t('seller_home.hours_edit') }}</button>
+            </div>
+            <div v-if="outsideHours" class="hours-hint">{{ $t('seller_home.hours_outside_hint') }}</div>
+
+            <q-dialog v-model="hoursDialog">
+                <q-card dark class="hours-dialog">
+                    <q-card-section class="text-subtitle1">{{ $t('seller_home.hours_label') }}</q-card-section>
+                    <q-card-section>
+                        <q-toggle v-model="allDay" :label="$t('seller_home.hours_all_day')" color="positive" dense />
+                        <div v-if="!allDay" class="hours-inputs">
+                            <label>{{ $t('seller_home.hours_open_at') }} <input v-model="draftOpen" type="time" required></label>
+                            <label>{{ $t('seller_home.hours_close_at') }} <input v-model="draftClose" type="time" required></label>
+                            <div class="hours-note">{{ $t('seller_home.hours_overnight_note') }}</div>
+                        </div>
+                    </q-card-section>
+                    <q-card-actions align="right">
+                        <q-btn flat no-caps :label="$t('common.button_label_cancel')" v-close-popup />
+                        <q-btn unelevated no-caps color="positive" :loading="savingHours"
+                            :disable="!allDay && (!draftOpen || !draftClose)"
+                            :label="$t('common.button_label_save')" @click="saveHours" />
+                    </q-card-actions>
+                </q-card>
+            </q-dialog>
         </div>
 
         <div class="avatar-wrap" @click="$router.push('/seller/me')">
@@ -172,5 +277,66 @@ export default {
     align-items: center;
     justify-content: center;
     color: rgba(255, 255, 255, 0.6);
+}
+
+.open-toggle {
+    margin-top: 8px;
+    font-size: 13px;
+}
+
+.hours-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.hours-edit {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #f5A623;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.hours-hint {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #f5A623;
+}
+
+.hours-dialog {
+    min-width: 280px;
+}
+
+.hours-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 14px;
+
+    label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+
+    input {
+        background: transparent;
+        color: inherit;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        padding: 6px 8px;
+        color-scheme: dark;
+    }
+}
+
+.hours-note {
+    font-size: 11px;
+    opacity: 0.6;
 }
 </style>

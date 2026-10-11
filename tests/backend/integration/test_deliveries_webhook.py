@@ -62,6 +62,9 @@ class _FakeOrderDAO:
             return self._order
         return None
 
+    def touch_order(self, order_id):
+        self.touched = order_id
+
     def update_order_status(self, order_id, status):
         self.last_status = status
         if self._order:
@@ -210,3 +213,28 @@ def test_webhook_registration_ping_ok_without_db_write(fastapi_client, monkeypat
         assert res.status_code == 200
         assert fake_del.last_update is None, "Unsigned request must NOT update the delivery"
         assert fake_ord.last_status is None
+
+
+def test_webhook_driver_assigned_notifies_seller(
+    fastapi_client, lalamove_secret, lalamove_api_key, monkeypatch
+):
+    """DRIVER_ASSIGNED (no order.status in payload) → seller pushed, order status untouched."""
+    fake_del = _FakeDeliveryDAO({"id": "del-uuid", "order_id": "ord-uuid", "lalamove_order_id": "LM12345", "status": "ON_GOING"})
+    fake_ord = _FakeOrderDAO({"id": "ord-uuid", "status": "ready"})
+    monkeypatch.setattr("apis.deliveries.DAODeliveries", lambda: fake_del)
+    monkeypatch.setattr("apis.deliveries.DAOOrders", lambda: fake_ord)
+    notified = []
+    monkeypatch.setattr("apis.deliveries.push_service.notify_seller_driver_assigned", notified.append)
+
+    body, raw = _make_webhook_body(
+        lalamove_api_key, lalamove_secret,
+        event_type="DRIVER_ASSIGNED",
+        data_dict={"order": {"orderId": "LM12345"}, "driver": {"name": "Tran Van A", "phone": "+84900000009", "plateNumber": "59X1-12345"}},
+    )
+    res = fastapi_client.post("/deliveries/webhook", content=raw, headers={"Content-Type": "application/json"})
+
+    assert res.status_code == 200
+    assert [o["id"] for o in notified] == ["ord-uuid"]
+    assert fake_ord.last_status is None, "Driver assignment must not change the order status"
+    assert fake_ord.touched == "ord-uuid", "Seller list signature must move on a delivery-only change"
+    assert fake_del.last_update["driver_name"] == "Tran Van A"

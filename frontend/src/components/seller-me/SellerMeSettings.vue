@@ -1,13 +1,13 @@
 <script>
 import { mapState, mapActions } from 'pinia';
-import { User, MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight } from 'lucide-vue-next';
+import { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight } from 'lucide-vue-next';
 import { useAccountV2Store } from '@/stores/v2/account/accountStore';
 import BaseSwitch from '@/components/v2/shared/BaseSwitch.vue';
 
 export default {
     name: 'SellerMeSettings',
 
-    components: { User, MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, BaseSwitch },
+    components: { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, BaseSwitch },
 
     computed: {
         ...mapState(useAccountV2Store, ['notifications']),
@@ -34,12 +34,6 @@ export default {
                 <!-- No v-model: the click bubbles up to the row, which toggles -->
                 <BaseSwitch :model-value="notifications.orderUpdates" :label="$t('seller_me.menu_label_new_order_alerts')" />
             </div>
-
-            <router-link to="/account/profile" class="menu-item">
-                <div class="menu-icon"><User size="18" /></div>
-                <span class="menu-label">{{ $t('seller_me.menu_label_profile') }}</span>
-                <ChevronRight size="16" class="menu-arrow" />
-            </router-link>
 
             <router-link to="/account/address" class="menu-item">
                 <div class="menu-icon"><MapPin size="18" /></div>

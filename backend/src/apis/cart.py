@@ -8,6 +8,9 @@ import logging
 from dao.dao_cart_items import DAOCartItems
 from dao.dao_carts import DAOCarts
 from dao.dao_food_item_variants import DAOFoodItemVariants
+from dao.dao_food_items import DAOFoodItems
+from apis.orders import STORE_CLOSED_DETAIL, is_same_day
+from core.store_hours import is_open_now
 from schemas import Schema
 
 from fastapi import (
@@ -62,6 +65,11 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
     
     user_id = user["id"]
     _validate_variant(request.food_item_id, request.variant_id)
+
+    gate = DAOFoodItems().read_order_gate(request.food_item_id)
+    seller = (gate or {}).get("seller_profiles") or {}
+    if gate and is_same_day(gate.get("preorder_day")) and not is_open_now(seller.get("is_open"), seller.get("opening_time"), seller.get("closing_time")):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=STORE_CLOSED_DETAIL)
 
     dao_cart = DAOCarts()    
     cart = dao_cart.read_cart_by_user_id_seller_id(user_id=user_id)

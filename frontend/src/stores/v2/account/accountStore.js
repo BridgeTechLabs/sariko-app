@@ -258,6 +258,15 @@ export const useAccountV2Store = defineStore('accountV2Store', {
                 }
             } catch (error) {
                 console.warn(`accountV2Store - togglePush - ${error}`)
+                // subscribe() throws when the browser has no push service (e.g. Brave with Google push off)
+                if (!this.notifications.orderUpdates) {
+                    Notify.create({
+                        classes: 'quasar-notify-negative',
+                        message: i18n.global.t('account_v2.push_failed'),
+                        progress: true,
+                        position: 'bottom',
+                    })
+                }
             }
         },
 

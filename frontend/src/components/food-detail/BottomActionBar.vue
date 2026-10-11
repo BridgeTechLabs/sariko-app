@@ -1,4 +1,5 @@
 <script>
+import { blockedByClosedStore } from '@/utils/storeOpen';
 import { Minus, Plus, ShoppingBasket } from 'lucide-vue-next';
 import { useSellerStore } from '@/stores/seller/sellerStore';
 import { useCartStore } from '@/stores/cart/cartStore';
@@ -28,7 +29,11 @@ export default {
         canDecrease() {
             return !!this.food && this.quantity > 1
         },
+        storeClosed() {
+            return blockedByClosedStore(this.seller, this.food?.preorder_day)
+        },
         canAdd() {
+            if (this.storeClosed) return false
             // A dish with levels cannot be priced until one is picked — the backend
             // rejects it anyway, so the button must not offer it.
             // Every level sold out: nothing addable, even though `levels` is empty.
@@ -78,8 +83,8 @@ export default {
             this.loading = true
             const cartStore = useCartStore()
             try {
-                await cartStore.addItem(this.seller.id, this.food.id, this.seller.store_name, this.quantity, this.sellerStore.selectedVariantId)
-                if (cartStore.isShowModalCartConflict) {
+                const added = await cartStore.addItem(this.seller.id, this.food.id, this.seller.store_name, this.quantity, this.sellerStore.selectedVariantId)
+                if (!added || cartStore.isShowModalCartConflict) {
                     this.loading = false
                     return
                 }
@@ -149,7 +154,7 @@ export default {
         >
             <span v-if="loading" class="cta__spinner" aria-hidden="true"></span>
             <ShoppingBasket v-else :size="20" />
-            <span class="cta__label">{{ $t('food_detail_page.button_add_to_cart') }}</span>
+            <span class="cta__label">{{ storeClosed ? $t('food_detail_page.button_store_closed') : $t('food_detail_page.button_add_to_cart') }}</span>
         </button>
     </div>
 </template>

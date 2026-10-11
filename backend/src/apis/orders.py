@@ -40,6 +40,20 @@ def unavailable_names(cart_items: list) -> list:
     return names
 
 
+# Shared with POST /cart/add. A closed store still takes pre-orders (delivered on a later
+# day); only same-day dishes (preorder_day 0) are blocked.
+STORE_CLOSED_DETAIL = "This store is closed now. Same-day dishes can't be ordered; pre-order dishes still can."
+
+
+def is_same_day(preorder_day) -> bool:
+    return not preorder_day  # 0 / None
+
+
+def same_day_names(cart_items: list) -> list:
+    return [(item.get("food_items") or {}).get("name") for item in cart_items
+            if is_same_day((item.get("food_items") or {}).get("preorder_day"))]
+
+
 @router.post("")
 def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token)):
 
@@ -84,6 +98,10 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
     seller_info = dao_seller_profile.read_seller_order_info(cart["seller_id"])
     if not seller_info:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Seller not found")
+
+    # Items may have entered the cart before the seller closed
+    if not seller_info["is_open"] and same_day_names(cart_items):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=STORE_CLOSED_DETAIL)
 
     commission_rate = seller_info["commission_rate"]
     commission_amount = round(subtotal * commission_rate, 2)
