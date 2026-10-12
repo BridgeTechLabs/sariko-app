@@ -23,6 +23,9 @@ Bugs found during manual testing. Newest at the bottom.
 | 14 | Seller can't open/close their store | 🔧 Built in `fix/common-bugs`: switch + daily hours on seller Home; closed/outside hours blocks same-day only; lists Open → Closed → Coming soon | DEV `5067e95` (2026-10-12) |
 | 15 | Onboarding / legacy address form: saving a first address → 500 (NOT NULL receiver) | 🔧 Fix in `fix/common-bugs`: insert defaults receiver to account holder | DEV `820ac47` (2026-10-12) |
 | 16 | Prod deploy never runs: prod runner registered to the old repo; DEV runner also carries the prod label | ✅ Runner re-registered + DEV label removed; run attempt 3 on `ec2-sariko-app` → prod `1f9f04f` | PROD `1f9f04f` (2026-10-12) |
+| 17 | PROD: off-sale dish can be added to cart, then checkout fails "No longer available" | 🔧 Fix in `fix/common-bugs`: Sold out overlay + disabled in menu, CTA "Bán hết", cart add refuses | — |
+| 18 | DEV: error on login: chat list 500 "JWT issued at future" (PGRST303) | ⬜ Open: proposed retry-once in shared Supabase transport | — |
+| 19 | Menu manage: remove the quantity "Step" field (always 1) | 🔧 Fix in `fix/common-bugs` | — |
 
 ---
 
@@ -245,3 +248,37 @@ Prod migration history ≠ repo (only `20260916144935` recorded), so **never `su
 - VAPID: the `app.sariko.store` bundle key `BFHAUE9N…` **matches** the running prod backend private key
 - ⚠️ `https://sariko.store` (apex) fails the TLS handshake (`sslv3 alert handshake failure`), while `www.sariko.store` → 200 and `app.sariko.store` serves today's build. Check the Cloudflare SSL/DNS setup for the apex (LINKS.md lists sariko.store as the marketplace PWA).
 - [ ] Still to smoke-test by hand on prod: new buyer onboarding saves an address (#15), push on Chrome, seller open/closed + hours
+
+---
+
+## #17 — PROD: an off-sale dish can be added to the cart; checkout then fails
+- **Found:** 2026-10-12 on prod. Backend log: `HTTP 400: No longer available: Dinuguan`.
+- **Data (prod public menu API):** `evelyns-kakanin-and-ulam` → "Dinuguan" (`53b5d479…`) has `is_available = false` (seller switched "Đang bán" off). `pan-de-saigon` → "Pork Dinuguan" is on sale.
+- **Backend is right to refuse:** `apis/orders.py` `unavailable_names()` blocks off-sale dishes at `POST /orders`.
+- **The gap (pre-existing, not from today's release):**
+  - Buyer UI ignores the dish's `is_available`: `seller/seller-page/Menu.vue` doesn't pass it to `FoodCard.vue`; `food-detail/BottomActionBar.vue` and `home-page/FeaturedDishCard.vue` don't check it either. Off-sale dishes look normal and are addable.
+  - `POST /cart/add` (`apis/cart.py`) only checks the price option's `is_available` (`_validate_variant`), not the dish's.
+  - Cart page (`components/order-cart/*`) doesn't flag off-sale items, so the buyer only sees the error at checkout and doesn't know which item to remove.
+- **Workaround now:** the buyer removes "Dinuguan" from the cart; or, if it was switched off by mistake, the seller turns "Đang bán" back on.
+- **Fix idea:** (1) `POST /cart/add` rejects an off-sale dish (add `is_available` to `DAOFoodItems.read_order_gate`); (2) buyer UI shows a "Hết món" badge and disables add for off-sale dishes (seller page, food detail, featured); (3) cart marks off-sale items and blocks checkout with a "remove X" message.
+- **Decided (Jack, 2026-10-12):** off-sale dishes stay in the buyer menu with a **"Bán hết / Sold out"** label over the photo, muted and not tappable. Only dishes the seller **deletes** disappear (delete is a hard `DELETE`, so they're already gone).
+- **Why it wasn't hidden:** `GET /sellers/{slug}/menu` (buyer) and `GET /sellers/me/menu` (seller) share `DAOFoodItems.read_menu_by_seller_id()`, which returns every dish with its `is_available` flag. The seller needs that, but the buyer route never filtered or flagged it. Search and featured dishes already filter `is_available = true`.
+- **Built:** `POST /cart/add` → 400 "This dish is sold out" (`read_order_gate` now selects `is_available`; test in `test_store_closed.py`). `Menu.vue` passes `is-available` → `FoodCard.vue` shows the overlay, muted row, no detail/add. `BottomActionBar.vue` CTA "Bán hết" on a direct link. `cartStore` toasts `cart_page.dish_sold_out`.
+- **Not done:** the cart page still doesn't mark sold-out items already in a cart. Checkout shows the backend toast "No longer available: X" (English).
+
+---
+
+## #18 — Error on login: `GET /chat/conversations` → 500 "JWT issued at future" (PGRST303)
+- **Found:** 2026-10-12 on DEV ("every login shows an error"). Both logins in the last 24h hit it: 2026-10-11 19:20:04 and 2026-10-12 04:11:39 UTC. Prod: 0 so far (container since 22:36).
+- **Log:** `error list_for_buyer …: {'message': 'JWT issued at future', 'code': 'PGRST303'}`, followed by `Supabase stale connection, retrying once`.
+- **Confirmed upstream (2026-10-12):** this is a **PostgREST bug**, fixed in **v14.18 (2026-09-10) / v16.3 (2026-09-11)**, PR #5196 "Fix sporadic PGRST303 JWT issued at future errors". The related PR #5159 (v14.17/16.1) is "JWT validation uses wrong current time due to a bug in auto-update": after idling, PostgREST validated with a stale cached clock, so a freshly minted token looked issued in the future. **DEV and prod both run PostgREST 14.5** (read from OpenAPI `info.version` inside the backend containers). Same reports with `sb_secret_` keys: supabase/supabase#49655 (closed, no official cause; workaround retry ~1s), #50651.
+- **Original hypothesis:** DEV and prod use the new `sb_secret_…` key. The Supabase API gateway swaps it for a short-lived JWT per request, and PostgREST rejects the JWT when its `iat` is ahead of PostgREST's clock. Transient. It shows up on the first requests after idle, which is login. The EC2 clock is NTP-synced, and our code passes no user JWT to PostgREST (every DAO uses the shared service client).
+- **Side notes:** login calls `GET /chat/conversations?as_seller=false` twice within 1s. The 25× `403 /sellers/me/orders` from Jack's IP on 2026-10-11 20:00–20:33 came from the dev panel's silent seller-order fetch, not from login.
+- **Fix:** (1) real fix = get the Supabase projects onto PostgREST ≥ 14.18 (Dashboard → Project Settings → Infrastructure; ask support if no upgrade is offered). (2) Until then, in `backend/src/clients/supabase.py` `_RetryOnDisconnectTransport`, also retry once (after ~1s) when PostgREST answers 401 with `PGRST303`. That covers every DAO in one place. Alternative: switch to the legacy `service_role` JWT key (fixed past `iat`).
+
+---
+
+## #19 — Menu manage: remove the "Step" (quantity_step) field
+- **Requested:** 2026-10-12 (Jack). Sellers no longer set a step; it's always 1.
+- **Why it's safe:** `quantity_step` is stored but read nowhere: not by the buyer qty buttons, the cart or the order. On prod only `dummy-store` "Turon" has step 2. The prod log also showed sellers entering `quantity_step = 0` → 422 validation errors, which this removes.
+- **Change:** `components/seller-menu/ModalEditItem.vue` drops the input, and create/edit always send `quantity_step: 1` (so an existing dish is normalised the next time it's saved). The `seller_menu.item_quantity_step` i18n key is removed. Backend schema/column unchanged (default 1, `ge=1`).

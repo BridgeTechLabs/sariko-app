@@ -67,6 +67,9 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
     _validate_variant(request.food_item_id, request.variant_id)
 
     gate = DAOFoodItems().read_order_gate(request.food_item_id)
+    # Off sale ("Đang bán" off): shown as Sold out in the menu; POST /orders would refuse it anyway
+    if gate and gate.get("is_available") is False:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This dish is sold out")
     seller = (gate or {}).get("seller_profiles") or {}
     if gate and is_same_day(gate.get("preorder_day")) and not is_open_now(seller.get("is_open"), seller.get("opening_time"), seller.get("closing_time")):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=STORE_CLOSED_DETAIL)

@@ -8,6 +8,11 @@ import { useAuthStore } from '@/stores/auth/authStore';
 
 export default {
     props: {
+        // false = seller switched "Đang bán" off: shown as Sold out, not tappable (deleted dishes aren't returned at all)
+        isAvailable: {
+            type: Boolean,
+            default: true
+        },
         hasVariants: {
             type: Boolean,
             default: false
@@ -70,6 +75,7 @@ export default {
 
     methods: {
         goToDetail() {
+            if (!this.isAvailable) return
             if (this.seller?.slug) {
                 this.$router.push(`/food/${this.seller.slug}/${this.itemId}`)
             }
@@ -77,6 +83,7 @@ export default {
 
         async handleAddToCart(e) {
             e.stopPropagation()
+            if (!this.isAvailable) return
             // No single price to add — the level is picked on the detail page.
             if (this.hasVariants) return this.goToDetail()
             const authStore = useAuthStore()
@@ -104,14 +111,17 @@ export default {
 </script>
 
 <template>
-    <div class="food-row" @click="goToDetail">
+    <div class="food-row" :class="{ 'sold-out': !isAvailable }" @click="goToDetail">
 
-        <img
-        :src="imgSrc"
-        :alt="name"
-        class="food-thumb"
-        @error="$event.target.src = '/images/default-food-image.webp'"
-        />
+        <div class="thumb-wrap">
+            <img
+            :src="imgSrc"
+            :alt="name"
+            class="food-thumb"
+            @error="$event.target.src = '/images/default-food-image.webp'"
+            />
+            <div v-if="!isAvailable" class="sold-out-label">{{ $t('seller_page.section_food_cards.label_sold_out') }}</div>
+        </div>
 
         <div class="food-info">
             <div class="food-name">
@@ -137,7 +147,7 @@ export default {
                     <div class="food-price">₫{{ price }}</div>
                     <div v-if="unitLabel" class="unit-label">/ {{ unitLabel }}</div>
                 </div>
-                <q-btn flat dense no-caps :loading="loading" :disable="storeClosed" @click="handleAddToCart">
+                <q-btn flat dense no-caps :loading="loading" :disable="storeClosed || !isAvailable" @click="handleAddToCart">
                     <q-icon name="fa-solid fa-circle-plus" size="26px" style="color: #f5A623" />
                     <template #loading>
                         <q-spinner-dots color="orange" size="20px" />
@@ -251,4 +261,33 @@ export default {
     color: var(--text-secondary);
 }
 
+
+.thumb-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+// Muted row; the label sits outside the muted parts so it stays readable
+.sold-out {
+    cursor: default;
+
+    .food-thumb { filter: grayscale(1); opacity: 0.45; }
+    .food-info { opacity: 0.45; }
+}
+
+.sold-out-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    text-align: center;
+}
 </style>

@@ -88,6 +88,8 @@ export const useCartStore = defineStore("cartStore", {
                     this.pendingVariantId = variantId
                     this.pendingSellerName = newSellerName
                     this.showConflictModal(e.currentSellerName || '', newSellerName || '')
+                } else if (e.message.includes('sold out')) {
+                    Notify.create({ classes: 'quasar-notify-negative', message: i18n.global.t('cart_page.dish_sold_out'), position: 'bottom', timeout: 3000 })
                 } else if (e.message.includes('store is closed')) {
                     Notify.create({ classes: 'quasar-notify-negative', message: i18n.global.t('cart_page.store_closed_same_day'), position: 'bottom', timeout: 3000 })
                 } else {
