@@ -77,7 +77,7 @@ export default {
             <div class="nav-label">{{ $t('bottom_nav.button_label_notifications') }}</div>
         </div>
 
-        <router-link to="/account" class="nav-item">
+        <router-link to="/account" class="nav-item" :class="{ active: isActive('/account') }">
             <div class="icon-wrapper">
                 <CircleUserRound size="18px" />
                 <span v-if="inboxBadge > 0" class="order-badge">{{ inboxBadge }}</span>

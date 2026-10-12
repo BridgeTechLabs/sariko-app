@@ -23,6 +23,12 @@ Bugs found during manual testing. Newest at the bottom.
 | 14 | Seller can't open/close their store | 🔧 Built in `fix/common-bugs`: switch + daily hours on seller Home; closed/outside hours blocks same-day only; lists Open → Closed → Coming soon | DEV `5067e95` (2026-10-12) |
 | 15 | Onboarding / legacy address form: saving a first address → 500 (NOT NULL receiver) | 🔧 Fix in `fix/common-bugs`: insert defaults receiver to account holder | DEV `820ac47` (2026-10-12) |
 | 16 | Prod deploy never runs: prod runner registered to the old repo; DEV runner also carries the prod label | ✅ Runner re-registered + DEV label removed; run attempt 3 on `ec2-sariko-app` → prod `1f9f04f` | PROD `1f9f04f` (2026-10-12) |
+| 17 | PROD: off-sale dish can be added to cart, then checkout fails "No longer available" | 🔧 Fix in `fix/common-bugs`: Sold out overlay + disabled in menu, CTA "Bán hết", cart add refuses | DEV `b7b5d24` (2026-10-12) |
+| 18 | DEV: error on login: chat list 500 "JWT issued at future" (PGRST303) | ⬜ Open: proposed retry-once in shared Supabase transport | — |
+| 19 | Menu manage: remove the quantity "Step" field (always 1) | 🔧 Fix in `fix/common-bugs` | DEV `b7b5d24` (2026-10-12) |
+| 20 | Plan: add a DB migration step to the prod pipeline | 📋 Planned (after baseline repair) | — |
+| 21 | Buyer bottom nav: Account button not highlighted on `/account` | 🔧 Fix in `fix/common-bugs`: Account link gets `isActive('/account')` | — |
+| 22 | Ready button before the window: confirm instead of block (changes #9) | 🔧 Fix in `fix/common-bugs`: button enabled, confirm dialog when early, backend 400 removed | — |
 
 ---
 
@@ -133,6 +139,7 @@ Bugs found during manual testing. Newest at the bottom.
   - Is an emergency override needed (the seller finished early, or the buyer asks for earlier)?
 - **Decided (2026-10-12):** 45 min · frontend + backend · no override · orders without an appointment are unchanged.
 - **Built:** `backend/src/apis/sellers.py` `READY_WINDOW` + `ready_opens_at()` (400 when early, test `tests/backend/unit/test_ready_window.py`); `frontend/src/utils/readyWindow.js` (`READY_WINDOW_MINUTES` must match the backend); button disabled with a countdown in `SellerOrderActionBar.vue` (detail) and `ActionOrdersList.vue` (seller home), refreshed every minute.
+- **Changed by #22 (2026-10-12):** no longer blocked; early tap asks for confirmation, backend gate removed.
 
 ---
 
@@ -245,3 +252,74 @@ Prod migration history ≠ repo (only `20260916144935` recorded), so **never `su
 - VAPID: the `app.sariko.store` bundle key `BFHAUE9N…` **matches** the running prod backend private key
 - ⚠️ `https://sariko.store` (apex) fails the TLS handshake (`sslv3 alert handshake failure`), while `www.sariko.store` → 200 and `app.sariko.store` serves today's build. Check the Cloudflare SSL/DNS setup for the apex (LINKS.md lists sariko.store as the marketplace PWA).
 - [ ] Still to smoke-test by hand on prod: new buyer onboarding saves an address (#15), push on Chrome, seller open/closed + hours
+
+---
+
+## #17 — PROD: an off-sale dish can be added to the cart; checkout then fails
+- **Found:** 2026-10-12 on prod. Backend log: `HTTP 400: No longer available: Dinuguan`.
+- **Data (prod public menu API):** `evelyns-kakanin-and-ulam` → "Dinuguan" (`53b5d479…`) has `is_available = false` (seller switched "Đang bán" off). `pan-de-saigon` → "Pork Dinuguan" is on sale.
+- **Backend is right to refuse:** `apis/orders.py` `unavailable_names()` blocks off-sale dishes at `POST /orders`.
+- **The gap (pre-existing, not from today's release):**
+  - Buyer UI ignores the dish's `is_available`: `seller/seller-page/Menu.vue` doesn't pass it to `FoodCard.vue`; `food-detail/BottomActionBar.vue` and `home-page/FeaturedDishCard.vue` don't check it either. Off-sale dishes look normal and are addable.
+  - `POST /cart/add` (`apis/cart.py`) only checks the price option's `is_available` (`_validate_variant`), not the dish's.
+  - Cart page (`components/order-cart/*`) doesn't flag off-sale items, so the buyer only sees the error at checkout and doesn't know which item to remove.
+- **Workaround now:** the buyer removes "Dinuguan" from the cart; or, if it was switched off by mistake, the seller turns "Đang bán" back on.
+- **Fix idea:** (1) `POST /cart/add` rejects an off-sale dish (add `is_available` to `DAOFoodItems.read_order_gate`); (2) buyer UI shows a "Hết món" badge and disables add for off-sale dishes (seller page, food detail, featured); (3) cart marks off-sale items and blocks checkout with a "remove X" message.
+- **Decided (Jack, 2026-10-12):** off-sale dishes stay in the buyer menu with a **"Bán hết / Sold out"** label over the photo, muted and not tappable. Only dishes the seller **deletes** disappear (delete is a hard `DELETE`, so they're already gone).
+- **Why it wasn't hidden:** `GET /sellers/{slug}/menu` (buyer) and `GET /sellers/me/menu` (seller) share `DAOFoodItems.read_menu_by_seller_id()`, which returns every dish with its `is_available` flag. The seller needs that, but the buyer route never filtered or flagged it. Search and featured dishes already filter `is_available = true`.
+- **Built:** `POST /cart/add` → 400 "This dish is sold out" (`read_order_gate` now selects `is_available`; test in `test_store_closed.py`). `Menu.vue` passes `is-available` → `FoodCard.vue` shows the overlay, muted row, no detail/add. `BottomActionBar.vue` CTA "Bán hết" on a direct link. `cartStore` toasts `cart_page.dish_sold_out`.
+- **Verified on DEV `b7b5d24` (API):** `POST /cart/add` Leche Flan as buyer2 → 400 "This dish is sold out", 0 cart rows written; menu returns Leche Flan `is_available=false`; DEV bundle contains the Sold out UI. UI check pending.
+- **Not done:** the cart page still doesn't mark sold-out items already in a cart. Checkout shows the backend toast "No longer available: X" (English).
+
+---
+
+## #18 — Error on login: `GET /chat/conversations` → 500 "JWT issued at future" (PGRST303)
+- **Found:** 2026-10-12 on DEV ("every login shows an error"). Both logins in the last 24h hit it: 2026-10-11 19:20:04 and 2026-10-12 04:11:39 UTC. Prod: 0 so far (container since 22:36).
+- **Log:** `error list_for_buyer …: {'message': 'JWT issued at future', 'code': 'PGRST303'}`, followed by `Supabase stale connection, retrying once`.
+- **Confirmed upstream (2026-10-12):** this is a **PostgREST bug**, fixed in **v14.18 (2026-09-10) / v16.3 (2026-09-11)**, PR #5196 "Fix sporadic PGRST303 JWT issued at future errors". The related PR #5159 (v14.17/16.1) is "JWT validation uses wrong current time due to a bug in auto-update": after idling, PostgREST validated with a stale cached clock, so a freshly minted token looked issued in the future. **DEV and prod both run PostgREST 14.5** (read from OpenAPI `info.version` inside the backend containers). Same reports with `sb_secret_` keys: supabase/supabase#49655 (closed, no official cause; workaround retry ~1s), #50651.
+- **Original hypothesis:** DEV and prod use the new `sb_secret_…` key. The Supabase API gateway swaps it for a short-lived JWT per request, and PostgREST rejects the JWT when its `iat` is ahead of PostgREST's clock. Transient. It shows up on the first requests after idle, which is login. The EC2 clock is NTP-synced, and our code passes no user JWT to PostgREST (every DAO uses the shared service client).
+- **Side notes:** login calls `GET /chat/conversations?as_seller=false` twice within 1s. The 25× `403 /sellers/me/orders` from Jack's IP on 2026-10-11 20:00–20:33 came from the dev panel's silent seller-order fetch, not from login.
+- **Fix:** (1) real fix = get the Supabase projects onto PostgREST ≥ 14.18 (Dashboard → Project Settings → Infrastructure; ask support if no upgrade is offered). (2) Until then, in `backend/src/clients/supabase.py` `_RetryOnDisconnectTransport`, also retry once (after ~1s) when PostgREST answers 401 with `PGRST303`. That covers every DAO in one place. Alternative: switch to the legacy `service_role` JWT key (fixed past `iat`).
+
+---
+
+## #19 — Menu manage: remove the "Step" (quantity_step) field
+- **Requested:** 2026-10-12 (Jack). Sellers no longer set a step; it's always 1.
+- **Why it's safe:** `quantity_step` is stored but read nowhere: not by the buyer qty buttons, the cart or the order. On prod only `dummy-store` "Turon" has step 2. The prod log also showed sellers entering `quantity_step = 0` → 422 validation errors, which this removes.
+- **Change:** `components/seller-menu/ModalEditItem.vue` drops the input, and create/edit always send `quantity_step: 1` (so an existing dish is normalised the next time it's saved). The `seller_menu.item_quantity_step` i18n key is removed. Backend schema/column unchanged (default 1, `ge=1`).
+
+---
+
+## #20 — 📋 Plan: DB migrations in the prod pipeline
+- **Decided 2026-10-12:** not yet. Keep applying prod migrations **by hand** (SQL editor, one transaction each) until the steps below are done.
+- **Blocker:** prod `supabase_migrations.schema_migrations` only holds `20260916144935` (in no repo file). None of the 22 repo migrations are recorded, so `supabase db push` on prod would try to re-run all of them on a drifted schema (prod has `admin_*` functions, the `ensure_rls` event trigger, `blog_posts`/`waitlist`… see memory "Prod schema drift").
+- **Steps:**
+  1. **Baseline diff (one time):** `pg_dump --schema-only` prod vs the schema built from migrations (DEV). Everything the migrations create must already exist on prod. Extra prod objects are fine; missing or different ones must be fixed first.
+  2. **Repair history:** `supabase migration repair --status applied <all 22 versions> --db-url <prod>` (`20261003…` and `20261009…` were applied by hand on 2026-10-12). Done when `supabase db push --dry-run --db-url <prod>` reports nothing to apply.
+  3. **Pipeline step** in `prd-deploy-pipeline.yml`, before deploy: `supabase db push --dry-run` (log the plan) → `supabase db push` **without `--include-all`** (an out-of-order migration should stop the deploy). Secret `SUPABASE_DB_URL` in the `production` environment (session pooler URL), plus **Required reviewers** on that environment.
+- **Rule for migrations (lesson from #15):** the migration runs before the new code, so it must keep the **old** code working (expand → contract). New columns are nullable or have defaults. `NOT NULL`, drops and renames ship in a later release, once no running code depends on the old shape.
+
+---
+
+## #21 — Buyer bottom nav: Account button not highlighted on its own route
+- **Found:** 2026-10-12 (Jack, manual testing)
+- **Steps:** Log in as a buyer, tap Account in the bottom nav (route `/account`)
+- **Actual:** The Account button stays grey; no tab looks active
+- **Expected:** Account is highlighted (accent color + dark pill), like Home and Orders on their routes
+- **Where:** `frontend/src/components/nav/BottomNavigation.vue`. The Home and Orders `<router-link>`s carry `:class="{ active: isActive(...) }"`; the Account link has no binding, so `.nav-item.active` never applies. The Cart link has none either, but the nav is hidden on `/cart`, so that one doesn't show.
+- **Fix (done 2026-10-12, in `fix/common-bugs`):** added `:class="{ active: isActive('/account') }"` to the Account link. The nav is hidden on `/account/*` sub-pages, so `startsWith('/account')` only matters for `/account` itself.
+- **Seller nav** (`SellerBottomNav.vue`): all 5 links have the binding, not affected.
+
+---
+
+## #22 — Ready before the delivery window: confirm, don't block (changes #9)
+- **Requested:** 2026-10-12 (Jack). Sellers must be able to tap "Sẵn sàng giao hàng" before the 45-min window; if it's early, show a confirm dialog instead of disabling the button.
+- **Change:**
+  - `frontend/src/utils/readyWindow.js`: new `confirmEarlyReady(vm, minutes)` (Quasar dialog, resolves `true` when on time or confirmed). 45-min window and countdown label unchanged.
+  - `SellerOrderActionBar.vue` (detail) and `ActionOrdersList.vue` (seller home): `:disable` removed; `onAccept` awaits the confirm. On seller home the confirm runs after the seller-info pre-flight check.
+  - `backend/src/apis/sellers.py`: removed the "Too early to mark ready" 400 plus `READY_WINDOW` / `ready_opens_at()`; `tests/backend/unit/test_ready_window.py` deleted with it.
+  - i18n `seller_order_detail.ready_early_title` / `ready_early_body` (en-PH + vi).
+- **Dialog (UX round 2, Jack 2026-10-12):** gold title = the question "Bạn muốn đặt giao hàng sớm chứ?"; light body = only the buyer's chosen time + time left ("Khách hẹn nhận hàng lúc 15:03 Th 2, 12/10 (còn 2h 5m nữa)."); confirm button says the action, "Đặt giao hàng ngay" (not "OK"), gold fill; Cancel = `common.button_label_cancel`. Styles are global in `assets/main.css` (`.ready-early-dialog`), because the dialog is teleported out of scoped CSS.
+- **UX round 3 (Jack 2026-10-12, "text bị cắt"):** title "Đặt giao hàng sớm?" + bullets "• Khách nhận hàng lúc: …" / "• Còn lại: …". Root cause of the cut text: Quasar `.q-dialog-plugin` is a fixed 400px with no max-width under 600px viewport, so on phones (~375px) the card overflowed. Global fix in `main.css`: `.q-dialog-plugin { max-width: calc(100vw - 48px) }` (also fixes the seller close-store confirm in `SellerGreeting.vue`).
+- **Effect to know:** confirming early books Lalamove right away, so the driver can arrive (and deliver) before `delivery_appointment`.
+- **UI check:** scheduled order > 45 min away → button shows "Sẵn sàng sau …", is tappable, dialog appears; Cancel = nothing happens; OK = order goes ready + Lalamove booked. Inside the window → no dialog.

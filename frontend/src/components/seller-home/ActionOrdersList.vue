@@ -2,7 +2,7 @@
 import { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin } from 'lucide-vue-next';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
-import { minutesUntilReady, formatWait } from '@/utils/readyWindow';
+import { minutesUntilReady, formatWait, confirmEarlyReady } from '@/utils/readyWindow';
 
 const STATUS_DISPLAY_KEY = {
     pending:          'seller_home.status_new',
@@ -212,6 +212,7 @@ export default {
                     return
                 }
             }
+            if (!await confirmEarlyReady(this, order)) return
             this.clearError(order.id)
             this.loadingOrders = { ...this.loadingOrders, [order.id]: true }
 
@@ -410,7 +411,7 @@ export default {
                         <q-btn flat dense no-caps class="btn-reject" :disable="!!loadingOrders[order.id]" @click="openRejectDialog(order)">
                             <X :size="14" style="margin-right: 4px;" /> {{ $t('seller_home.action_reject') }}
                         </q-btn>
-                        <q-btn unelevated dense no-caps class="btn-accept" :loading="!!loadingOrders[order.id]" :disable="order.readyWaitMinutes > 0" @click="onAccept(order)">
+                        <q-btn unelevated dense no-caps class="btn-accept" :loading="!!loadingOrders[order.id]" @click="onAccept(order)">
                             <Check :size="14" style="margin-right: 4px;" /> {{ order.readyWaitMinutes ? $t('seller_order_detail.ready_available_in', { time: formatWait(order.readyWaitMinutes) }) : order.nextLabel }}
                         </q-btn>
                     </div>

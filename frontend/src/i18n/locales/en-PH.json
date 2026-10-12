@@ -129,6 +129,7 @@
             "banner_text_line_2": "· 17% commission · Founding Seller"
         },
         "section_food_cards": {
+            "label_sold_out": "Sold out",
             "label_item_instant": "Same-day",
             "lable_item_pre_order": "Pre-order",
             "lable_item_pre_order_unit_day": "days"
@@ -148,6 +149,7 @@
         "coming_soon": "Coming soon"
     },
     "food_detail_page": {
+        "button_sold_out": "Sold out",
         "button_store_closed": "Store closed",
         "label_price": "Price",
         "label_total_price": "Total price",
@@ -165,6 +167,7 @@
         "label_choose_option": "Choose an option"
     },
     "cart_page": {
+        "dish_sold_out": "This dish is sold out.",
         "store_closed_same_day": "This store is closed: same-day dishes are paused, pre-order dishes are still available.",
         "section_delivery_address": {
             "title": "DELIVERY TO {name}",
@@ -536,6 +539,9 @@
         "action_accept_order": "Accept Order",
         "action_mark_ready": "Mark Ready for Delivery",
         "ready_available_in": "Ready in {time}",
+        "ready_early_title": "Book the delivery early?",
+        "ready_early_body": "• Customer receives at: {time}\n• Time left: {wait}",
+        "ready_early_confirm": "Book delivery now",
         "action_mark_done": "Mark as Done",
         "action_reject": "Reject",
         "action_bar_driver_on_way": "🚴 Driver is on the way",
@@ -628,7 +634,6 @@
         "item_unit_label": "Unit",
         "item_unit_label_placeholder": "E.g. serving",
         "item_min_quantity": "Min Qty",
-        "item_quantity_step": "Step",
         "item_preorder": "Pre-order",
         "item_preorder_day": "Preorder (days)",
         "item_available": "On sale",

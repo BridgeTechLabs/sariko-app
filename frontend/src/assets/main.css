@@ -112,6 +112,26 @@ html, body {
     font-weight: 600;
 }
 
+/* Quasar $q.dialog cards are a fixed 400px with no max-width under 600px, so text is cut off on phones */
+.q-dialog-plugin {
+    max-width: calc(100vw - 48px);
+}
+
+/* Early "Ready" confirm (utils/readyWindow.js) */
+.ready-early-dialog .q-dialog__title {
+    color: var(--color-accent);
+    font-weight: 700;
+}
+.ready-early-dialog .q-dialog__message {
+    color: #e5e7eb;
+    white-space: pre-line;
+}
+.ready-early-dialog .ready-early-ok {
+    background-color: var(--color-accent) !important;
+    color: #040A14 !important;
+    font-weight: 700;
+}
+
 .quasar-notify-negative {
     font-family: "Plus Jakarta Sans", sans-serif;
     background-color: red;
