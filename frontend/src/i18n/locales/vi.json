@@ -129,6 +129,7 @@
             "banner_text_line_2": "· Hoa hồng 17% · Người bán sáng lập"
         },
         "section_food_cards": {
+            "label_sold_out": "Bán hết",
             "label_item_instant": "Giao ngay",
             "lable_item_pre_order": "Cần đặt trước",
             "lable_item_pre_order_unit_day": "ngày"
@@ -148,6 +149,7 @@
         "coming_soon": "Sắp mở bán"
     },
     "food_detail_page": {
+        "button_sold_out": "Bán hết",
         "button_store_closed": "Cửa hàng đang đóng",
         "label_price": "Giá",
         "label_total_price": "Tổng tiền",
@@ -165,6 +167,7 @@
         "label_choose_option": "Chọn mức giá"
     },
     "cart_page": {
+        "dish_sold_out": "Món này đã bán hết.",
         "store_closed_same_day": "Cửa hàng đang đóng: món giao ngay tạm ngưng, món đặt trước vẫn đặt được.",
         "section_delivery_address": {
             "title": "GIAO ĐẾN {name}",
@@ -631,7 +634,6 @@
         "item_unit_label": "Đơn vị",
         "item_unit_label_placeholder": "VD: phần",
         "item_min_quantity": "SL tối thiểu",
-        "item_quantity_step": "Bước tăng",
         "item_preorder": "Đặt trước",
         "item_preorder_day": "Đặt trước (ngày)",
         "item_available": "Đang bán",

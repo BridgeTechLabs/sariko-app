@@ -34,9 +34,9 @@ def add_to_cart(monkeypatch):
     monkeypatch.setattr("apis.cart.DAOCarts", _FakeCarts)
     monkeypatch.setattr("apis.cart.DAOCartItems", _FakeCartItems)
 
-    def call(preorder_day, is_open, opening_time=None, closing_time=None):
+    def call(preorder_day, is_open, opening_time=None, closing_time=None, is_available=True):
         _FakeCartItems.added = []
-        gate = {"preorder_day": preorder_day,
+        gate = {"is_available": is_available, "preorder_day": preorder_day,
                 "seller_profiles": {"is_open": is_open, "opening_time": opening_time, "closing_time": closing_time}}
         monkeypatch.setattr("apis.cart.DAOFoodItems", lambda: type("D", (), {"read_order_gate": lambda self, i: gate})())
         res = client.post("/cart/add", json={"seller_id": "seller-1", "food_item_id": "food-1", "quantity": 1})
@@ -81,4 +81,11 @@ def test_switch_on_but_outside_hours_blocks_same_day(add_to_cart):
     closes = (now + timedelta(minutes=6)).strftime("%H:%M:00")
     res, added = add_to_cart(preorder_day=0, is_open=True, opening_time=opens, closing_time=closes)
     assert res.status_code == 400
+    assert added == []
+
+
+def test_sold_out_dish_blocked_even_when_open(add_to_cart):
+    res, added = add_to_cart(preorder_day=0, is_open=True, is_available=False)
+    assert res.status_code == 400
+    assert "sold out" in res.json()["detail"]
     assert added == []

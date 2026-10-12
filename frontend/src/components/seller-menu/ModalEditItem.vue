@@ -55,7 +55,6 @@ export default {
                 price: null,
                 unit_label: '',
                 min_quantity: 1,
-                quantity_step: 1,
                 preorder_day: 0,
                 is_preorder: false,   // UI only: off = instant (preorder_day 0), on = preorder_day ≥ 1
                 is_available: true,
@@ -76,7 +75,6 @@ export default {
                     price: this.item.price || null,
                     unit_label: this.item.unit_label || '',
                     min_quantity: this.item.min_quantity ?? 1,
-                    quantity_step: this.item.quantity_step ?? 1,
                     preorder_day: this.item.preorder_day ?? 0,
                     is_preorder: (this.item.preorder_day ?? 0) > 0,
                     is_available: this.item.is_available ?? true,
@@ -137,7 +135,7 @@ export default {
                     price: Number(this.form.price),
                     unit_label: this.form.unit_label?.trim() || undefined,
                     min_quantity: this.form.min_quantity,
-                    quantity_step: this.form.quantity_step,
+                    quantity_step: 1,  // no longer editable; buyers always step by 1
                     preorder_day: this.form.is_preorder ? Math.max(1, Number(this.form.preorder_day) || 1) : 0,
                     is_available: this.form.is_available,
                     is_featured: this.form.is_featured,
@@ -284,15 +282,11 @@ export default {
                     </div>
                 </div>
 
-                <!-- Min qty + Step + Preorder -->
+                <!-- Min qty -->
                 <div class="field-row">
                     <div class="field-group flex-1">
                         <div class="field-label">{{ $t('seller_menu.item_min_quantity') }}</div>
                         <q-input v-model.number="form.min_quantity" dense outlined dark type="number" :min="1" />
-                    </div>
-                    <div class="field-group flex-1">
-                        <div class="field-label">{{ $t('seller_menu.item_quantity_step') }}</div>
-                        <q-input v-model.number="form.quantity_step" dense outlined dark type="number" :min="1" />
                     </div>
                 </div>
 
