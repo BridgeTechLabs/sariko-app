@@ -1,6 +1,6 @@
 <script>
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
-import { minutesUntilReady, formatWait } from '@/utils/readyWindow';
+import { minutesUntilReady, formatWait, confirmEarlyReady } from '@/utils/readyWindow';
 
 const STATUS_NEXT = {
     pending:   'confirmed',
@@ -100,6 +100,7 @@ export default {
         async onAccept() {
             const nextStatus = STATUS_NEXT[this.order.status]
             if (!nextStatus) return
+            if (!await confirmEarlyReady(this, this.order)) return
             this.accepting = true
             try {
                 await useDashboardStore().setOrderStatus(this.order.id, nextStatus)
@@ -185,7 +186,7 @@ export default {
                 <q-btn v-if="canReject" flat no-caps class="btn-reject" @click="showRejectDialog = true">
                     {{ $t('seller_order_detail.action_reject') }}
                 </q-btn>
-                <q-btn v-if="canAccept" unelevated no-caps class="btn-accept" :loading="accepting" :disable="readyWaitMinutes > 0" @click="onAccept">
+                <q-btn v-if="canAccept" unelevated no-caps class="btn-accept" :loading="accepting" @click="onAccept">
                     {{ readyWaitMinutes ? $t('seller_order_detail.ready_available_in', { time: formatWait(readyWaitMinutes) }) : acceptLabel }}
                 </q-btn>
             </template>
