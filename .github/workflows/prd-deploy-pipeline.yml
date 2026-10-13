@@ -25,6 +25,18 @@ jobs:
             sariko/sariko-backend:${GITHUB_SHA::7} \
             pytest -v -p no:cacheprovider
 
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply DB migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          cd backend
+          supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+          supabase db push --db-url "$SUPABASE_DB_URL" --yes
+
       - name: Push docker image
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -55,9 +67,7 @@ jobs:
             printf 'IMAGE_TAG=%s\nROLLED_BACK_FROM=%s\n' "$(cat /tmp/previous_tag.txt)" "${GITHUB_SHA::7}" > image_tags.env
             exit 1
           }
-
-      # Only after a healthy deploy (skipped on rollback). Keeps current + previous tag for the next rollback.
-      # No DB migration step on prod: its migration history isn't the repo's (apply migrations by hand).
+          
       - name: Clean up old images
         run: |
           cd ~/deploy

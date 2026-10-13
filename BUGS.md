@@ -26,9 +26,11 @@ Bugs found during manual testing. Newest at the bottom.
 | 17 | PROD: off-sale dish can be added to cart, then checkout fails "No longer available" | 🔧 Fix in `fix/common-bugs`: Sold out overlay + disabled in menu, CTA "Bán hết", cart add refuses | DEV `b7b5d24` (2026-10-12) |
 | 18 | DEV: error on login: chat list 500 "JWT issued at future" (PGRST303) | ⬜ Open: proposed retry-once in shared Supabase transport | — |
 | 19 | Menu manage: remove the quantity "Step" field (always 1) | 🔧 Fix in `fix/common-bugs` | DEV `b7b5d24` (2026-10-12) |
-| 20 | Plan: add a DB migration step to the prod pipeline | 📋 Planned (after baseline repair) | — |
+| 20 | Plan: add a DB migration step to the prod pipeline | 🔧 Baseline reconciled + history repaired (`db push --dry-run`: up to date); migration step added to `prd-deploy-pipeline.yml` (staged), secret `SUPABASE_DB_URL` set on `production` | — |
 | 21 | Buyer bottom nav: Account button not highlighted on `/account` | 🔧 Fix in `fix/common-bugs`: Account link gets `isActive('/account')` | — |
 | 22 | Ready button before the window: confirm instead of block (changes #9) | 🔧 Fix in `fix/common-bugs`: button enabled, confirm dialog when early, backend 400 removed | — |
+| 23 | PROD security: RLS off on `orders` + `deliveries`, anon has full grants | ✅ PART 1 of `prod_baseline_reconcile.sql` run by hand; re-dump shows RLS on (only `waitlist` left, other app) | PROD DB (2026-10-13) |
+| 24 | PROD: `orders.updated_at` + trigger missing → `touch_order` fails on every Lalamove webhook | ✅ PART 2 run by hand; re-dump matches DEV | PROD DB (2026-10-13) |
 
 ---
 
@@ -297,6 +299,16 @@ Prod migration history ≠ repo (only `20260916144935` recorded), so **never `su
   1. **Baseline diff (one time):** `pg_dump --schema-only` prod vs the schema built from migrations (DEV). Everything the migrations create must already exist on prod. Extra prod objects are fine; missing or different ones must be fixed first.
   2. **Repair history:** `supabase migration repair --status applied <all 22 versions> --db-url <prod>` (`20261003…` and `20261009…` were applied by hand on 2026-10-12). Done when `supabase db push --dry-run --db-url <prod>` reports nothing to apply.
   3. **Pipeline step** in `prd-deploy-pipeline.yml`, before deploy: `supabase db push --dry-run` (log the plan) → `supabase db push` **without `--include-all`** (an out-of-order migration should stop the deploy). Secret `SUPABASE_DB_URL` in the `production` environment (session pooler URL), plus **Required reviewers** on that environment.
+- **Step 1 progress (2026-10-13):** `backend/supabase/scripts/dump_schema_prod_dev.sh` dumped both schemas (`reference/`, gitignored). Object-level diff prod vs dev:
+  - **Missing on prod:** RLS on `orders`/`deliveries` (#23), `orders.updated_at` + `on_orders_update` trigger (#24), `pg_trgm` + 16 indexes, `carts_user_id_key`, `users_id_fkey`, 14 policies, `search_path` + `coalesce(is_seller,false)` in the signup functions.
+  - **Prod-only (keep):** `admin_*` ×4, `blog_posts`, `waitlist` (+ trigger, **no RLS either**), `rls_auto_enable`, `is_my_seller`, `bump_conversation` (dead: points at `public.conversations`), 2-arg `update_order_payment_status`, `uniq_admin_payouts_seller_period`, `orders REPLICA IDENTITY FULL`, policies "sellers can read their orders" / "delivery_read_own", `pg_net`.
+  - **Cosmetic only:** column order in `admin_payouts`/`cart_items`/`chat_conversations`/`order_items`, keyword case in `update_order_payment_status`, column comments.
+  - **Open decision:** `seller_profiles.display_order` is `numeric NULL` on prod vs `integer NOT NULL DEFAULT 0` in the repo (the admin repo may write it). Not in the reconcile file.
+  - **PART 0 (Jack, 2026-10-13):** no duplicate carts. 11 `public.users` rows had no auth user (test / `rls-probe*@example.com` accounts): 10 deleted; `test01@sariko.store` kept because it owns order `d5d62a87…` (pending, **paid**, 292,000 ₫, 2026-09-22). So `users_id_fkey` is added `NOT VALID`; validate it once that order is resolved.
+  - **After PART 1+2 (re-dump 2026-10-13):** prod == DEV except the accepted prod-only objects, column order, 9 DEV column comments, `users_id_fkey NOT VALID`, and `seller_profiles.display_order` (open decision). Step 1 done.
+  - **Fix:** `backend/supabase/scripts/prod_baseline_reconcile.sql` (PART 0 checks → PART 1 RLS → PART 2 one transaction). Then re-run the dump script and diff again before step 2.
+- **Step 2 done (Jack, 2026-10-13):** `migration repair --status reverted 20260916144935` + `--status applied` for all 22 repo versions → `supabase db push --dry-run` on prod: "Remote database is up to date".
+- **Step 3 (2026-10-13):** `prd-deploy-pipeline.yml` runs `supabase db push --dry-run` then `--yes` (no `--include-all`) after tests, before the image push. Secret `SUPABASE_DB_URL` (prod Session pooler) added to the `production` environment. Required reviewers: optional, not set. First prod deploy should log "Remote database is up to date".
 - **Rule for migrations (lesson from #15):** the migration runs before the new code, so it must keep the **old** code working (expand → contract). New columns are nullable or have defaults. `NOT NULL`, drops and renames ship in a later release, once no running code depends on the old shape.
 
 ---
