@@ -13,6 +13,7 @@ from core.store_hours import confirm_deadline, is_open_now
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_orders import DAOOrders
 from dao.dao_refunds import DAORefunds
+from services import push_service
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +48,11 @@ def expire_unconfirmed_orders(now: datetime = None) -> int:
             continue
         if now < confirm_deadline(_ts(order["paid_at"]), opening, closing, _ts(seller.get("opened_at")), now, window):
             continue
-        if not dao_orders.update_order_status(order["id"], "cancelled", TIMEOUT_REASON, expected_status="pending"):
+        cancelled = dao_orders.update_order_status(order["id"], "cancelled", TIMEOUT_REASON, expected_status="pending")
+        if not cancelled:
             continue  # the seller acted first
         DAORefunds().create_refund_for_order(order, "seller_timeout")
+        push_service.notify_seller_order_expired(cancelled)
         logger.warning(f"[Expiry] order={order['id']} cancelled: seller did not confirm in time")
         expired += 1
     return expired
