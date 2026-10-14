@@ -43,6 +43,17 @@ def get_founding_sellers():
     return {"success": True, "founding_sellers": sellers}
 
 
+FOUNDING_SLOTS = 50  # rate card: 50 founding sellers
+
+
+@router.get("/founding/slots")
+def get_founding_slots():
+    """Founding places left, for the "become a seller" card. Every seller on the
+    founding tier takes one, whether listed yet or not."""
+    taken = DAOSellerProfiles().count_sellers_by_tier("founding")
+    return {"success": True, "slots_left": max(0, FOUNDING_SLOTS - taken)}
+
+
 # ── Seller Dashboard Endpoints (must be before /{slug_name} wildcard) ──
 
 def _get_seller_id(user):
