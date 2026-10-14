@@ -650,7 +650,7 @@
         "toast_image_too_large": "Photo is too large ({size} MB). Please pick one under {max} MB.",
         "toast_image_bad_format": "This photo format isn't supported. Please use a JPG, PNG or WebP photo.",
         "toast_image_upload_failed": "Item saved, but the photo didn't upload. Open the item to add the photo again.",
-        "toast_name_taken": "You already have a dish with this name. Edit that dish instead, or use a different name.",
+        "toast_name_taken": "This category already has a dish with this name. Edit that dish instead, or use a different name.",
         "toast_delete_failed": "Failed to delete. Please try again.",
         "variants_label": "Price options",
         "variant_add": "Add price option",

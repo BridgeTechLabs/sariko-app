@@ -6,12 +6,12 @@ from dao.dao_base import DAOBase
 
 logger = logging.getLogger(__name__)
 
-# Postgres unique_violation, raised by uniq_food_items_seller_name — the API turns it into a 409.
+# Postgres unique_violation, raised by uniq_food_items_seller_category_name — the API turns it into a 409.
 PG_UNIQUE_VIOLATION = "23505"
 
 
 class FoodItemNameTaken(Exception):
-    """The seller already has a dish with this name (case/whitespace-insensitive)."""
+    """The seller already has a dish with this name in this category (case/whitespace-insensitive)."""
 
 
 class DAOFoodItems(DAOBase):

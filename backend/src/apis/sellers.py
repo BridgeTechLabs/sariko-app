@@ -402,7 +402,7 @@ def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_tok
     except HTTPException:
         raise
     except FoodItemNameTaken:
-        raise HTTPException(status_code=409, detail="You already have a dish with this name")
+        raise HTTPException(status_code=409, detail="You already have a dish with this name in this category")
     except Exception as e:
         logger.exception(f"Exception in POST /sellers/me/menu/items: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -424,7 +424,7 @@ def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depe
     except HTTPException:
         raise
     except FoodItemNameTaken:
-        raise HTTPException(status_code=409, detail="You already have a dish with this name")
+        raise HTTPException(status_code=409, detail="You already have a dish with this name in this category")
     except Exception as e:
         logger.exception(f"Exception in PATCH /sellers/me/menu/items/{item_id}: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
