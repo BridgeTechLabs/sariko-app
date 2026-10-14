@@ -2,6 +2,13 @@
 import { CircleCheckBig, Clock, CircleX } from 'lucide-vue-next';
 import { useOrderStore } from '@/stores/order/orderStore.js';
 
+// Cancels made by the system store a fixed English text (backend constants);
+// show those translated. Reasons a seller picked or typed are shown as written.
+const SYSTEM_REASON_KEYS = {
+    'Seller did not confirm in time': 'order_detail.reason_seller_timeout',                      // services/order_expiry.py
+    'Driver booking failed after 3 attempts': 'seller_order_detail.cancel_reason_no_driver',   // apis/sellers.py
+}
+
 export default {
     components: {
         CircleCheckBig, Clock, CircleX
@@ -37,7 +44,9 @@ export default {
             return key ? this.$t(`order_detail.${key}`) : this.$t('order_detail.title')
         },
         cancellationReason() {
-            return this.order?.cancellation_reason || null
+            const reason = this.order?.cancellation_reason
+            if (!reason) return null
+            return SYSTEM_REASON_KEYS[reason] ? this.$t(SYSTEM_REASON_KEYS[reason]) : reason
         },
         statusSubtext() {
             if (this.isPaymentPending) return this.$t('order_detail.status_subtext_awaiting_payment')

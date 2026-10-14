@@ -17,7 +17,7 @@ from dao.dao_refunds import DAORefunds
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIRM_MINUTES = 30
-TIMEOUT_REASON = "Seller did not confirm in time"
+TIMEOUT_REASON = "Seller did not confirm in time"  # the buyer UI translates this exact text (OrderStatusHeader.vue)
 
 
 def _ts(value):
