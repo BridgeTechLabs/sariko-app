@@ -113,7 +113,6 @@ sariko-app/
 ├── infra/docker/                # compose.yaml, nginx, get_cert.sh
 ├── tests/                       # backend (pytest), frontend, smoke, manual
 ├── .github/workflows/main.yml   # Test → build → deploy → rollback
-├── BACKEND_APIS.md              # Endpoint reference
 ├── CLAUDE.md                    # Development guidelines
 └── README.md                    # This file
 ```
@@ -212,7 +211,6 @@ All endpoints are served under `/rest/v1/`. In development the Vite proxy maps
 | MOIT | Compliance reporting |
 | Dev | Local-only test helpers (`ENV=local\|dev` only) |
 
-Full endpoint reference: [`BACKEND_APIS.md`](BACKEND_APIS.md).
 Interactive docs at `http://localhost:5000/docs` while the backend runs.
 
 ---
