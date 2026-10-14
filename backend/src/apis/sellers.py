@@ -494,7 +494,7 @@ def upload_food_item_image(item_id: str, body: Schema.RequestUploadImage, user=D
     try:
         seller_id = _get_seller_id(user)
         path = f"food-items/{seller_id}/{item_id}"
-        image_url = upload_image_base64(path, body.image_base64, body.content_type or "image/jpeg")
+        image_url = upload_image_base64(path, body.image_base64)
         return {"success": True, "image_url": image_url}
     except HTTPException:
         raise

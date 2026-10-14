@@ -129,7 +129,7 @@ def upload_avatar(body: Schema.RequestUploadImage, user=Depends(verify_token)):
             path = f"avatar-sellers/{seller_profile['id']}/avatar.jpg"
         else:
             path = f"avatar-buyers/{user_id}/avatar.jpg"
-        url = upload_image_base64(path, body.image_base64, body.content_type or "image/jpeg")
+        url = upload_image_base64(path, body.image_base64)
         # Fixed filename → cache-buster so the new avatar isn't served stale
         return {"success": True, "avatar_url": f"{url}?v={int(time.time())}"}
     except Exception as e:
