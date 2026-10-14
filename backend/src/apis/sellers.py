@@ -3,7 +3,7 @@ import logging
 from core.store_hours import is_open_now
 
 from dao.dao_seller_profiles import DAOSellerProfiles
-from dao.dao_food_items import DAOFoodItems
+from dao.dao_food_items import DAOFoodItems, FoodItemNameTaken
 from dao.dao_menu_categories import DAOMenuCategories
 from dao.dao_reviews import DAOReviews
 
@@ -401,6 +401,8 @@ def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_tok
         return {"success": True, "item": item}
     except HTTPException:
         raise
+    except FoodItemNameTaken:
+        raise HTTPException(status_code=409, detail="You already have a dish with this name")
     except Exception as e:
         logger.exception(f"Exception in POST /sellers/me/menu/items: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -421,6 +423,8 @@ def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depe
         return {"success": True, "item": item}
     except HTTPException:
         raise
+    except FoodItemNameTaken:
+        raise HTTPException(status_code=409, detail="You already have a dish with this name")
     except Exception as e:
         logger.exception(f"Exception in PATCH /sellers/me/menu/items/{item_id}: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))

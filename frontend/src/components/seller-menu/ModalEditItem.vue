@@ -139,6 +139,12 @@ export default {
 
         async save() {
             if (!this.canSave) return
+            // Same rule as the DB's uniq_food_items_seller_name, checked here so the seller gets it in their language
+            const name = this.form.name.trim().toLowerCase()
+            if (useMenuStore().allItems.some(i => i.id !== this.item?.id && i.name.trim().toLowerCase() === name)) {
+                this.$q.notify({ type: 'negative', message: this.$t('seller_menu.toast_name_taken'), position: 'bottom' })
+                return
+            }
             this.saving = true
             try {
                 const store = useMenuStore()
