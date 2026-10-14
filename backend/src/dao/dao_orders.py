@@ -191,16 +191,22 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_order_by_id_for_seller: {e}")
 
-    def update_order_status(self, order_id: str, status: str, cancellation_reason: Optional[str] = None):
+    def update_order_status(self, order_id: str, status: str, cancellation_reason: Optional[str] = None,
+                            expected_status: Optional[str] = None):
+        """expected_status makes the write conditional: if someone else changed the
+        status first (seller vs the confirm-timeout job), nothing is written and
+        None comes back."""
         try:
             update_data = {"status": status}
             if cancellation_reason:
                 update_data["cancellation_reason"] = cancellation_reason
 
-            result = self._supabase_client.table(self._table_name) \
+            query = self._supabase_client.table(self._table_name) \
                 .update(update_data) \
-                .eq("id", order_id) \
-                .execute()
+                .eq("id", order_id)
+            if expected_status:
+                query = query.eq("status", expected_status)
+            result = query.execute()
 
             if result and result.data:
                 # The updated row carries seller_id, so the cache drop costs
@@ -217,6 +223,25 @@ class DAOOrders(DAOBase):
             raise Exception(f"Supabase error - update_order_status: {e}")
         except Exception as e:
             raise Exception(f"error update_order_status: {e}")
+
+    def read_unconfirmed_paid_orders(self, paid_before: datetime):
+        """Paid orders still waiting for the seller, paid at least one confirm window ago,
+        with the store hours needed to decide whether they timed out."""
+        try:
+            result = self._supabase_client.table(self._table_name) \
+                .select("id, total_amount, payment_status, transaction_ref, ipn_data, payment_create_date, paid_at, "
+                        "seller_profiles(is_open, opening_time, closing_time, opened_at)") \
+                .eq("status", "pending") \
+                .eq("payment_status", "paid") \
+                .lte("paid_at", paid_before.isoformat()) \
+                .execute()
+
+            return result.data if result and result.data else []
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_unconfirmed_paid_orders: {e}")
+        except Exception as e:
+            raise Exception(f"error read_unconfirmed_paid_orders: {e}")
 
     def read_order_by_id_raw(self, order_id: str):
         """Read order by ID without user scoping (for IPN server-to-server)."""

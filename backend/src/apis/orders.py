@@ -198,18 +198,7 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
     if updated:
         push_service.notify_buyer_cancelled(updated)
 
-    if order.get("payment_status") == "paid":
-        from dao.dao_refunds import DAORefunds
-        try:
-            DAORefunds().create_refund(
-                order_id=order_id,
-                amount=order["total_amount"],
-                reason="buyer_cancel",
-                original_txn_ref=order.get("transaction_ref"),
-                ipn_data=order.get("ipn_data"),
-                payment_create_date=order.get("payment_create_date"),
-            )
-        except Exception as e:
-            logger.warning(f"Failed to create refund record for order {order_id}: {e}")
+    from dao.dao_refunds import DAORefunds
+    DAORefunds().create_refund_for_order(order, "buyer_cancel")
 
     return {"success": True}

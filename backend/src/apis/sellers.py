@@ -270,19 +270,8 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
             if booking_result is None:
                 logger.error(f"[Delivery] All 3 booking attempts failed for order={order_id}: {last_booking_error}")
                 dao_orders.update_order_status(order_id, "cancelled", "Driver booking failed after 3 attempts")
-                if order.get("payment_status") == "paid":
-                    from dao.dao_refunds import DAORefunds
-                    try:
-                        DAORefunds().create_refund(
-                            order_id=order_id,
-                            amount=order["total_amount"],
-                            reason="driver_booking_failed",
-                            original_txn_ref=order.get("transaction_ref"),
-                            ipn_data=order.get("ipn_data"),
-                            payment_create_date=order.get("payment_create_date"),
-                        )
-                    except Exception as re:
-                        logger.warning(f"Failed to create refund record for order {order_id}: {re}")
+                from dao.dao_refunds import DAORefunds
+                DAORefunds().create_refund_for_order(order, "driver_booking_failed")
                 raise HTTPException(status_code=503, detail="Unable to book a delivery driver. Your order has been cancelled.")
 
             dao_deliveries = DAODeliveries()
@@ -306,8 +295,17 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                 raise HTTPException(status_code=500, detail=f"Failed to record delivery: {db_err}")
             logger.warning(f"[Delivery] Auto-booked order={order_id} lalamove={booking_result.lalamove_order_id}")
 
-        # Only update status after delivery booking succeeds (or if not a delivery order)
-        updated = dao_orders.update_order_status(order_id, body.status, cancellation_reason)
+        # Only update status after delivery booking succeeds (or if not a delivery order).
+        # Conditional on the status read above: the confirm-timeout job may have
+        # cancelled (and refunded) the order in between.
+        updated = dao_orders.update_order_status(order_id, body.status, cancellation_reason,
+                                                 expected_status=order["status"])
+        if not updated:
+            raise HTTPException(status_code=409, detail="Order status changed, please refresh")
+
+        if body.status == "cancelled":
+            from dao.dao_refunds import DAORefunds
+            DAORefunds().create_refund_for_order(order, "seller_cancel")
 
         return {"success": True, "order": updated}
     except HTTPException:
