@@ -3,17 +3,16 @@ on:
     branches:
       - main
 jobs:
-  test:
-    name: build-test-deploy
-    runs-on:
-      labels: ec2-sariko-app
+  build:
+    name: build-test-migrate-push
+    runs-on: ubuntu-latest
     environment:
       name: production
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
 
-      - name: Build image (local only, not pushed)
+      - name: Build image
         run: docker build --platform linux/amd64 -t sariko/sariko-backend:${GITHUB_SHA::7} backend
 
       - name: Test inside that image
@@ -37,15 +36,22 @@ jobs:
           supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
           supabase db push --db-url "$SUPABASE_DB_URL" --yes
 
-      - name: Push docker image
+      - name: Push the tested image
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          cd backend
-          ./docker_build_and_push.sh
+          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          docker push sariko/sariko-backend:${GITHUB_SHA::7}
 
+  deploy:
+    name: deploy
+    needs: build
+    runs-on:
+      labels: ec2-sariko-app
+    environment:
+      name: production
+    steps:
       - name: Deploy app
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -73,4 +79,3 @@ jobs:
           cd ~/deploy
           ./cleanup_docker_images.sh
           docker image prune -f
-          docker builder prune -f --filter until=72h
