@@ -2,6 +2,11 @@
 import { useMenuStore } from '@/stores/seller/menuStore'
 import { ImagePlus, X, Plus, Trash2 } from 'lucide-vue-next'
 
+// nginx client_max_body_size is 10m and base64 adds ~33%, so ~7.5 MB raw is the ceiling
+const MAX_IMAGE_MB = 7
+// What the backend's Pillow re-encode can read (iPhone HEIC is not)
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
 export default {
     name: 'ModalEditItem',
 
@@ -113,6 +118,15 @@ export default {
         onImagePick(e) {
             const file = e.target.files?.[0]
             if (!file) return
+            if (!IMAGE_TYPES.includes(file.type)) {
+                this.$q.notify({ type: 'negative', message: this.$t('seller_menu.toast_image_bad_format'), position: 'bottom' })
+                return
+            }
+            if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+                const size = (file.size / 1024 / 1024).toFixed(1)
+                this.$q.notify({ type: 'negative', message: this.$t('seller_menu.toast_image_too_large', { size, max: MAX_IMAGE_MB }), position: 'bottom' })
+                return
+            }
             this.imageFile = file
             this.imagePreview = URL.createObjectURL(file)
         },
@@ -125,6 +139,12 @@ export default {
 
         async save() {
             if (!this.canSave) return
+            // Same rule as the DB's uniq_food_items_seller_name, checked here so the seller gets it in their language
+            const name = this.form.name.trim().toLowerCase()
+            if (useMenuStore().allItems.some(i => i.id !== this.item?.id && i.name.trim().toLowerCase() === name)) {
+                this.$q.notify({ type: 'negative', message: this.$t('seller_menu.toast_name_taken'), position: 'bottom' })
+                return
+            }
             this.saving = true
             try {
                 const store = useMenuStore()
@@ -161,8 +181,16 @@ export default {
                 // Upload image after we have the item ID
                 if (this.imageFile) {
                     this.uploadProgress = true
-                    const publicUrl = await store.uploadImage(itemId, this.imageFile)
-                    await store.updateItem(itemId, { image_url: publicUrl })
+                    try {
+                        const publicUrl = await store.uploadImage(itemId, this.imageFile)
+                        await store.updateItem(itemId, { image_url: publicUrl })
+                    } catch (e) {
+                        // The item is already saved: close so a retry edits it instead of creating a duplicate
+                        console.error('ModalEditItem - image upload -', e)
+                        this.$q.notify({ type: 'warning', message: this.$t('seller_menu.toast_image_upload_failed'), position: 'bottom', timeout: 5000 })
+                        this.close()
+                        return
+                    }
                 }
 
                 this.$q.notify({ classes: 'quasar-notify-positive', message: this.$t('seller_menu.toast_item_saved'), position: 'bottom', timeout: 1500 })
