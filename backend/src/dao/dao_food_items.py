@@ -1,7 +1,17 @@
 import logging
+
+from postgrest.exceptions import APIError as PostgrestExceptionAPIError
+
 from dao.dao_base import DAOBase
 
 logger = logging.getLogger(__name__)
+
+# Postgres unique_violation, raised by uniq_food_items_seller_name — the API turns it into a 409.
+PG_UNIQUE_VIOLATION = "23505"
+
+
+class FoodItemNameTaken(Exception):
+    """The seller already has a dish with this name (case/whitespace-insensitive)."""
 
 
 class DAOFoodItems(DAOBase):
@@ -63,11 +73,16 @@ class DAOFoodItems(DAOBase):
 
     def create(self, seller_id: str, fields: dict):
         fields["seller_id"] = seller_id
-        result = (
-            self._supabase_client.table(self._table_name)
-            .insert(fields)
-            .execute()
-        )
+        try:
+            result = (
+                self._supabase_client.table(self._table_name)
+                .insert(fields)
+                .execute()
+            )
+        except PostgrestExceptionAPIError as e:
+            if e.code == PG_UNIQUE_VIOLATION:
+                raise FoodItemNameTaken()
+            raise
         return result.data[0] if result.data else None
 
     def read_order_gate(self, item_id: str):
@@ -93,13 +108,18 @@ class DAOFoodItems(DAOBase):
         return result.data[0] if result.data else None
 
     def update(self, item_id: str, seller_id: str, fields: dict):
-        result = (
-            self._supabase_client.table(self._table_name)
-            .update(fields)
-            .eq("id", item_id)
-            .eq("seller_id", seller_id)
-            .execute()
-        )
+        try:
+            result = (
+                self._supabase_client.table(self._table_name)
+                .update(fields)
+                .eq("id", item_id)
+                .eq("seller_id", seller_id)
+                .execute()
+            )
+        except PostgrestExceptionAPIError as e:
+            if e.code == PG_UNIQUE_VIOLATION:
+                raise FoodItemNameTaken()
+            raise
         return result.data[0] if result.data else None
 
     def delete(self, item_id: str, seller_id: str):
