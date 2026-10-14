@@ -70,6 +70,13 @@ def test_confirm_window_falls_back_on_bad_values(config, value, minutes):
 
 
 @pytest.fixture
+def seller_pushes(monkeypatch):
+    sent = []
+    monkeypatch.setattr(order_expiry.push_service, "notify_seller_order_expired", lambda order: sent.append(order["id"]))
+    return sent
+
+
+@pytest.fixture
 def refunds(monkeypatch):
     queued = []
     monkeypatch.setattr(order_expiry.DAORefunds, "__init__", lambda self: None)
@@ -83,7 +90,7 @@ def _order(oid, paid, is_open=True, opens=None, closes=None):
             "seller_profiles": {"is_open": is_open, "opening_time": opens, "closing_time": closes, "opened_at": None}}
 
 
-def test_expiry_cancels_and_refunds_only_timed_out_orders(monkeypatch, config, refunds):
+def test_expiry_cancels_and_refunds_only_timed_out_orders(monkeypatch, config, refunds, seller_pushes):
     fake = FakeOrders([
         _order("late", at("11:00")),
         _order("fresh", at("11:45")),                        # 15 min, not yet
@@ -95,9 +102,10 @@ def test_expiry_cancels_and_refunds_only_timed_out_orders(monkeypatch, config, r
     assert order_expiry.expire_unconfirmed_orders(now=at("12:00")) == 1
     assert fake.cancelled == ["late"]
     assert refunds == [("late", "seller_timeout")]
+    assert seller_pushes == ["late"]          # not "raced": the seller acted, nothing to tell them
 
 
-def test_expiry_uses_the_configured_window(monkeypatch, config, refunds):
+def test_expiry_uses_the_configured_window(monkeypatch, config, refunds, seller_pushes):
     config.value = 90
     fake = FakeOrders([_order("hour_old", at("11:00"))])
     monkeypatch.setattr(order_expiry, "DAOOrders", lambda: fake)

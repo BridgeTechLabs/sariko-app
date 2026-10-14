@@ -310,6 +310,7 @@
     },
     "order_detail": {
         "cancelled_reason": "Reason",
+        "reason_seller_timeout": "The seller didn't confirm your order in time",
         "title": "Order Detail",
         "status_title_awaiting_payment": "Awaiting Payment",
         "status_title_pending": "Order Placed!",

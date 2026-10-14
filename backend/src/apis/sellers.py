@@ -269,6 +269,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
 
             if booking_result is None:
                 logger.error(f"[Delivery] All 3 booking attempts failed for order={order_id}: {last_booking_error}")
+                # The buyer UI translates this exact text (OrderStatusHeader.vue)
                 dao_orders.update_order_status(order_id, "cancelled", "Driver booking failed after 3 attempts")
                 from dao.dao_refunds import DAORefunds
                 DAORefunds().create_refund_for_order(order, "driver_booking_failed")

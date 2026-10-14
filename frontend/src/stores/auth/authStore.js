@@ -128,6 +128,17 @@ export const useAuthStore = defineStore("authStore", {
 
         async bootstrap() {
             if (this._authSub) return;
+            // Subscribe before any await: supabase-js fires PASSWORD_RECOVERY / SIGNED_IN
+            // from a URL callback only once, right after init, and late subscribers miss it.
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+                if (event === 'INITIAL_SESSION') return;
+                if (event === 'PASSWORD_RECOVERY') {
+                    this.isPasswordRecovery = true;
+                    return;
+                }
+                this._setFromSession(session);
+            });
+            this._authSub = subscription;
             try {
                 const res = await apiAuth.authGetSession();
                 if (res?.session) {
@@ -176,16 +187,6 @@ export const useAuthStore = defineStore("authStore", {
                         console.error(`authStore - bootstrap - orders preload failed: ${e}`);
                     }
                 }
-
-                const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-                    if (event === 'INITIAL_SESSION') return;
-                    if (event === 'PASSWORD_RECOVERY') {
-                        this.isPasswordRecovery = true;
-                        return;
-                    }
-                    this._setFromSession(session);
-                });
-                this._authSub = subscription;
             } catch (e) {
                 console.error(`authStore - bootstrap - ${e}`);
             }

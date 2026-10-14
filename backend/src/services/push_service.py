@@ -58,6 +58,10 @@ MESSAGES = {
         "en": ("Order cancelled by customer", "A customer cancelled a paid order. Tap to see details."),
         "vi": ("Khách đã hủy đơn", "Khách vừa hủy một đơn đã thanh toán. Nhấn để xem chi tiết."),
     },
+    "seller_order_expired": {
+        "en": ("Order cancelled: not confirmed in time", "A paid order wasn't confirmed in time, so it was cancelled and the customer will be refunded."),
+        "vi": ("Đơn đã tự hủy", "Một đơn đã thanh toán không được xác nhận kịp thời nên đã bị hủy, khách sẽ được hoàn tiền."),
+    },
 }
 
 
@@ -86,6 +90,12 @@ def notify_buyer_cancelled(order: dict):
     if order.get("payment_status") != "paid":
         return
     _send_async(order.get("seller_user_id"), "seller_buyer_cancelled", f"/seller/orders/{order['id']}")
+
+
+def notify_seller_order_expired(order: dict):
+    """Seller side: the confirm-timeout job cancelled a paid order the seller never answered.
+    notify_order_status already told the buyer."""
+    _send_async(order.get("seller_user_id"), "seller_order_expired", f"/seller/orders/{order['id']}")
 
 
 def notify_seller_driver_assigned(order: dict):
