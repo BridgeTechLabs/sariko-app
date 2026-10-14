@@ -310,6 +310,7 @@
     },
     "order_detail": {
         "cancelled_reason": "Lý do",
+        "reason_seller_timeout": "Người bán không xác nhận đơn kịp thời",
         "title": "Chi tiết đơn hàng",
         "status_title_awaiting_payment": "Chờ thanh toán",
         "status_title_pending": "Đã đặt hàng!",

@@ -16,6 +16,7 @@ export default {
             activeFilter: 'all',
             newOrderAudio: null,
             unlockAudioHandler: null,
+            soundArmed: false,
         }
     },
 
@@ -101,11 +102,13 @@ export default {
     },
 
     watch: {
-        // Detect new orders appearing in the action list → play sound
+        // A paid order the seller hasn't seen yet → play sound. Armed after the first
+        // load, so opening the page is silent but the first order into an empty list
+        // still rings; a delivery_failed order coming back to the list is not new.
         allActionOrders(newOrders, oldOrders) {
-            if (!oldOrders || oldOrders.length === 0) return
-            const oldIds = new Set(oldOrders.map(o => o.id))
-            const hasNew = newOrders.some(o => !oldIds.has(o.id))
+            if (!this.soundArmed) return
+            const oldIds = new Set((oldOrders || []).map(o => o.id))
+            const hasNew = newOrders.some(o => o.status === 'pending' && !oldIds.has(o.id))
             if (hasNew) this.playNewOrderSound()
         },
     },
@@ -113,6 +116,8 @@ export default {
     async mounted() {
         this.setupAudioUnlock()
         await Promise.all([this.fetchOrders(), this.fetchSellerInfo()])
+        await this.$nextTick()  // let the watcher see the first load before arming the sound
+        this.soundArmed = true
         this.startWatchingOrders()
     },
 
