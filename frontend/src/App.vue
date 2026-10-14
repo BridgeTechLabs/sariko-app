@@ -1,21 +1,27 @@
 <script>
 import BottomNavigation from '@/components/nav/BottomNavigation.vue'
 import SellerBottomNav from '@/components/nav/SellerBottomNav.vue'
-import HackerPanel from '@/components/dev/HackerPanel.vue'
+import { defineAsyncComponent } from 'vue'
 import { setUpAxiosPolicy } from "@/lib/axiosPolicy.js";
 import { useAuthStore } from '@/stores/auth/authStore'
 import { useChatStore } from '@/stores/chat/chatStore'
+
+// Dev panel (Ctrl+Shift+Q) only in builds with VITE_DEV_PANEL=true (local, DEV).
+// Vite inlines the flag at build time, so the prod bundle doesn't contain the panel.
+const DevPanel = import.meta.env.VITE_DEV_PANEL === 'true'
+    ? defineAsyncComponent(() => import('@/components/dev/HackerPanel.vue'))
+    : null
 
 export default {
     name: 'App',
     components: {
         BottomNavigation,
         SellerBottomNav,
-        HackerPanel,
     },
 
     setup() {
         setUpAxiosPolicy();
+        return { DevPanel }
     },
 
     data() {
@@ -65,7 +71,7 @@ export default {
         </div>
         <SellerBottomNav v-if="showNavigation && isSeller" />
         <BottomNavigation v-else-if="showNavigation" />
-        <HackerPanel />
+        <component :is="DevPanel" v-if="DevPanel" />
     </div>    
 </template>
 
