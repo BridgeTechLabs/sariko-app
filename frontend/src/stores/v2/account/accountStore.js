@@ -3,6 +3,7 @@ import { Notify } from 'quasar'
 import apiUsers from '@/apis/users/apiUsers'
 import apiUserAddresses from '@/apis/users/apiUserAddresses'
 import apiAuth from '@/apis/auth/apiAuth'
+import { apiSellers } from '@/apis/sellers/apiSellers'
 import { i18n } from '@/plugins/i18n'
 import { useAuthStore } from '@/stores/auth/authStore'
 import { fileToBase64 } from '@/utils/fileToBase64'
@@ -103,7 +104,8 @@ export const useAccountV2Store = defineStore('accountV2Store', {
             orderUpdates: false,
             sellerNews: false,
         },
-        foundingSlotsLeft: 7,
+        // null until GET /sellers/founding/slots answers (BecomeSellerCard hides the line)
+        foundingSlotsLeft: null,
         // Language screen selection — id from LANGUAGE_OPTIONS_V2, synced from preferred_language in fetchAccount
         selectedLanguage: toLanguageId(null),
         // Add / edit address form draft — editingAddressId null means "new"
@@ -210,6 +212,15 @@ export const useAccountV2Store = defineStore('accountV2Store', {
                 this.addresses = (addressRes?.addresses || []).map(toAddressV2)
             } catch (error) {
                 console.error(`accountV2Store - fetchAccount - ${error}`)
+            }
+        },
+
+        async fetchFoundingSlots() {
+            try {
+                const res = await apiSellers.getFoundingSlots()
+                this.foundingSlotsLeft = res?.slots_left ?? null
+            } catch (error) {
+                console.error(`accountV2Store - fetchFoundingSlots - ${error}`)
             }
         },
 

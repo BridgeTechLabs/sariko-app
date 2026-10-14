@@ -18,6 +18,7 @@
         "button_label_saving": "Đang lưu...",
         "toast_update_success": "Cập nhật thành công",
         "toast_update_failed": "Cập nhật thất bại, vui lòng thử lại",
+        "toast_same_password": "Mật khẩu mới phải khác mật khẩu hiện tại",
         "rating_count": "{count} đánh giá"
     },
     "bottom_nav": {
@@ -723,7 +724,7 @@
         "push_failed": "Không bật được thông báo trên trình duyệt này. Nếu dùng Brave: bật \"Use Google services for push messaging\" trong Cài đặt → Quyền riêng tư, rồi thử lại.",
         "become_seller_eyebrow": "Nấu cho kababayan",
         "become_seller_title": "Bán món lutong bahay từ bếp nhà bạn",
-        "become_seller_desc": "Còn {count} suất người bán sáng lập. Miễn phí 3 tháng, sau đó giữ mức phí thấp cố định.",
+        "become_seller_desc": "Còn {count} suất người bán sáng lập. Miễn phí duy trì 4 tháng đầu, sau đó giữ mức phí thấp cố định.",
         "become_seller_cta": "Bắt đầu bán",
         "help": "Trợ giúp và liên hệ",
         "terms": "Điều khoản dịch vụ",
