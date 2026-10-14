@@ -49,6 +49,25 @@ class DAORefunds(DAOBase):
         except Exception as e:
             raise Exception(f"error create_refund: {e}")
 
+    def create_refund_for_order(self, order: dict, reason: str):
+        """Queue a full refund for a cancelled order, if it was paid. The admin repo
+        sends it to VNPay. Never raises, because the cancel has already happened;
+        a second refund for the same order is refused by refunds_order_id_key."""
+        if order.get("payment_status") != "paid":
+            return None
+        try:
+            return self.create_refund(
+                order_id=order["id"],
+                amount=order["total_amount"],
+                reason=reason,
+                original_txn_ref=order.get("transaction_ref"),
+                ipn_data=order.get("ipn_data"),
+                payment_create_date=order.get("payment_create_date"),
+            )
+        except Exception as e:
+            logger.error(f"Failed to create {reason} refund for order {order['id']}: {e}")
+            return None
+
     def read_refunds(self, status: Optional[str] = None):
         try:
             query = self._supabase_client.table(self._table_name) \

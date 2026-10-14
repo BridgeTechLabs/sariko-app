@@ -28,3 +28,21 @@ class DAOAdminConfig(DAOBase):
             raise Exception(f"Supabase error - get_tax_rate: {e}")
         except Exception as e:
             raise Exception(f"error get_tax_rate: {e}")
+
+    def get_setting(self, key: str):
+        """A platform setting from admin_settings (jsonb value), or None if the row is missing."""
+        try:
+            result = (
+                self._supabase_client
+                .table("admin_settings")
+                .select("value")
+                .eq("key", key)
+                .maybe_single()
+                .execute()
+            )
+            return result.data["value"] if result and result.data else None
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - get_setting: {e}")
+        except Exception as e:
+            raise Exception(f"error get_setting: {e}")
