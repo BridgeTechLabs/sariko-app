@@ -157,6 +157,22 @@ class DAOSellerProfiles(DAOBase):
         except Exception as e:
             raise Exception(f"error update_avatar_url: {e}")
 
+    def count_sellers_by_tier(self, tier: str) -> int:
+        try:
+            result = (
+                self._supabase_client
+                .table(self._table_name)
+                .select("id", count="exact")
+                .eq("tier", tier)
+                .limit(1)
+                .execute()
+            )
+            return result.count or 0
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - count_sellers_by_tier: {e}")
+        except Exception as e:
+            raise Exception(f"error count_sellers_by_tier: {e}")
+
     def read_seller_order_info(self, seller_id: str):
         """Fetch user_id + effective commission rate in one query for order creation."""
         try:

@@ -39,7 +39,7 @@ export default {
                 console.error(`ChangePasswordSaveBar - onClickedUpdate - ${error}`)
                 this.$q.notify({
                     classes: 'quasar-notify-negative',
-                    message: this.$t('common.toast_update_failed'),
+                    message: this.$t(error?.code === 'same_password' ? 'common.toast_same_password' : 'common.toast_update_failed'),
                     position: 'bottom',
                     timeout: 2000,
                 })

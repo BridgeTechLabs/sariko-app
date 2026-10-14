@@ -1,5 +1,5 @@
 <script>
-import { mapState } from 'pinia';
+import { mapState, mapActions } from 'pinia';
 import { useAccountV2Store } from '@/stores/v2/account/accountStore';
 import BaseIcon from '@/components/v2/shared/BaseIcon.vue';
 import BaseButton from '@/components/v2/shared/BaseButton.vue';
@@ -9,6 +9,14 @@ export default {
 
     computed: {
         ...mapState(useAccountV2Store, ['foundingSlotsLeft']),
+    },
+
+    methods: {
+        ...mapActions(useAccountV2Store, ['fetchFoundingSlots']),
+    },
+
+    mounted() {
+        this.fetchFoundingSlots()
     },
 }
 </script>
@@ -21,7 +29,7 @@ export default {
             <span>{{ $t('account_v2.become_seller_eyebrow') }}</span>
         </div>
         <p class="title">{{ $t('account_v2.become_seller_title') }}</p>
-        <p class="desc">{{ $t('account_v2.become_seller_desc', { count: foundingSlotsLeft }) }}</p>
+        <p v-if="foundingSlotsLeft !== null" class="desc">{{ $t('account_v2.become_seller_desc', { count: foundingSlotsLeft }) }}</p>
         <BaseButton variant="gold" :size="40" icon="arrow-right">
             {{ $t('account_v2.become_seller_cta') }}
         </BaseButton>

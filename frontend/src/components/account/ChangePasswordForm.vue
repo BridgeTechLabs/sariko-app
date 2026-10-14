@@ -70,7 +70,7 @@ export default {
             } catch (e) {
                 this.$q.notify({
                     classes: 'quasar-notify-negative',
-                    message: this.$t('common.toast_update_failed'),
+                    message: this.$t(e?.code === 'same_password' ? 'common.toast_same_password' : 'common.toast_update_failed'),
                     position: 'bottom',
                     timeout: 2000,
                 })

@@ -21,6 +21,15 @@ export const apiSellers = {
         }
     },
 
+    getFoundingSlots: async () => {
+        try {
+            const response = await apiClient.get(`/v1/sellers/founding/slots`)
+            return response
+        } catch (error) {
+            throw new Error(error.response?.data?.detail || 'Failed to getFoundingSlots')
+        }
+    },
+
     getFeaturedDishes: async () => {
         try {
             const response = await apiClient.get(`/v1/sellers/featured-dishes`)
