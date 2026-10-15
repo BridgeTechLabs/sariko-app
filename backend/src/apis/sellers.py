@@ -25,7 +25,10 @@ logger = logging.getLogger(__name__)
 VALID_STATUS_TRANSITIONS = {
     "pending":          ["confirmed", "cancelled"],
     "confirmed":        ["ready", "cancelled"],
-    "ready":            ["done", "cancelled"],  # delivery_failed is set by webhook only, not by seller
+    # No seller cancel once a Lalamove driver is booked: the API only cancels before
+    # or within 5 min of matching, so Sariko cancels the trip and the order (T75).
+    # delivery_failed is set by webhook only; its trip has already ended.
+    "ready":            ["done"],
     "delivery_failed":  ["done", "cancelled"],
 }
 
