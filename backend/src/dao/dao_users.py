@@ -16,7 +16,6 @@ class DAOUsers(DAOBase):
     def get_users(self, user_id: Optional[str] = None):
         
         try:
-            logger.warning(f"user_id {user_id}")
             query = self._supabase_client.table(self._table_name)
             query = query.select("*")
             

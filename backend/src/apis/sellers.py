@@ -550,7 +550,6 @@ def get_featured_dishes():
     try:
         dao = DAOFoodItems()
         dishes = dao.read_featured_dishes()
-        print(dishes)
         return {"success": True, "featured_dishes": dishes}
     except Exception as e:
         logger.exception(f"Exception in GET /sellers/featured-dishes: {repr(e)}")
