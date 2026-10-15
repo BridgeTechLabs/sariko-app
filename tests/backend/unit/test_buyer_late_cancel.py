@@ -1,15 +1,9 @@
 """R4 + R6 (docs/dev/order-cancel-refund.md): the buyer may cancel a late `confirmed`
 (1 h) or `delivery_failed` (30 min) order with a full refund. No DB, no network.
 
-Run from backend/src:  python -m pytest tests/test_buyer_late_cancel.py
+Run from tests/backend:  pytest unit/test_buyer_late_cancel.py
 """
-import os
-import sys
 from datetime import datetime, timedelta, timezone
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-# core.auth refuses to import without this; the value is never fetched here.
-os.environ.setdefault("SUPABASE_JWKS_URL", "https://test.invalid/jwks")
 
 import pytest
 from fastapi import HTTPException

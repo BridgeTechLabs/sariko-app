@@ -1,12 +1,8 @@
 """A duplicate dish name (DB unique_violation) must surface as FoodItemNameTaken,
 which the API turns into a 409. No DB, no network.
 
-Run from backend/src:  python -m pytest tests/test_food_item_name_taken.py
+Run from tests/backend:  pytest unit/test_food_item_name_taken.py
 """
-import os
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 from postgrest.exceptions import APIError

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from core.store_hours import confirm_deadline
+from dao.dao_admin_config import DAOAdminConfig
 from services import order_expiry
 
 WINDOW = timedelta(minutes=30)
@@ -42,8 +43,12 @@ class FakeOrders:
         return {"id": order_id}
 
 
-class FakeConfig:
+class FakeConfig(DAOAdminConfig):
+    """Only the DB read is faked; the real get_minutes validation runs."""
     value = 30
+
+    def __init__(self):
+        pass  # no Supabase client
 
     def get_setting(self, key):
         assert key == "order_confirm_minutes"
