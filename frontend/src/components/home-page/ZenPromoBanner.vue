@@ -2,8 +2,8 @@
 import { ChevronRight, X } from 'lucide-vue-next'
 
 const DISMISS_KEY = 'sariko.zen_promo_dismissed_version'
-// Bump this when banner copy/visual changes and you want all users to see it again.
-const BANNER_VERSION = '1'
+// Bump VITE_ZEN_BANNER_VERSION (and rebuild) to re-show the banner to users who dismissed it.
+const BANNER_VERSION = import.meta.env.VITE_ZEN_BANNER_VERSION || '1'
 
 export default {
     name: 'ZenPromoBanner',
