@@ -1,12 +1,9 @@
 """Image compression before upload. No DB, no network.
 
-Run from backend/src:  python -m pytest tests/test_storage.py   (or: python tests/test_storage.py)
+Run from tests/backend:  pytest unit/test_storage.py
 """
 import io
-import os
-import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from PIL import Image
 
