@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 from dao.dao_base import DAOBase
 
@@ -46,3 +47,16 @@ class DAOAdminConfig(DAOBase):
             raise Exception(f"Supabase error - get_setting: {e}")
         except Exception as e:
             raise Exception(f"error get_setting: {e}")
+
+    def get_positive_int(self, key: str, default: int) -> int:
+        """An integer > 0 setting. Read on every call, so an admin change applies at
+        once. A missing or invalid value (0, "abc") falls back to the default rather
+        than letting a typo cancel or unlock every order at once."""
+        value = self.get_setting(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
+        logger.error(f"[Settings] invalid {key}={value!r}, using {default}")
+        return default
+
+    def get_minutes(self, key: str, default: int) -> timedelta:
+        return timedelta(minutes=self.get_positive_int(key, default))

@@ -2,6 +2,7 @@ import logging
 
 from core.store_hours import is_open_now
 
+from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_seller_profiles import DAOSellerProfiles
 from dao.dao_food_items import DAOFoodItems, FoodItemNameTaken
 from dao.dao_menu_categories import DAOMenuCategories
@@ -25,7 +26,10 @@ logger = logging.getLogger(__name__)
 VALID_STATUS_TRANSITIONS = {
     "pending":          ["confirmed", "cancelled"],
     "confirmed":        ["ready", "cancelled"],
-    "ready":            ["done", "cancelled"],  # delivery_failed is set by webhook only, not by seller
+    # No seller cancel once a Lalamove driver is booked: the API only cancels before
+    # or within 5 min of matching, so Sariko cancels the trip and the order (T75).
+    # delivery_failed is set by webhook only; its trip has already ended.
+    "ready":            ["done"],
     "delivery_failed":  ["done", "cancelled"],
 }
 
@@ -216,6 +220,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
         cancellation_reason = body.cancellation_reason if body.status == "cancelled" else None
 
         # For "ready" + delivery: book Lalamove FIRST, only update status if booking succeeds
+        booking_result = None
         if body.status == "ready" and order.get("delivery_method") == "delivery":
             from services.lalamove_service import get_lalamove_service
             from dao.dao_deliveries import DAODeliveries
@@ -251,17 +256,18 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
             try:
                 sender_phone = to_e164_vn(seller.get("phone") or "")
             except ValueError as e:
-                raise HTTPException(status_code=400, detail=f"Seller phone invalid: {e}. Update store phone in settings.")
+                raise HTTPException(status_code=400, detail={"code": "seller_phone_invalid", "message": f"Seller phone invalid: {e}. Update store phone in settings."})
             try:
                 recipient_phone = to_e164_vn(buyer.get("phone") or "")
             except ValueError as e:
-                raise HTTPException(status_code=400, detail=f"Buyer phone invalid: {e}. Buyer must update phone before delivery.")
+                raise HTTPException(status_code=400, detail={"code": "buyer_phone_invalid", "message": f"Buyer phone invalid: {e}. Buyer must update phone before delivery."})
 
             logger.warning(f"[Delivery] order={order_id} sender_phone={sender_phone} recipient_phone={recipient_phone}")
 
             booking_result = None
             last_booking_error = None
-            for attempt in range(1, 4):
+            attempts = DAOAdminConfig().get_positive_int("driver_booking_attempts", 3)
+            for attempt in range(1, attempts + 1):
                 try:
                     booking_result = service.place_order(
                         quotation_id=quotation.quotation_id,
@@ -276,12 +282,12 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     break
                 except Exception as e:
                     last_booking_error = e
-                    logger.warning(f"[Delivery] place_order attempt {attempt}/3 failed for order={order_id}: {e}")
+                    logger.warning(f"[Delivery] place_order attempt {attempt}/{attempts} failed for order={order_id}: {e}")
 
             if booking_result is None:
-                logger.error(f"[Delivery] All 3 booking attempts failed for order={order_id}: {last_booking_error}")
-                # The buyer UI translates this exact text (OrderStatusHeader.vue)
-                dao_orders.update_order_status(order_id, "cancelled", "Driver booking failed after 3 attempts")
+                logger.error(f"[Delivery] All {attempts} booking attempts failed for order={order_id}: {last_booking_error}")
+                # The buyer UI translates this exact text (OrderStatusHeader.vue); no count in it, it's a setting
+                dao_orders.update_order_status(order_id, "cancelled", "Driver booking failed")
                 from dao.dao_refunds import DAORefunds
                 DAORefunds().create_refund_for_order(order, "driver_booking_failed")
                 raise HTTPException(status_code=503, detail="Unable to book a delivery driver. Your order has been cancelled.")
@@ -308,11 +314,15 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
             logger.warning(f"[Delivery] Auto-booked order={order_id} lalamove={booking_result.lalamove_order_id}")
 
         # Only update status after delivery booking succeeds (or if not a delivery order).
-        # Conditional on the status read above: the confirm-timeout job may have
-        # cancelled (and refunded) the order in between.
+        # Conditional on the status read above: the confirm-timeout job or a buyer
+        # cancelling a late order may have cancelled (and refunded) it in between.
         updated = dao_orders.update_order_status(order_id, body.status, cancellation_reason,
                                                  expected_status=order["status"])
         if not updated:
+            # The trip was booked for an order that is no longer ours to send (R4.6).
+            # It is still ASSIGNING_DRIVER, which Lalamove lets us cancel.
+            if booking_result and not service.cancel_order(booking_result.lalamove_order_id):
+                logger.error(f"[Delivery] order={order_id} changed while booking; cancel of lalamove={booking_result.lalamove_order_id} failed — MANUAL INTERVENTION NEEDED")
             raise HTTPException(status_code=409, detail="Order status changed, please refresh")
 
         if body.status == "cancelled":

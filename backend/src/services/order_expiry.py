@@ -26,14 +26,8 @@ def _ts(value):
 
 
 def confirm_window() -> timedelta:
-    """Read on every run, so a change in admin_settings applies within a minute.
-    A missing or invalid value falls back to the default rather than letting a
-    typo (0, "abc") cancel every waiting order at once."""
-    value = DAOAdminConfig().get_setting("order_confirm_minutes")
-    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-        return timedelta(minutes=value)
-    logger.error(f"[Expiry] invalid order_confirm_minutes={value!r}, using {DEFAULT_CONFIRM_MINUTES}")
-    return timedelta(minutes=DEFAULT_CONFIRM_MINUTES)
+    """Read on every run, so a change in admin_settings applies within a minute."""
+    return DAOAdminConfig().get_minutes("order_confirm_minutes", DEFAULT_CONFIRM_MINUTES)
 
 
 def expire_unconfirmed_orders(now: datetime = None) -> int:

@@ -1,4 +1,5 @@
 <script>
+import { apiErrorMessage } from '@/lib/axiosPolicy.js';
 import { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin } from 'lucide-vue-next';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
@@ -229,7 +230,7 @@ export default {
                 })
             } catch (e) {
                 console.error('ActionOrdersList - onAccept -', e)
-                const errorMsg = e?.response?.data?.detail || this.t('seller_home.toast_update_failed', 'Failed to update order')
+                const errorMsg = apiErrorMessage(e?.response?.data)
                 this.orderErrors = { ...this.orderErrors, [order.id]: [errorMsg] }
             } finally {
                 const { [order.id]: _, ...rest } = this.loadingOrders
@@ -428,7 +429,7 @@ export default {
                             {{ $t('seller_home.delivery_issue_details') }}
                         </button>
                         <q-btn
-                            v-if="(deliveryStatuses[order.id]?.rebook_count || 0) < 3 && rebookErrors[order.id] !== 'max_attempts'"
+                            v-if="(deliveryStatuses[order.id]?.rebook_count || 0) < (deliveryStatuses[order.id]?.rebook_max || 3) && rebookErrors[order.id] !== 'max_attempts'"
                             unelevated dense no-caps
                             class="btn-rebook"
                             :loading="!!rebookingOrders[order.id]"
