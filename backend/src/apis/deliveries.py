@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 
 from core.auth import verify_token
 from core.phone import to_e164_vn
+from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_deliveries import DAODeliveries
 from dao.dao_orders import DAOOrders
 from dao.dao_seller_profiles import DAOSellerProfiles
@@ -16,6 +17,11 @@ from services.lalamove_service import get_lalamove_service
 
 router = APIRouter(prefix="/deliveries")
 logger = logging.getLogger(__name__)
+
+
+def rebook_max() -> int:
+    """How many times a seller may rebook a driver after Lalamove ends a trip (admin_settings)."""
+    return DAOAdminConfig().get_positive_int("seller_rebook_max", 3)
 
 
 # --------------------------------------------------------------------------
@@ -266,6 +272,7 @@ def get_delivery_status_for_seller(order_id: str, user=Depends(verify_token)):
                 "driver_plate": delivery.get("driver_plate"),
                 "share_link": delivery.get("share_link"),
                 "rebook_count": delivery.get("rebook_count", 0),
+                "rebook_max": rebook_max(),
             }
         }
 
@@ -300,7 +307,7 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
             raise HTTPException(status_code=400, detail="No cancelled delivery to rebook")
 
         rebook_count = delivery.get("rebook_count", 0)
-        if rebook_count >= 3:
+        if rebook_count >= rebook_max():
             raise HTTPException(status_code=400, detail="Max rebook attempts reached")
 
         full_order = dao_orders.read_order_with_seller_coords(order_id)
@@ -314,11 +321,11 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
         try:
             sender_phone = to_e164_vn(seller.get("phone") or "")
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Seller phone invalid: {e}")
+            raise HTTPException(status_code=400, detail={"code": "seller_phone_invalid", "message": f"Seller phone invalid: {e}"})
         try:
             recipient_phone = to_e164_vn(buyer.get("phone") or "")
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Buyer phone invalid: {e}")
+            raise HTTPException(status_code=400, detail={"code": "buyer_phone_invalid", "message": f"Buyer phone invalid: {e}"})
 
         quotation = service.get_quotation(
             pickup_lat=float(seller.get("lat") or 0),

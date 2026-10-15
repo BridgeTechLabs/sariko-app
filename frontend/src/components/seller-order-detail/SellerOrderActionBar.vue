@@ -40,11 +40,12 @@ export default {
         },
         canReject()  { return ['pending', 'confirmed'].includes(this.order.status) },
         rebookCount() { return this.delivery?.rebook_count || 0 },
+        rebookMax() { return this.delivery?.rebook_max || 3 },  // admin_settings.seller_rebook_max
         canRebook() {
-            return this.order.status === 'delivery_failed' && this.rebookCount < 3
+            return this.order.status === 'delivery_failed' && this.rebookCount < this.rebookMax
         },
         maxRebookReached() {
-            return this.order.status === 'delivery_failed' && this.rebookCount >= 3
+            return this.order.status === 'delivery_failed' && this.rebookCount >= this.rebookMax
         },
 
         isDeliveryStuck() {
@@ -193,7 +194,7 @@ export default {
             <template v-else-if="order.status === 'delivery_failed'">
                 <template v-if="canRebook">
                     <q-btn unelevated no-caps class="btn-rebook" :loading="rebooking" @click="onRebook">
-                        {{ $t('seller_order_detail.action_rebook_delivery') }} ({{ rebookCount + 1 }}/3)
+                        {{ $t('seller_order_detail.action_rebook_delivery') }} ({{ rebookCount + 1 }}/{{ rebookMax }})
                     </q-btn>
                 </template>
                 <template v-else-if="maxRebookReached">

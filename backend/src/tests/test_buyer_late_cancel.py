@@ -14,6 +14,7 @@ os.environ.setdefault("SUPABASE_JWKS_URL", "https://test.invalid/jwks")
 import pytest
 from fastapi import HTTPException
 
+import apis.deliveries as deliveries
 import apis.orders as orders
 import apis.sellers as sellers
 import dao.dao_deliveries
@@ -50,10 +51,25 @@ class FakeRefunds:
             refunds.append((order["id"], reason, order["total_amount"]))
 
 
+class FakeSettings:
+    """admin_settings rows; empty = every window falls back to its default."""
+    rows = {}
+
+    def get_positive_int(self, key, default):
+        return self.rows.get(key, default)
+
+    def get_minutes(self, key, default):
+        return timedelta(minutes=self.get_positive_int(key, default))
+
+
 @pytest.fixture(autouse=True)
 def fakes(monkeypatch):
     refunds.clear()
     cancelled_trips.clear()
+    FakeSettings.rows = {}
+    monkeypatch.setattr(orders, "DAOAdminConfig", FakeSettings)
+    monkeypatch.setattr(sellers, "DAOAdminConfig", FakeSettings)
+    monkeypatch.setattr(deliveries, "DAOAdminConfig", FakeSettings)
     monkeypatch.setattr(orders, "DAOOrders", FakeOrders)
     monkeypatch.setattr(dao.dao_refunds, "DAORefunds", FakeRefunds)
     monkeypatch.setattr(orders.push_service, "notify_buyer_cancelled", lambda o: None)
@@ -169,6 +185,49 @@ def test_r4_6_seller_ready_vs_buyer_cancel_leaves_no_trip(monkeypatch):
     assert cancelled_trips == ["trip-1"]
 
 
+class NoDriverLalamove(FakeLalamove):
+    tries = 0
+
+    def place_order(self, **kw):
+        NoDriverLalamove.tries += 1
+        raise RuntimeError("no driver")
+
+
+def test_booking_attempts_come_from_admin_settings(monkeypatch):
+    FakeSettings.rows = {"driver_booking_attempts": 2}
+    NoDriverLalamove.tries = 0
+    order("confirmed", delivery_method="delivery")
+    monkeypatch.setattr(sellers, "DAOOrders", FakeSellerOrders)
+    monkeypatch.setattr(sellers, "_get_seller_id", lambda user: "seller")
+    monkeypatch.setattr(services.lalamove_service, "get_lalamove_service", lambda: NoDriverLalamove())
+    with pytest.raises(HTTPException) as e:
+        sellers.update_seller_order_status("o1", Schema.RequestUpdateOrderStatus(status="ready"), user={"id": "s"})
+    assert e.value.status_code == 503
+    assert NoDriverLalamove.tries == 2
+    assert FakeOrders.row["status"] == "cancelled"
+    assert FakeOrders.row["cancellation_reason"] == "Driver booking failed"  # OrderStatusHeader.vue translates it
+    assert refunds == [("o1", "driver_booking_failed", 125000)]
+
+
+def test_rebook_max_comes_from_admin_settings(monkeypatch):
+    FakeSettings.rows = {"seller_rebook_max": 2}
+    order("delivery_failed", delivery_method="delivery")
+
+    class Profiles:
+        def read_seller_profile_by_user_id(self, _):
+            return {"id": "seller"}
+
+    class Deliveries:
+        def read_delivery_by_order_id(self, _):
+            return {"id": "d1", "status": "REJECTED", "rebook_count": 2}
+    monkeypatch.setattr(deliveries, "DAOSellerProfiles", Profiles)
+    monkeypatch.setattr(deliveries, "DAOOrders", FakeSellerOrders)
+    monkeypatch.setattr(deliveries, "DAODeliveries", Deliveries)
+    with pytest.raises(HTTPException) as e:
+        deliveries.rebook_delivery("o1", user={"id": "s"})
+    assert (e.value.status_code, e.value.detail) == (400, "Max rebook attempts reached")
+
+
 def test_r6_1_delivery_failed_29_min_refused():
     order("delivery_failed", status_changed_at=ago(minutes=29))
     assert assert_refused() == "delivery_failed"
@@ -182,6 +241,35 @@ def test_r6_2_delivery_failed_31_min_cancels_with_refund():
 def test_r6_4_rebooked_order_has_no_cancel_deadline():
     # Rebook moves the order back to ready (and resets status_changed_at in the DB trigger)
     assert orders.cancel_after({"status": "ready", "status_changed_at": ago(hours=2)}) is None
+
+
+def test_windows_come_from_admin_settings():
+    FakeSettings.rows = {"buyer_cancel_late_confirmed_minutes": 90,
+                         "buyer_cancel_late_delivery_failed_minutes": 45,
+                         "buyer_cancel_before_appointment_minutes": 120}
+    order("confirmed", status_changed_at=ago(minutes=61))
+    assert assert_refused() == "confirmed"              # 61 < 90
+    order("delivery_failed", status_changed_at=ago(minutes=31))
+    assert assert_refused() == "delivery_failed"        # 31 < 45
+    soon = (datetime.now(timezone.utc) + timedelta(hours=3)).isoformat()
+    order("pending", delivery_appointment=soon)
+    assert buyer_cancel()["success"]                    # 3 h ahead > 2 h cutoff (default 24 h would refuse)
+
+
+def test_appointment_cutoff_default_24h():
+    soon = (datetime.now(timezone.utc) + timedelta(hours=10)).isoformat()
+    order("pending", delivery_appointment=soon)
+    assert assert_refused() == "pending"                # R3.3
+
+
+def test_invalid_setting_falls_back_to_default():
+    from dao.dao_admin_config import DAOAdminConfig
+    for bad in (None, 0, -5, "abc", True, 1.5):
+        dao = DAOAdminConfig.__new__(DAOAdminConfig)    # skip __init__: no Supabase client
+        dao.get_setting = lambda key, v=bad: v
+        assert dao.get_minutes("k", 60) == timedelta(minutes=60)
+    dao.get_setting = lambda key: 90
+    assert dao.get_minutes("k", 60) == timedelta(minutes=90)
 
 
 def test_pending_cancel_unchanged():

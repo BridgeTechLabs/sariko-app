@@ -88,7 +88,8 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
     if sold_out:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No longer available: {', '.join(sold_out)}",
+            detail={"code": "no_longer_available", "message": f"No longer available: {', '.join(sold_out)}",
+                    "names": ", ".join(sold_out)},
         )
     subtotal = sum(
         cart_item_unit_price(item) * item["quantity"]
@@ -127,6 +128,7 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
         delivery_fee, quotation_id = quote.total_fee, quote.quotation_id
         if Decimal(str(request.delivery_fee or 0)) != delivery_fee:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
+                "code": "delivery_fee_changed",
                 "message": "Delivery fee has changed",
                 "delivery_fee": delivery_fee,
                 "quotation_id": quotation_id,
@@ -207,9 +209,9 @@ def cancel_after(order: dict):
     changed = _ts(order.get("status_changed_at"))
     if order["status"] == "confirmed":
         appointment = _ts(order.get("delivery_appointment"))
-        return (appointment or changed) + timedelta(hours=1)
+        return (appointment or changed) + DAOAdminConfig().get_minutes("buyer_cancel_late_confirmed_minutes", 60)
     if order["status"] == "delivery_failed":
-        return changed + timedelta(minutes=30)
+        return changed + DAOAdminConfig().get_minutes("buyer_cancel_late_delivery_failed_minutes", 30)
     return None
 
 
@@ -240,8 +242,13 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
     reason = None
     if order["status"] == "pending":
         appointment = _ts(order.get("delivery_appointment"))
-        if appointment and (appointment - now).total_seconds() < 86400:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể hủy đơn trong vòng 24 giờ trước giờ hẹn")
+        if appointment:
+            cutoff = DAOAdminConfig().get_minutes("buyer_cancel_before_appointment_minutes", 1440)
+            if appointment - now < cutoff:
+                hours = f"{cutoff.total_seconds() / 3600:g}"
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
+                    "code": "cancel_cutoff", "hours": hours,
+                    "message": f"Can't cancel within {hours} hours of the delivery time"})
     else:
         deadline = cancel_after(order)
         if not deadline or now < deadline:

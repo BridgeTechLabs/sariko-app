@@ -141,6 +141,7 @@ export default {
                 }
             } catch (e) {
                 console.error(e)
+                // The error toast (translated) comes from axiosPolicy
                 if (e.detail?.delivery_fee != null) {
                     // Server re-quoted a different fee: show it, buyer places the order again
                     this.deliveryStore.quotation = {
@@ -148,20 +149,10 @@ export default {
                         total_fee: e.detail.delivery_fee,
                         quotation_id: e.detail.quotation_id,
                     }
-                    this.$q.notify({
-                        type: 'warning',
-                        message: this.$t('cart_page.delivery_fee_changed', { fee: this.deliveryFeeText }),
-                        position: 'top'
-                    })
                     return
                 }
                 const cartStore = useCartStore()
                 await cartStore.refreshCart()
-                this.$q.notify({
-                    type: 'negative',
-                    message: 'Failed to place order. Please try again.',
-                    position: 'top'
-                })
             } finally {
                 this.submitting = false
             }
