@@ -219,6 +219,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
         cancellation_reason = body.cancellation_reason if body.status == "cancelled" else None
 
         # For "ready" + delivery: book Lalamove FIRST, only update status if booking succeeds
+        booking_result = None
         if body.status == "ready" and order.get("delivery_method") == "delivery":
             from services.lalamove_service import get_lalamove_service
             from dao.dao_deliveries import DAODeliveries
@@ -311,11 +312,15 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
             logger.warning(f"[Delivery] Auto-booked order={order_id} lalamove={booking_result.lalamove_order_id}")
 
         # Only update status after delivery booking succeeds (or if not a delivery order).
-        # Conditional on the status read above: the confirm-timeout job may have
-        # cancelled (and refunded) the order in between.
+        # Conditional on the status read above: the confirm-timeout job or a buyer
+        # cancelling a late order may have cancelled (and refunded) it in between.
         updated = dao_orders.update_order_status(order_id, body.status, cancellation_reason,
                                                  expected_status=order["status"])
         if not updated:
+            # The trip was booked for an order that is no longer ours to send (R4.6).
+            # It is still ASSIGNING_DRIVER, which Lalamove lets us cancel.
+            if booking_result and not service.cancel_order(booking_result.lalamove_order_id):
+                logger.error(f"[Delivery] order={order_id} changed while booking; cancel of lalamove={booking_result.lalamove_order_id} failed — MANUAL INTERVENTION NEEDED")
             raise HTTPException(status_code=409, detail="Order status changed, please refresh")
 
         if body.status == "cancelled":

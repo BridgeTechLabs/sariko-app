@@ -181,6 +181,7 @@
             "title_total_amount": "Tổng cộng",
             "button_label_checkout": "Đặt hàng"
         },
+        "delivery_fee_changed": "Phí giao hàng đã đổi thành {fee}. Vui lòng kiểm tra và đặt lại.",
         "validation": {
             "missing_phone": "Cần có số điện thoại để đặt hàng.",
             "missing_address": "Cần có địa chỉ giao hàng.",
@@ -312,6 +313,9 @@
     "order_detail": {
         "cancelled_reason": "Lý do",
         "reason_seller_timeout": "Người bán không xác nhận đơn kịp thời",
+        "reason_seller_late": "Người bán trễ hạn",
+        "late_cancel_hint": "Dự kiến trước {time}. Quá giờ này bạn có thể hủy và được hoàn tiền.",
+        "btn_late_cancel": "Đơn đang chậm: Hủy và hoàn tiền",
         "title": "Chi tiết đơn hàng",
         "status_title_awaiting_payment": "Chờ thanh toán",
         "status_title_pending": "Đã đặt hàng!",

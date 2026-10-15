@@ -141,6 +141,20 @@ export default {
                 }
             } catch (e) {
                 console.error(e)
+                if (e.detail?.delivery_fee != null) {
+                    // Server re-quoted a different fee: show it, buyer places the order again
+                    this.deliveryStore.quotation = {
+                        ...this.deliveryStore.quotation,
+                        total_fee: e.detail.delivery_fee,
+                        quotation_id: e.detail.quotation_id,
+                    }
+                    this.$q.notify({
+                        type: 'warning',
+                        message: this.$t('cart_page.delivery_fee_changed', { fee: this.deliveryFeeText }),
+                        position: 'top'
+                    })
+                    return
+                }
                 const cartStore = useCartStore()
                 await cartStore.refreshCart()
                 this.$q.notify({

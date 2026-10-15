@@ -13,6 +13,7 @@ export default {
             payingNow: false,
             cancelling: false,
             showCancelDialog: false,
+            now: Date.now(),
         }
     },
 
@@ -36,9 +37,31 @@ export default {
             if (!this.order) return ''
             return new Intl.NumberFormat('vi-VN').format(this.order.total_amount) + ' ₫'
         },
+        // Late confirmed / delivery_failed order: buyer may cancel + full refund from this time (backend cancel_after)
+        lateCancelAt() {
+            return this.order?.cancel_after ? new Date(this.order.cancel_after) : null
+        },
+        canLateCancel() {
+            return !!this.lateCancelAt && this.now >= this.lateCancelAt.getTime()
+        },
+        lateCancelAtText() {
+            const d = this.lateCancelAt
+            const locale = this.$i18n.locale
+            const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+            if (d.toDateString() === new Date(this.now).toDateString()) return time
+            return `${time} ${d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit' })}`
+        },
         hasActions() {
-            return this.isPaymentPending || this.isPending
+            return this.isPaymentPending || this.isPending || !!this.lateCancelAt
         }
+    },
+
+    mounted() {
+        this._clock = setInterval(() => { this.now = Date.now() }, 30_000)
+    },
+
+    beforeUnmount() {
+        clearInterval(this._clock)
     },
 
     methods: {
@@ -82,8 +105,12 @@ export default {
             {{ $t('order_detail.btn_pay_now', { amount: totalText }) }}
         </q-btn>
 
-        <q-btn v-if="isPending" class="btn-cancel" flat dense no-caps @click="showCancelDialog = true">
-            {{ $t('order_detail.btn_cancel') }}
+        <div v-if="lateCancelAt && !canLateCancel" class="late-hint">
+            {{ $t('order_detail.late_cancel_hint', { time: lateCancelAtText }) }}
+        </div>
+
+        <q-btn v-if="isPending || canLateCancel" class="btn-cancel" flat dense no-caps @click="showCancelDialog = true">
+            {{ canLateCancel ? $t('order_detail.btn_late_cancel') : $t('order_detail.btn_cancel') }}
         </q-btn>
 
         <!-- Cancel Confirmation Dialog -->
@@ -126,6 +153,12 @@ export default {
     font-weight: 500;
     font-size: 14px;
     padding: 10px 0;
+}
+
+.late-hint {
+    font-size: 13px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .cancel-dialog {

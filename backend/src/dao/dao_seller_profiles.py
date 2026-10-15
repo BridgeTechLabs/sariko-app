@@ -179,7 +179,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("user_id, is_open, opening_time, closing_time, commission_rate_override, admin_tier_config(commission_rate)")
+                .select("user_id, is_open, opening_time, closing_time, address, lat, lon, commission_rate_override, admin_tier_config(commission_rate)")
                 .eq("id", seller_id)
                 .maybe_single()
                 .execute()
@@ -193,6 +193,9 @@ class DAOSellerProfiles(DAOBase):
                 "user_id": row["user_id"],
                 "is_open": is_open_now(row["is_open"], row["opening_time"], row["closing_time"]),
                 "commission_rate": float(effective_rate),
+                "address": row["address"],
+                "lat": row["lat"],
+                "lon": row["lon"],
             }
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_seller_order_info: {e}")

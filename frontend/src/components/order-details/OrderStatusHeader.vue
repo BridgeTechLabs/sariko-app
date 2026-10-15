@@ -7,6 +7,7 @@ import { useOrderStore } from '@/stores/order/orderStore.js';
 const SYSTEM_REASON_KEYS = {
     'Seller did not confirm in time': 'order_detail.reason_seller_timeout',                      // services/order_expiry.py
     'Driver booking failed after 3 attempts': 'seller_order_detail.cancel_reason_no_driver',   // apis/sellers.py
+    'Seller was late': 'order_detail.reason_seller_late',                                     // apis/orders.py
 }
 
 export default {

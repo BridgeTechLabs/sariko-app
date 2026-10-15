@@ -1,4 +1,6 @@
 import logging
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from fastapi import (
     APIRouter,
@@ -16,6 +18,7 @@ from dao.dao_order_items import DAOOrderItems
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
 from services import push_service
+from services.lalamove_service import get_lalamove_service
 from utils.pricing import cart_item_unit_price
 
 router = APIRouter(prefix="/orders")
@@ -91,7 +94,6 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
         cart_item_unit_price(item) * item["quantity"]
         for item in cart_items
     )
-    total_amount = subtotal + float(request.delivery_fee or 0)
 
     # 3. Get seller user_id + effective commission rate in one query
     dao_seller_profile = DAOSellerProfiles()
@@ -102,6 +104,34 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
     # Items may have entered the cart before the seller closed
     if not seller_info["is_open"] and same_day_names(cart_items):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=STORE_CLOSED_DETAIL)
+
+    # Delivery fee is quoted here, never taken from the client (R1, docs/dev/order-cancel-refund.md).
+    # A fee that differs from what the buyer saw → 409 with the new fee; the cart shows it and they re-place.
+    delivery_fee, quotation_id = None, None
+    if request.delivery_method == "delivery":
+        if not seller_info["lat"] or not seller_info["lon"]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Seller location not configured")
+        try:
+            quote = get_lalamove_service().get_quotation(
+                pickup_lat=float(seller_info["lat"]),
+                pickup_lon=float(seller_info["lon"]),
+                pickup_address=seller_info["address"] or "Pickup",
+                dropoff_lat=request.delivery_lat,
+                dropoff_lon=request.delivery_lon,
+                dropoff_address=request.delivery_address,
+            )
+        except Exception as e:
+            logger.exception(f"Lalamove quotation failed in POST /orders: {e}")
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,
+                                detail="Could not get a delivery fee quote. Please try again.")
+        delivery_fee, quotation_id = quote.total_fee, quote.quotation_id
+        if Decimal(str(request.delivery_fee or 0)) != delivery_fee:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
+                "message": "Delivery fee has changed",
+                "delivery_fee": delivery_fee,
+                "quotation_id": quotation_id,
+            })
+    total_amount = subtotal + (delivery_fee or 0)
 
     commission_rate = seller_info["commission_rate"]
     commission_amount = round(subtotal * commission_rate, 2)
@@ -128,8 +158,8 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
         note=request.note,
         delivery_lat=request.delivery_lat,
         delivery_lon=request.delivery_lon,
-        delivery_fee=request.delivery_fee,
-        quotation_id=request.quotation_id,
+        delivery_fee=delivery_fee,
+        quotation_id=quotation_id,
         delivery_appointment=request.delivery_appointment,
     )
 
@@ -163,6 +193,26 @@ def get_orders(user=Depends(verify_token)):
     return {"success": True, "orders": orders}
 
 
+SELLER_LATE_REASON = "Seller was late"  # the buyer UI translates this exact text (OrderStatusHeader.vue)
+
+
+def _ts(value):
+    return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
+
+
+def cancel_after(order: dict):
+    """When the buyer may cancel a late order with a full refund (R4, R6 in
+    docs/dev/order-cancel-refund.md), or None if this status has no such deadline.
+    Nothing auto-cancels: past the deadline the buyer chooses to wait or cancel."""
+    changed = _ts(order.get("status_changed_at"))
+    if order["status"] == "confirmed":
+        appointment = _ts(order.get("delivery_appointment"))
+        return (appointment or changed) + timedelta(hours=1)
+    if order["status"] == "delivery_failed":
+        return changed + timedelta(minutes=30)
+    return None
+
+
 @router.get("/{order_id}")
 def get_order_detail(order_id: str, user=Depends(verify_token)):
 
@@ -172,6 +222,8 @@ def get_order_detail(order_id: str, user=Depends(verify_token)):
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
+    deadline = cancel_after(order)
+    order["cancel_after"] = deadline.isoformat() if deadline else None
     return {"success": True, "order": order}
 
 
@@ -184,19 +236,24 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
-    if order["status"] != "pending":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending orders can be cancelled")
-
-    if order.get("delivery_appointment"):
-        import datetime as dt
-        appt = dt.datetime.fromisoformat(order["delivery_appointment"].replace("Z", "+00:00"))
-        now = dt.datetime.now(dt.timezone.utc)
-        if (appt - now).total_seconds() < 86400:
+    now = datetime.now(timezone.utc)
+    reason = None
+    if order["status"] == "pending":
+        appointment = _ts(order.get("delivery_appointment"))
+        if appointment and (appointment - now).total_seconds() < 86400:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không thể hủy đơn trong vòng 24 giờ trước giờ hẹn")
+    else:
+        deadline = cancel_after(order)
+        if not deadline or now < deadline:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This order can't be cancelled now")
+        reason = SELLER_LATE_REASON
 
-    updated = dao_orders.update_order_status(order_id=order_id, status="cancelled")
-    if updated:
-        push_service.notify_buyer_cancelled(updated)
+    # Conditional: the seller may have moved the order on (e.g. tapped Ready) since we read it
+    updated = dao_orders.update_order_status(order_id=order_id, status="cancelled", cancellation_reason=reason,
+                                             expected_status=order["status"])
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Order status changed, please refresh")
+    push_service.notify_buyer_cancelled(updated)
 
     from dao.dao_refunds import DAORefunds
     DAORefunds().create_refund_for_order(order, "buyer_cancel")

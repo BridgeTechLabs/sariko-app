@@ -181,6 +181,7 @@
             "title_total_amount": "Total Amount",
             "button_label_checkout": "Checkout"
         },
+        "delivery_fee_changed": "Delivery fee has changed to {fee}. Please check and place your order again.",
         "validation": {
             "missing_phone": "Phone number is required to place an order.",
             "missing_address": "Delivery address is required.",
@@ -312,6 +313,9 @@
     "order_detail": {
         "cancelled_reason": "Reason",
         "reason_seller_timeout": "The seller didn't confirm your order in time",
+        "reason_seller_late": "Seller was late",
+        "late_cancel_hint": "Expected by {time}. After that you can cancel for a full refund.",
+        "btn_late_cancel": "Order is late: Cancel and refund",
         "title": "Order Detail",
         "status_title_awaiting_payment": "Awaiting Payment",
         "status_title_pending": "Order Placed!",

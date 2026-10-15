@@ -358,8 +358,11 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
                 logger.error(f"[Delivery] Rollback cancel also failed for {result.lalamove_order_id}: {cancel_err}")
             raise HTTPException(status_code=500, detail=f"Rebook DB update failed: {db_err}")
 
-        if order["status"] == "delivery_failed":
-            dao_orders.update_order_status(order_id, "ready")
+        # Conditional: the buyer may have cancelled the late order meanwhile (R6) → drop the new trip
+        if order["status"] == "delivery_failed" and not dao_orders.update_order_status(order_id, "ready", expected_status="delivery_failed"):
+            if not service.cancel_order(result.lalamove_order_id):
+                logger.error(f"[Delivery] order={order_id} changed while rebooking; cancel of lalamove={result.lalamove_order_id} failed — MANUAL INTERVENTION NEEDED")
+            raise HTTPException(status_code=409, detail="Order status changed, please refresh")
 
         logger.warning(f"[Delivery] Re-booked order={order_id} attempt={rebook_count + 1} lalamove={result.lalamove_order_id}")
 
