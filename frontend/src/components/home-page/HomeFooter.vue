@@ -7,6 +7,7 @@
             <a href="/docs/sariko_payment_methods.html" target="_blank">{{ $t('account_page.menu_label_payment_methods') }}</a>
             <a href="/docs/sariko_fees.html" target="_blank">{{ $t('account_page.menu_label_fees') }}</a>
             <a href="/docs/about.html" target="_blank">{{ $t('account_page.menu_label_about') }}</a>
+            <router-link to="/join" class="link-sell">{{ $t('home_page.section_footer.link_sell') }}</router-link>
         </nav>
 
         <div class="company-info">
@@ -42,6 +43,11 @@
 .footer-links a {
     color: var(--text-secondary);
     text-decoration: none;
+}
+
+.footer-links .link-sell {
+    color: var(--brand-saffron);
+    font-weight: 600;
 }
 
 .company-info a {
