@@ -52,7 +52,25 @@ class DAOAdminConfig(DAOBase):
         """An integer > 0 setting. Read on every call, so an admin change applies at
         once. A missing or invalid value (0, "abc") falls back to the default rather
         than letting a typo cancel or unlock every order at once."""
-        value = self.get_setting(key)
+        return self._positive_int(key, self.get_setting(key), default)
+
+    def get_positive_ints(self, defaults: dict) -> dict:
+        """Several get_positive_int settings in one query: {key: value}, defaults for missing/invalid rows."""
+        try:
+            result = (
+                self._supabase_client
+                .table("admin_settings")
+                .select("key, value")
+                .in_("key", list(defaults))
+                .execute()
+            )
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - get_positive_ints: {e}")
+        values = {row["key"]: row["value"] for row in (result.data or [])}
+        return {key: self._positive_int(key, values.get(key), default) for key, default in defaults.items()}
+
+    @staticmethod
+    def _positive_int(key: str, value, default: int) -> int:
         if isinstance(value, int) and not isinstance(value, bool) and value > 0:
             return value
         logger.error(f"[Settings] invalid {key}={value!r}, using {default}")

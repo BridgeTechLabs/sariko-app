@@ -5,7 +5,9 @@
             <a href="/docs/privacy-policy.html" target="_blank">{{ $t('account_page.menu_label_privacy') }}</a>
             <a href="/docs/sariko_shipping_policy.html" target="_blank">{{ $t('account_page.menu_label_shipping') }}</a>
             <a href="/docs/sariko_payment_methods.html" target="_blank">{{ $t('account_page.menu_label_payment_methods') }}</a>
+            <a href="/docs/sariko_fees.html" target="_blank">{{ $t('account_page.menu_label_fees') }}</a>
             <a href="/docs/about.html" target="_blank">{{ $t('account_page.menu_label_about') }}</a>
+            <router-link to="/join" class="link-sell">{{ $t('home_page.section_footer.link_sell') }}</router-link>
         </nav>
 
         <div class="company-info">
@@ -13,6 +15,7 @@
             <div>{{ $t('home_page.section_footer.label_tax_code') }}: 0316852554</div>
             <div>{{ $t('home_page.section_footer.label_address') }}: 195/3 Điện Biên Phủ, P. 15, Q. Bình Thạnh, Tp. Hồ Chí Minh</div>
             <div>{{ $t('home_page.section_footer.label_email') }}: <a href="mailto:info@sariko.store">info@sariko.store</a></div>
+            <div>{{ $t('home_page.section_footer.label_partners') }}</div>
         </div>
 
         <a href="https://online.gov.vn/nen-tang/1929fbb4-3ace-4ebf-920e-1520195f0f37" target="_blank" rel="noopener" title="Đã xác nhận với Bộ Công Thương" class="moit-badge">
@@ -40,6 +43,11 @@
 .footer-links a {
     color: var(--text-secondary);
     text-decoration: none;
+}
+
+.footer-links .link-sell {
+    color: var(--brand-saffron);
+    font-weight: 600;
 }
 
 .company-info a {

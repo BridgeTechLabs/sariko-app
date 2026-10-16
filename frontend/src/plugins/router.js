@@ -48,6 +48,12 @@ const routes = [
         meta: { requiresAuth: true }
     },
     {
+        // Public seller application. Not "onboarding": /onboarding is the buyer's phone + address setup.
+        path: '/join',
+        name: 'join',
+        component: () => import('@/pages/JoinPage.vue'),
+    },
+    {
         path: '/sellers',
         name: 'all-sellers',
         component: () => import('@/pages/AllSellersPage.vue'),
