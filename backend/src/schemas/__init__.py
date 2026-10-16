@@ -52,6 +52,10 @@ from schemas.request_update_variant import RequestUpdateVariant
 # Deliveries
 from schemas.request_quotation import RequestQuotation
 
+# Seller onboarding (/join)
+from schemas.request_create_onboarding_application import RequestCreateOnboardingApplication
+from schemas.request_upload_onboarding_file import RequestUploadOnboardingFile
+
 
 class Schema:
     RequestUploadImage = RequestUploadImage
@@ -88,3 +92,6 @@ class Schema:
     RequestUpdateVariant = RequestUpdateVariant
 
     RequestQuotation = RequestQuotation
+
+    RequestCreateOnboardingApplication = RequestCreateOnboardingApplication
+    RequestUploadOnboardingFile = RequestUploadOnboardingFile

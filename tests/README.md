@@ -15,7 +15,8 @@ tests/
 │   ├── unit/           Pure logic, no DB/HTTP
 │   └── integration/    FastAPI TestClient + mocked DAOs
 ├── manual/             Scripts chạy tay (cần real API creds, không auto)
-│   └── test_lalamove_live.py
+│   ├── test_lalamove_live.py
+│   └── check_dev_history.py   DEV: bảng history_* + mật khẩu tối thiểu
 └── frontend/           Vitest tests (chưa setup — placeholder)
     └── README.md
 ```
@@ -66,6 +67,9 @@ KHÔNG auto-run, không ảnh hưởng pytest. Chạy thủ công khi cần veri
 ```bash
 LALAMOVE_MODE=live LALAMOVE_API_KEY=... LALAMOVE_API_SECRET=... \
     python tests/manual/test_lalamove_live.py
+
+# Sau khi deploy DEV: bảng history_*, phí giao server tính, mật khẩu tối thiểu (tài khoản DEV_*)
+python3 -I tests/manual/check_dev_history.py
 ```
 
 ## Triết lý

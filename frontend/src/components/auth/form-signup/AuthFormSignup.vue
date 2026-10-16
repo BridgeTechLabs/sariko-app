@@ -186,6 +186,10 @@ export default {
             <ButtonSignup />
         </div>
 
+        <router-link to="/join" class="link-join">
+            {{ $t('auth_page.auth_input_fields.signup.link_apply_seller') }}
+        </router-link>
+
         <router-link to="/home" class="link-home">
             {{ $t('auth_page.link_back_to_home') }}
         </router-link>
@@ -196,7 +200,7 @@ export default {
 <style lang="scss" scoped>
 
 .agree {
-    margin-top: 8px;
+    margin: 8px 0 20px;
     font-size: 13px;
     color: var(--text-secondary);
 
@@ -314,6 +318,17 @@ export default {
 
 .button-signup {
     width: 100%;
+}
+
+.link-join {
+    display: block;
+    text-align: center;
+    width: 100%;
+    margin-top: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: $accent;
+    text-decoration: none;
 }
 
 .link-home {
