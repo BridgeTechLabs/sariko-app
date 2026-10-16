@@ -105,7 +105,7 @@
                 "placeholder_email": "Please enter your email address",
                 "placeholder_password": "Please enter your password",
                 "placeholder_full_name": "Please enter your full name",
-                "hint_email": "e.g. johndoe@gmail.com",
+                "hint_email": "e.g. johndoe{'@'}gmail.com",
                 "hint_password": "Min. 6 characters",
                 "hint_full_name": "e.g. John Doe"
             },

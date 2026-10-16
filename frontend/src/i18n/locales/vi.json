@@ -105,7 +105,7 @@
                 "placeholder_email": "Nhập địa chỉ email của bạn",
                 "placeholder_password": "Nhập mật khẩu của bạn",
                 "placeholder_full_name": "Nhập họ tên của bạn",
-                "hint_email": "VD: nguyenvana@gmail.com",
+                "hint_email": "VD: nguyenvana{'@'}gmail.com",
                 "hint_password": "Ít nhất 6 ký tự",
                 "hint_full_name": "VD: Nguyễn Văn A"
             },
