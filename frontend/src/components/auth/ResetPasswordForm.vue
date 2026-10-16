@@ -19,7 +19,7 @@ export default {
 
     computed: {
         canSave() {
-            return this.newPassword.length >= 6 && !this.saving && !this.newError && !this.confirmError
+            return this.newPassword.length >= 8 && !this.saving && !this.newError && !this.confirmError
         }
     },
 
@@ -29,7 +29,7 @@ export default {
                 this.newError = this.$t('reset_password_page.error_required')
                 return false
             }
-            if (this.newPassword.length < 6) {
+            if (this.newPassword.length < 8) {
                 this.newError = this.$t('reset_password_page.error_min_length')
                 return false
             }

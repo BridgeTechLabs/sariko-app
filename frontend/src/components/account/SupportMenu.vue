@@ -1,8 +1,8 @@
 <script>
-import { FileText, Shield, Info, Truck, CreditCard, MessageCircle, ChevronRight, ExternalLink } from 'lucide-vue-next';
+import { FileText, Shield, Info, Truck, CreditCard, Receipt, MessageCircle, ChevronRight, ExternalLink } from 'lucide-vue-next';
 
 export default {
-    components: { FileText, Shield, Info, Truck, CreditCard, MessageCircle, ChevronRight, ExternalLink },
+    components: { FileText, Shield, Info, Truck, CreditCard, Receipt, MessageCircle, ChevronRight, ExternalLink },
 
     computed: {
         supportMailto() {
@@ -43,6 +43,12 @@ export default {
             <a href="/docs/sariko_payment_methods.html" target="_blank" class="menu-item">
                 <div class="menu-icon"><CreditCard size="18" /></div>
                 <span class="menu-label">{{ $t('account_page.menu_label_payment_methods') }}</span>
+                <ChevronRight size="16" class="menu-arrow" />
+            </a>
+
+            <a href="/docs/sariko_fees.html" target="_blank" class="menu-item">
+                <div class="menu-icon"><Receipt size="18" /></div>
+                <span class="menu-label">{{ $t('account_page.menu_label_fees') }}</span>
                 <ChevronRight size="16" class="menu-arrow" />
             </a>
 

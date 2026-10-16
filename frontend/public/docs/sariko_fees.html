@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biểu phí — SariKo</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Outfit:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:   #0B1E45;
+    --gold:   #C9A84C;
+    --gold-lt:#E2C47A;
+    --cream:  #F4EFE4;
+    --text:   #1A1A2E;
+    --border: #D9D0BC;
+    --surface:#FDFAF5;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Outfit', sans-serif; background: var(--surface); color: var(--text); font-size: 15px; line-height: 1.75; }
+
+  .site-header { background: var(--navy); padding: 18px 40px; display: flex; align-items: center; justify-content: space-between; }
+  .wordmark { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 600; color: #fff; text-decoration: none; }
+  .wordmark span { color: var(--gold); }
+  .back-link { font-size: 13px; color: var(--gold-lt); text-decoration: none; }
+
+  .hero { background: var(--navy); padding: 52px 40px 44px; border-bottom: 3px solid var(--gold); }
+  .hero-tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 12px; }
+  .hero h1 { font-family: 'Cormorant Garamond', serif; font-size: clamp(32px, 5vw, 52px); font-weight: 500; color: #fff; line-height: 1.1; margin-bottom: 16px; }
+  .hero-meta { display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; color: rgba(255,255,255,0.6); font-family: 'JetBrains Mono', monospace; }
+  .hero-meta strong { color: var(--gold-lt); font-weight: 500; }
+
+  .layout { max-width: 900px; margin: 0 auto; padding: 56px 40px 80px; }
+  .section { margin-bottom: 48px; padding-bottom: 48px; border-bottom: 1px solid var(--border); }
+  .section:last-of-type { border-bottom: none; }
+  .section h2 { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 600; color: var(--navy); margin-bottom: 18px; line-height: 1.15; }
+  .section p, .section li { color: #2C2C3E; margin-bottom: 10px; }
+  .section ul { padding-left: 20px; }
+
+  .fee-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+  .fee-table thead tr { background: var(--navy); color: #fff; }
+  .fee-table th { padding: 10px 14px; text-align: left; font-weight: 500; font-size: 13px; }
+  .fee-table tbody tr { border-bottom: 1px solid var(--border); }
+  .fee-table tbody tr:nth-child(even) { background: var(--cream); }
+  .fee-table td { padding: 10px 14px; vertical-align: top; }
+
+  .page-footer { background: var(--navy); padding: 28px 40px; text-align: center; }
+  .page-footer p { font-size: 12px; color: rgba(255,255,255,0.4); line-height: 1.8; }
+
+  @media (max-width: 640px) {
+    .site-header, .hero, .layout { padding-left: 16px; padding-right: 16px; }
+    .fee-table { font-size: 12px; }
+    .fee-table th, .fee-table td { padding: 8px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="wordmark" href="https://www.sariko.store">Sari<span>Ko</span></a>
+  <a class="back-link" href="https://www.sariko.store">← sariko.store</a>
+</header>
+
+<div class="hero">
+  <div class="hero-tag">Biểu phí · Fee schedule</div>
+  <h1>Biểu phí dịch vụ</h1>
+  <div class="hero-meta">
+    <span><strong>Cập nhật</strong> 16/10/2026</span>
+    <span><strong>Đơn vị vận hành</strong> Công ty TNHH Zen Tech Asia</span>
+  </div>
+</div>
+
+<div class="layout">
+
+  <div class="section">
+    <h2>1. Người mua</h2>
+    <p>Người mua không trả phí mở, duy trì tài khoản hay phí sử dụng nền tảng. Mỗi đơn hàng gồm tiền món ăn theo giá người bán niêm yết và phí giao hàng.</p>
+    <p>Phí giao hàng do Lalamove báo giá lúc đặt hàng, hiển thị trước khi thanh toán và được chuyển toàn bộ cho Lalamove; SariKo không thu thêm trên phí giao hàng.</p>
+  </div>
+
+  <div class="section">
+    <h2>2. Người bán</h2>
+    <p>Không thu phí mở tài khoản. Phí duy trì thu theo tháng, tùy gói dịch vụ:</p>
+    <table class="fee-table">
+      <thead>
+        <tr><th>Gói dịch vụ</th><th>Phí duy trì (đồng/tháng)</th><th>Phí dịch vụ trên đơn hàng</th><th>Số món, danh mục tối đa</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Community</td><td>Miễn phí</td><td>19%</td><td>3 món, 1 danh mục</td></tr>
+        <tr><td>Tindahan</td><td>720.000</td><td>17%</td><td>30 món, 5 danh mục</td></tr>
+        <tr><td>Negosyo</td><td>1.200.000</td><td>15%</td><td>90 món, 10 danh mục</td></tr>
+        <tr><td>Enterprise (theo lời mời)</td><td>2.200.000</td><td>13%</td><td>Không giới hạn</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li><strong>Phí dịch vụ trên đơn hàng</strong> tính trên tiền món ăn của đơn hoàn tất, không tính trên phí giao hàng. Tỷ lệ là tỷ lệ của gói tại thời điểm người mua đặt hàng. Đơn bị hủy hoặc được hoàn tiền không bị tính phí.</li>
+      <li><strong>Thuế giá trị gia tăng:</strong> các mức phí trên chưa gồm thuế GTGT 10%, tính trên phí duy trì và phí dịch vụ.</li>
+      <li><strong>Phí thanh toán trực tuyến:</strong> SariKo chịu toàn bộ phí cổng thanh toán VNPAY.</li>
+      <li><strong>Chương trình Người bán sáng lập</strong> (50 người bán đầu tiên): miễn phí duy trì 4 tháng đầu, sau đó 720.000 đồng/tháng; phí dịch vụ trên đơn hàng 17%.</li>
+      <li><strong>Đổi gói:</strong> liên hệ Bộ phận Vận hành; phí và tỷ lệ mới áp dụng từ tháng kế tiếp.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>3. Thu phí và chi trả</h2>
+    <p>Hai tuần một lần, SariKo chi trả cho người bán tiền món ăn của các đơn hoàn tất trong kỳ, sau khi trừ phí dịch vụ, thuế GTGT trên phí dịch vụ và thuế khấu trừ, nộp thay người bán theo Nghị định 117/2025/NĐ-CP. Phí duy trì được trừ vào kỳ chi trả đầu tiên của mỗi tháng. Mỗi kỳ người bán nhận bảng kê chi tiết từng đơn hàng.</p>
+    <p>SariKo thông báo cho người bán ít nhất 30 ngày trước khi thay đổi biểu phí.</p>
+  </div>
+
+  <div class="section">
+    <h2>English summary</h2>
+    <p>Buyers pay no platform fees: each order is the seller's listed food price plus the Lalamove delivery fee, passed through in full. Sellers pay no sign-up fee; monthly fee and per-order service fee depend on the plan:</p>
+    <table class="fee-table">
+      <thead>
+        <tr><th>Plan</th><th>Monthly fee (VND)</th><th>Service fee per order</th><th>Max dishes, categories</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Community</td><td>Free</td><td>19%</td><td>3 dishes, 1 category</td></tr>
+        <tr><td>Tindahan</td><td>720,000</td><td>17%</td><td>30 dishes, 5 categories</td></tr>
+        <tr><td>Negosyo</td><td>1,200,000</td><td>15%</td><td>90 dishes, 10 categories</td></tr>
+        <tr><td>Enterprise (invitation only)</td><td>2,200,000</td><td>13%</td><td>Unlimited</td></tr>
+      </tbody>
+    </table>
+    <p>The service fee applies to the food amount of completed orders only (not delivery; cancelled or refunded orders are not charged). Fees exclude 10% VAT. SariKo absorbs VNPAY gateway fees. Founding Sellers (first 50): no monthly fee for 4 months, then 720,000 VND/month, 17% service fee. Payouts every 2 weeks, net of service fee, VAT on it and tax withheld under Decree 117/2025. Fee changes are announced at least 30 days in advance.</p>
+  </div>
+
+</div>
+
+<footer class="page-footer">
+  <p>
+    Công ty TNHH Zen Tech Asia (MST 0316852554) · 195/3 Điện Biên Phủ, P. 15, Q. Bình Thạnh, TP. Hồ Chí Minh<br>
+    Thanh toán: VNPAY · Giao hàng: Lalamove
+  </p>
+</footer>
+
+</body>
+</html>

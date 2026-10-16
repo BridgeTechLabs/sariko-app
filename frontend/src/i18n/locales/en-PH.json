@@ -106,7 +106,7 @@
                 "placeholder_password": "Please enter your password",
                 "placeholder_full_name": "Please enter your full name",
                 "hint_email": "e.g. johndoe{'@'}gmail.com",
-                "hint_password": "Min. 6 characters",
+                "hint_password": "Min. 8 characters",
                 "hint_full_name": "e.g. John Doe"
             },
             "signin": {
@@ -121,7 +121,8 @@
                 "title_subtext_role_buyer": "Find Filipino goods",
                 "title_text_role_seller": "Sell",
                 "title_subtext_role_seller": "Become a seller",
-                "button_label_text_signup": "Create Account"
+                "button_label_text_signup": "Create Account",
+                "agree_terms": "I agree to Sariko's {terms} and {privacy}"
             }
         }
     },
@@ -180,7 +181,8 @@
         "section_footer": {
             "label_tax_code": "Tax code",
             "label_address": "Address",
-            "label_email": "Email"
+            "label_email": "Email",
+            "label_partners": "Payments: VNPAY · Delivery: Lalamove"
         }
     },
     "seller_page": {
@@ -252,7 +254,10 @@
             "title_subtotal": "Subtotal",
             "title_estimated_delivery_fee": "Estimated Delivery Fee",
             "title_total_amount": "Total Amount",
-            "button_label_checkout": "Checkout"
+            "button_label_checkout": "Checkout",
+            "partners_note": "Payments by VNPAY · Delivery by Lalamove",
+            "agree_order": "I have reviewed my order and agree to the {policy}",
+            "agree_order_policy": "Delivery & Refund Policy"
         },
         "validation": {
             "missing_phone": "Phone number is required to place an order.",
@@ -298,6 +303,7 @@
         "menu_label_about": "About Sariko",
         "menu_label_shipping": "Shipping Policy",
         "menu_label_payment_methods": "Payment Methods",
+        "menu_label_fees": "Fees",
         "menu_label_contact_support": "Contact Support",
         "menu_label_switch_to_buyer": "Switch to Buyer Mode",
         "menu_label_switch_to_seller": "Switch to Seller Mode",
@@ -334,11 +340,11 @@
     },
     "change_password_page": {
         "label_new": "New password",
-        "placeholder_new": "At least 6 characters",
+        "placeholder_new": "At least 8 characters",
         "label_confirm": "Confirm password",
         "placeholder_confirm": "Re-enter new password",
         "error_required": "Please enter a password",
-        "error_min_length": "Password must be at least 6 characters",
+        "error_min_length": "Password must be at least 8 characters",
         "error_mismatch": "Passwords do not match",
         "success": "Password updated successfully"
     },
@@ -669,6 +675,7 @@
         "menu_label_language": "Language",
         "menu_label_terms": "Terms of Service",
         "menu_label_privacy": "Privacy Policy",
+        "menu_label_fees": "Fees",
         "menu_label_new_order_alerts": "New order notifications",
         "section_title_promote": "Promote Your Store",
         "promote_subtitle": "Share your shop link or QR code with customers",
@@ -763,11 +770,11 @@
         "greeting_text": "Set a new password",
         "greeting_subtext": "Choose a strong password for your account",
         "label_new": "New password",
-        "placeholder_new": "At least 6 characters",
+        "placeholder_new": "At least 8 characters",
         "label_confirm": "Confirm password",
         "placeholder_confirm": "Re-enter new password",
         "error_required": "Please enter a password",
-        "error_min_length": "Password must be at least 6 characters",
+        "error_min_length": "Password must be at least 8 characters",
         "error_mismatch": "Passwords do not match",
         "button_save": "Update Password",
         "success": "Password updated successfully",
@@ -854,9 +861,9 @@
         "address_form_save": "Save address",
         "address_form_save_changes": "Save changes",
         "password_new": "New password",
-        "password_new_placeholder": "At least 6 characters",
-        "password_new_hint": "Use at least 6 characters",
-        "password_new_error": "Password must be at least 6 characters",
+        "password_new_placeholder": "At least 8 characters",
+        "password_new_hint": "Use at least 8 characters",
+        "password_new_error": "Password must be at least 8 characters",
         "password_confirm": "Confirm password",
         "password_confirm_placeholder": "Re-enter new password",
         "password_confirm_error": "Passwords do not match",

@@ -116,8 +116,8 @@
   <div class="hero-tag">Legal Document · sariko.store/payment-methods</div>
   <h1>Payment Methods</h1>
   <div class="hero-meta">
-    <span><strong>Version</strong> 1.0</span>
-    <span><strong>Effective Date</strong> April 19, 2026</span>
+    <span><strong>Version</strong> 2.0</span>
+    <span><strong>Effective Date</strong> October 16, 2026</span>
     <span><strong>Operator</strong> Zen Tech Asia Co., Ltd.</span>
   </div>
 </div>
@@ -125,7 +125,7 @@
 <div class="layout">
 
   <div class="info-box">
-    This page discloses all accepted payment methods on the SariKo platform at <strong>www.sariko.store</strong>, as required under <strong>Decree 52/2013/NĐ-CP on E-Commerce</strong>. All payments on SariKo are processed by <strong>VNPay</strong>, a payment intermediary licensed by the <strong>State Bank of Vietnam</strong>. SariKo is operated by <strong>Zen Tech Asia Co., Ltd.</strong> (MST 0316852554).
+    This page discloses all accepted payment methods on the SariKo platform at <strong>www.sariko.store</strong>, as required under <strong>the Law on E-Commerce No. 122/2025/QH15 and Decree 248/2026/NĐ-CP</strong>. All payments on SariKo are processed by <strong>VNPay</strong>, a payment intermediary licensed by the <strong>State Bank of Vietnam</strong>. SariKo is operated by <strong>Zen Tech Asia Co., Ltd.</strong> (MST 0316852554).
   </div>
 
   <!-- S1 -->
@@ -165,48 +165,41 @@
   <!-- S2 -->
   <div class="section" id="s2">
     <div class="section-num">Section 02</div>
-    <h2>How Payment Works — The Escrow System</h2>
-    <p>SariKo uses a secure escrow model to protect both buyers and sellers. Your payment is never released directly to the seller at the moment of purchase — it is held in SariKo's escrow account until you confirm delivery.</p>
+    <h2>How Payment Works</h2>
+    <p>Buyers pay SariKo (Zen Tech Asia Co., Ltd.) through VNPAY when placing an order. Sellers are paid only for completed orders, on the payout schedule in Section 05.</p>
 
     <div class="flow">
       <div class="flow-step">
         <div class="flow-num">1</div>
         <div class="flow-content">
-          <strong>Buyer pays at checkout via VNPay</strong>
-          <p>The full order amount (goods + delivery fee) is processed by VNPay and held in SariKo's escrow account. The seller does not receive payment yet.</p>
+          <strong>Buyer pays at checkout via VNPAY</strong>
+          <p>The full order amount (food + delivery fee) is paid through VNPAY. The payment link is valid for 15 minutes. The order is sent to the seller only after VNPAY confirms the payment.</p>
         </div>
       </div>
       <div class="flow-step">
         <div class="flow-num">2</div>
         <div class="flow-content">
-          <strong>Seller prepares and dispatches the order</strong>
-          <p>The seller confirms, prepares, and dispatches the order via Lalamove, GrabExpress, or Ahamove.</p>
+          <strong>Seller accepts and prepares the order</strong>
+          <p>When the seller marks the order as ready, SariKo books a Lalamove driver automatically.</p>
         </div>
       </div>
       <div class="flow-step">
         <div class="flow-num">3</div>
         <div class="flow-content">
-          <strong>Buyer receives the order</strong>
-          <p>The delivery driver delivers the order to the buyer's address. The buyer inspects the goods.</p>
+          <strong>Order delivered</strong>
+          <p>When Lalamove reports the delivery as completed, the order is marked as done automatically.</p>
         </div>
       </div>
       <div class="flow-step">
         <div class="flow-num">4</div>
         <div class="flow-content">
-          <strong>Buyer confirms delivery — payment released</strong>
-          <p>The buyer taps "Confirm Delivery" in the SariKo app. This releases the escrowed payment to the seller. <strong>This action is final.</strong> Only confirm when satisfied with your order.</p>
-        </div>
-      </div>
-      <div class="flow-step">
-        <div class="flow-num">5</div>
-        <div class="flow-content">
-          <strong>Seller receives payout on weekly settlement</strong>
-          <p>Confirmed order amounts are batched and paid to sellers every Wednesday for the prior week's settled orders, via the seller's registered payout method.</p>
+          <strong>Seller receives the payout</strong>
+          <p>Every 2 weeks, SariKo pays the seller the food amount of completed orders, minus the service fee, VAT on that fee, and tax withheld on the seller's behalf under Decree 117/2025/NĐ-CP. The delivery fee goes to Lalamove. See the <a href="/docs/sariko_fees.html" style="color:var(--navy);font-weight:600;">fee schedule</a>.</p>
         </div>
       </div>
     </div>
 
-    <div class="warn-box"><strong>Auto-confirmation:</strong> If you do not confirm or dispute delivery within 48 hours of the scheduled delivery time, the order is automatically marked as delivered and payment is released to the seller. Please check the app promptly after your order arrives.</div>
+    <div class="warn-box"><strong>Cancelled orders</strong> are refunded to the buyer, not paid to the seller — see Section 06.</div>
   </div>
 
   <!-- S3 -->
@@ -252,9 +245,9 @@
           <td>All connections to sariko.store use HTTPS/TLS encryption</td>
         </tr>
         <tr>
-          <td>Buyer funds held in escrow until delivery confirmed</td>
+          <td>Sellers paid only for completed orders</td>
           <td class="yes">Always</td>
-          <td>Protects buyers from non-delivery; protects sellers from chargebacks</td>
+          <td>Cancelled orders are refunded to the buyer instead</td>
         </tr>
         <tr>
           <td>Payment gateway fees charged to buyer</td>
@@ -268,48 +261,22 @@
   <!-- S5 -->
   <div class="section" id="s5">
     <div class="section-num">Section 05</div>
-    <h2>Seller Payout Methods</h2>
-    <p>Sellers receive their weekly settlement payouts via one of the following methods, selected during seller onboarding. Payouts are processed every Wednesday for the prior week's confirmed orders.</p>
-
-    <div class="payout-grid">
-      <div class="payout-card">
-        <div class="pc-tag">Vietnam Bank Transfer</div>
-        <div class="pc-name">VND Bank Account</div>
-        <p>Direct bank transfer to any Vietnamese bank account (Techcombank, Vietcombank, MB Bank, BIDV, and others). Processed in VND. No transfer fee charged to seller.</p>
-      </div>
-      <div class="payout-card">
-        <div class="pc-tag">International Transfer</div>
-        <div class="pc-name">Wise Transfer</div>
-        <p>For sellers who prefer to receive payouts in Philippine Peso (PHP) or another currency. Processed via Wise Business at approximately 0.5–1% transfer fee, disclosed to the seller at payout time.</p>
-      </div>
-      <div class="payout-card">
-        <div class="pc-tag">Digital Wallet</div>
-        <div class="pc-name">PayPal</div>
-        <p>Available for sellers with a verified PayPal account. Processing fees apply per PayPal's standard rates and are disclosed to the seller during onboarding.</p>
-      </div>
-      <div class="payout-card">
-        <div class="pc-tag">Coming Soon</div>
-        <div class="pc-name">E-Wallet (VN)</div>
-        <p>MoMo and ZaloPay payout options for Vietnamese sellers will be available in a future update.</p>
-      </div>
-    </div>
-
-    <p>Sellers select their payout method during the seller onboarding process at <a href="https://joinna.sariko.store" target="_blank" style="color:var(--navy);font-weight:600;">joinna.sariko.store</a>. Payout method changes may be requested by contacting poppet@sariko.store.</p>
+    <h2>Seller Payouts</h2>
+    <p>Payouts are made every 2 weeks, by bank transfer in VND to a Vietnamese bank account in the seller's own name. No transfer fee is charged to the seller. Each payout comes with a statement listing every order, the fees and taxes deducted, and the amount paid.</p>
+    <p>Sellers register their bank account with the SariKo Operations team during onboarding. To change it, contact support@sariko.store.</p>
   </div>
 
   <!-- S6 -->
   <div class="section" id="s6">
     <div class="section-num">Section 06</div>
     <h2>Refunds</h2>
-    <p>Refund eligibility is determined by the circumstances of the order. The following guidelines apply:</p>
+    <p>Refunds are returned to the original payment method via VNPAY within 7 working days of approval. A full refund covers the whole amount paid, including the delivery fee.</p>
     <ul style="padding-left:20px; margin:12px 0;">
-      <li style="margin-bottom:10px;"><strong>Order not fulfilled by seller:</strong> Full refund issued to buyer's original payment method within 5–7 business days.</li>
-      <li style="margin-bottom:10px;"><strong>Wrong item delivered:</strong> Full refund or replacement at buyer's discretion, subject to SariKo investigation.</li>
-      <li style="margin-bottom:10px;"><strong>Goods damaged on arrival:</strong> Refund considered subject to photographic evidence submitted within 24 hours of receipt. Do not confirm delivery if goods are damaged.</li>
-      <li style="margin-bottom:10px;"><strong>Buyer confirmed delivery — change of mind:</strong> Refunds are not available after the buyer has confirmed delivery. The confirmation action is final.</li>
-      <li style="margin-bottom:10px;"><strong>Delivery fee:</strong> Non-refundable once the delivery driver has been dispatched, except where delivery failure is caused by the seller.</li>
+      <li style="margin-bottom:10px;"><strong>Full refund, automatically:</strong> the buyer cancels before the seller accepts; the seller declines or does not accept in time; no driver can be booked; or the buyer cancels because the seller is late or the delivery failed.</li>
+      <li style="margin-bottom:10px;"><strong>Missing, wrong, damaged or not-as-described food:</strong> contact support@sariko.store within 24 hours of receiving the order. SariKo resolves the request within 7 working days with a partial or full refund.</li>
+      <li style="margin-bottom:10px;"><strong>Change of mind:</strong> no refund once the seller has accepted the order.</li>
     </ul>
-    <p>To initiate a refund request, contact poppet@sariko.store with your order details and the reason for the request. Refunds are processed within 7 business days of approval back to the original payment method.</p>
+    <p>Details and time limits are in the <a href="/docs/sariko_shipping_policy.html#s6" style="color:var(--navy);font-weight:600;">Shipping &amp; Delivery Policy, Section 06</a>.</p>
   </div>
 
   <!-- S7 -->
@@ -319,7 +286,7 @@
     <p>For all payment-related queries, failed transactions, refund requests, or payout enquiries:</p>
     <div class="contact-card">
       <div class="ct-label">SariKo Payment Support</div>
-      <p><strong>Email:</strong> <a href="mailto:poppet@sariko.store">poppet@sariko.store</a></p>
+      <p><strong>Email:</strong> <a href="mailto:support@sariko.store">support@sariko.store</a></p>
       <p><strong>Phone:</strong> <a href="tel:+84909074793">+84 909 074 793</a></p>
       <p><strong>Operator:</strong> Zen Tech Asia Co., Ltd. (MST 0316852554)</p>
       <p><strong>Address:</strong> 195/3 Dien Bien Phu, Binh Thanh District, Ho Chi Minh City, Vietnam</p>
@@ -332,9 +299,9 @@
 <footer class="page-footer">
   <div class="divider"></div>
   <p>
-    SariKo Payment Methods · Version 1.0 · Effective April 19, 2026<br>
+    SariKo Payment Methods · Version 2.0 · Effective October 16, 2026<br>
     Operated by Zen Tech Asia Co., Ltd. (MST 0316852554) · 195/3 Dien Bien Phu, Binh Thanh District, Ho Chi Minh City, Vietnam<br>
-    Issued under Decree 52/2013/NĐ-CP on E-Commerce · Payments processed by VNPay (State Bank of Vietnam licensed)<br>
+    Issued under Law 122/2025/QH15 and Decree 248/2026/NĐ-CP on E-Commerce · Payments processed by VNPay (State Bank of Vietnam licensed)<br>
     © 2026 Zen Tech Asia Co., Ltd. All rights reserved.
   </p>
 </footer>

@@ -99,10 +99,6 @@ export default {
                 <template v-slot:prepend>
                     <LockKeyhole color="white" class="icon"/>
                 </template>
-
-                <template v-slot:hint>
-                    <span class="hint-text">{{ $t('auth_page.auth_input_fields.common.hint_password') }}</span>
-                </template>
             </q-input>
         </div>
 

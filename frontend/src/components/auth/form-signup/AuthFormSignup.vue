@@ -24,6 +24,7 @@ export default {
             "inputSignUpEmail",
             "inputSignUpPassword",
             "isSelectedSignUpRoleSeller",
+            "inputSignUpAgreed",
             "errors",
             "isLoading"
         ])
@@ -170,6 +171,17 @@ export default {
             </div>
         </div> -->
 
+        <q-checkbox v-model="inputSignUpAgreed" dense color="amber" class="agree">
+            <i18n-t keypath="auth_page.auth_input_fields.signup.agree_terms" tag="span">
+                <template #terms>
+                    <a href="https://buyerdox.sariko.store/" target="_blank" rel="noopener" @click.stop>{{ $t('account_page.menu_label_terms') }}</a>
+                </template>
+                <template #privacy>
+                    <a href="/docs/privacy-policy.html" target="_blank" @click.stop>{{ $t('account_page.menu_label_privacy') }}</a>
+                </template>
+            </i18n-t>
+        </q-checkbox>
+
         <div class="button-signup">
             <ButtonSignup />
         </div>
@@ -182,6 +194,16 @@ export default {
 </template>
 
 <style lang="scss" scoped>
+
+.agree {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+
+    a {
+        color: $accent;
+    }
+}
 
 .container {
     font-family: $sariko-font-family-secondary;
