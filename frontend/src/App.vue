@@ -35,7 +35,7 @@ export default {
             return useAuthStore().user?.id || null
         },
         showNavigation() {
-            const hiddenRoutes = ['food-detail', 'forgot-password', 'reset-password', 'signin', 'signup', 'all-sellers', 'conversation', 'seller', 'order-review', 'account-addresses-v2', 'account-address-new-v2', 'account-address-edit-v2', 'account-terms-v2', 'account-change-password-v2', 'account-edit-profile-v2']
+            const hiddenRoutes = ['food-detail', 'forgot-password', 'reset-password', 'signin', 'signup', 'all-sellers', 'conversation', 'seller', 'order-review', 'account-addresses-v2', 'account-address-new-v2', 'account-address-edit-v2', 'account-terms-v2', 'account-change-password-v2', 'account-edit-profile-v2', 'join']
             return !hiddenRoutes.includes(this.$route.name)
         }
     },
@@ -61,7 +61,8 @@ export default {
 
 <template>
     <div class="background">
-        <div class="app-container">
+        <!-- /join gets a wider column on desktop: its Menu step is a table -->
+        <div class="app-container" :class="{ 'app-container--wide': $route.name === 'join' }">
             <router-view/>
             <!-- <router-view v-slot="{ Component }"> -->
                 <!-- <transition name="fade" mode="out-in">
@@ -84,6 +85,10 @@ export default {
     display: flex;
     flex-direction: column;
     margin: auto;
+}
+
+.app-container--wide {
+    max-width: 1100px;
 }
 
 .fade-enter-active,
