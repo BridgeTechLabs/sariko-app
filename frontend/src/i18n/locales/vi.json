@@ -468,6 +468,10 @@
         "track_rider": "Theo dõi tài xế"
     },
     "seller_home": {
+        "deadline_auto_cancel": "Tự hủy sau {wait} nếu chưa nhận",
+        "deadline_auto_cancel_now": "Sắp tự hủy",
+        "deadline_buyer_cancel": "Khách được hủy sau {wait}",
+        "deadline_buyer_can_cancel": "Khách đã có thể hủy và được hoàn tiền",
         "hours_label": "Giờ mở cửa",
         "hours_all_day": "Cả ngày",
         "hours_edit": "Sửa",

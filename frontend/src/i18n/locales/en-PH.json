@@ -468,6 +468,10 @@
         "track_rider": "Track Rider"
     },
     "seller_home": {
+        "deadline_auto_cancel": "Auto-cancels in {wait} if not accepted",
+        "deadline_auto_cancel_now": "About to auto-cancel",
+        "deadline_buyer_cancel": "Buyer can cancel in {wait}",
+        "deadline_buyer_can_cancel": "Buyer can now cancel for a refund",
         "hours_label": "Opening hours",
         "hours_all_day": "All day",
         "hours_edit": "Edit",

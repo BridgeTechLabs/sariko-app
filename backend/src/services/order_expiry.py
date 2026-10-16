@@ -18,6 +18,7 @@ from services import push_service
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIRM_MINUTES = 30
+DEFAULT_REMINDER_MINUTES = 10
 TIMEOUT_REASON = "Seller did not confirm in time"  # the buyer UI translates this exact text (OrderStatusHeader.vue)
 
 
@@ -30,17 +31,28 @@ def confirm_window() -> timedelta:
     return DAOAdminConfig().get_minutes("order_confirm_minutes", DEFAULT_CONFIRM_MINUTES)
 
 
+# Orders the seller was already reminded about. In memory: a restart may remind once more.
+_reminded: set = set()
+
+
 def expire_unconfirmed_orders(now: datetime = None) -> int:
     now = now or datetime.now(timezone.utc)
     window = confirm_window()
+    reminder = DAOAdminConfig().get_minutes("order_confirm_reminder_minutes", DEFAULT_REMINDER_MINUTES)
     dao_orders = DAOOrders()
     expired = 0
-    for order in dao_orders.read_unconfirmed_paid_orders(paid_before=now - window):
+    waiting = dao_orders.read_unconfirmed_paid_orders(paid_before=now - max(window - reminder, timedelta(0)))
+    _reminded.intersection_update(order["id"] for order in waiting)  # forget orders that moved on
+    for order in waiting:
         seller = order.get("seller_profiles") or {}
         opening, closing = seller.get("opening_time"), seller.get("closing_time")
         if not is_open_now(seller.get("is_open"), opening, closing, now):
             continue
-        if now < confirm_deadline(_ts(order["paid_at"]), opening, closing, _ts(seller.get("opened_at")), now, window):
+        deadline = confirm_deadline(_ts(order["paid_at"]), opening, closing, _ts(seller.get("opened_at")), now, window)
+        if now < deadline:
+            if now >= deadline - reminder and order["id"] not in _reminded:
+                _reminded.add(order["id"])
+                push_service.notify_seller_order_expiring(order)
             continue
         cancelled = dao_orders.update_order_status(order["id"], "cancelled", TIMEOUT_REASON, expected_status="pending")
         if not cancelled:

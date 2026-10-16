@@ -15,6 +15,20 @@ export function formatWait(minutes) {
     return h ? `${h}h ${minutes % 60}m` : `${minutes}m`
 }
 
+// Line under the Accept / Ready button, from the backend `deadline`: pending → when the order
+// auto-cancels, confirmed → when the buyer may cancel for a refund. null = nothing to show
+// (no deadline, or a scheduled order still showing "Ready in …").
+export function deadlineHint(vm, order, now = Date.now()) {
+    if (!order.deadline || minutesUntilReady(order, now)) return null
+    const minutes = Math.ceil((new Date(order.deadline).getTime() - now) / 60_000)
+    const pending = order.status === 'pending'
+    if (minutes <= 0) {
+        return { text: vm.$t(pending ? 'seller_home.deadline_auto_cancel_now' : 'seller_home.deadline_buyer_can_cancel'), urgent: true }
+    }
+    const key = pending ? 'seller_home.deadline_auto_cancel' : 'seller_home.deadline_buyer_cancel'
+    return { text: vm.$t(key, { wait: formatWait(minutes) }), urgent: minutes <= 5 }
+}
+
 // Resolves true when it's time already, or the seller confirms booking the delivery early.
 export function confirmEarlyReady(vm, order) {
     if (!minutesUntilReady(order)) return Promise.resolve(true)
