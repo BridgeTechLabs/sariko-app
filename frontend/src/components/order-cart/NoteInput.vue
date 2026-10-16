@@ -18,7 +18,7 @@ export default {
     <div class="note-container">
         <div class="title">
             <MessageSquare :size="16" class="icon" />
-            Note
+            {{ $t('cart_page.note_label') }}
         </div>
         <div class="note-field">
             <q-input
@@ -27,7 +27,7 @@ export default {
             dark
             type="textarea"
             rows="2"
-            placeholder="Allergies, spice level, gate code..."
+            :placeholder="$t('cart_page.note_placeholder')"
             class="note"
         />
         </div>

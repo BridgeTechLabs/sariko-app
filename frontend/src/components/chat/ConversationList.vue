@@ -102,7 +102,7 @@ export default {
             try {
                 await this.pinConversation(conv.id, !conv.pinned);
             } catch (e) {
-                this.$q.notify({ classes: 'quasar-notify-negative', message: 'Failed to update pin', position: 'bottom', timeout: 2000 });
+                this.$q.notify({ classes: 'quasar-notify-negative', message: this.$t('chat.toast_pin_failed'), position: 'bottom', timeout: 2000 });
             }
         },
         async onDelete(conv) {
@@ -110,7 +110,7 @@ export default {
             try {
                 await this.deleteConversation(conv.id);
             } catch (e) {
-                this.$q.notify({ classes: 'quasar-notify-negative', message: 'Failed to delete', position: 'bottom', timeout: 2000 });
+                this.$q.notify({ classes: 'quasar-notify-negative', message: this.$t('chat.toast_delete_failed'), position: 'bottom', timeout: 2000 });
             }
         },
     },
@@ -127,8 +127,8 @@ export default {
         <!-- Empty -->
         <div v-else-if="conversations.length === 0" class="empty-state">
             <MessageCircle :size="40" />
-            <div class="empty-title">No messages yet</div>
-            <div class="empty-sub">Start a chat from a seller's page.</div>
+            <div class="empty-title">{{ $t('chat.no_messages') }}</div>
+            <div class="empty-sub">{{ $t('chat.empty_list_hint') }}</div>
         </div>
 
         <!-- List: Pin button on the right; swipe left → reveal Delete, then tap -->
@@ -143,7 +143,7 @@ export default {
             <!-- revealed on swipe left -->
             <button class="swipe-action delete" @click="onDelete(conv)">
                 <Trash2 :size="20" />
-                <span>Delete</span>
+                <span>{{ $t('chat.delete') }}</span>
             </button>
 
             <div class="conv-row" :style="rowStyle(conv)" @click="onRowClick(conv)">
@@ -154,7 +154,7 @@ export default {
 
                 <div class="conv-body">
                     <div class="conv-name">{{ partyName(conv) }}</div>
-                    <div class="conv-preview">{{ conv.last_message_text || 'No messages yet' }}</div>
+                    <div class="conv-preview">{{ conv.last_message_text || $t('chat.no_messages') }}</div>
                 </div>
 
                 <q-badge v-if="conv.unread_count > 0" class="conv-unread" rounded>
@@ -164,7 +164,7 @@ export default {
                 <button
                     class="pin-btn"
                     :class="{ active: conv.pinned }"
-                    :title="conv.pinned ? 'Unpin' : 'Pin'"
+                    :title="conv.pinned ? $t('chat.unpin') : $t('chat.pin')"
                     @click.stop="onPin(conv)"
                 >
                     <Pin :size="18" />

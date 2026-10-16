@@ -1,4 +1,16 @@
 {
+    "chat": {
+        "inbox_title": "Hộp thư",
+        "no_messages": "Chưa có tin nhắn",
+        "empty_list_hint": "Bắt đầu trò chuyện từ trang của người bán.",
+        "empty_thread": "Chưa có tin nhắn. Gửi lời chào nhé 👋",
+        "input_placeholder": "Nhập tin nhắn…",
+        "delete": "Xóa",
+        "pin": "Ghim",
+        "unpin": "Bỏ ghim",
+        "toast_pin_failed": "Không cập nhật được ghim",
+        "toast_delete_failed": "Xóa thất bại"
+    },
     "api_errors": {
         "generic": "Không thực hiện được. Vui lòng thử lại.",
         "server": "Có lỗi xảy ra. Nếu lỗi tiếp tục, vui lòng liên hệ admin.",
@@ -47,7 +59,8 @@
         "privacy_page": "Chính sách bảo mật",
         "change_password_page": "Đổi mật khẩu",
         "forgot_password_page": "Quên mật khẩu",
-        "reset_password_page": "Mật khẩu mới"
+        "reset_password_page": "Mật khẩu mới",
+        "orders_page": "Đơn hàng của tôi"
     },
     "common": {
         "duration_minutes": "{m} phút",
@@ -59,9 +72,16 @@
         "toast_update_success": "Cập nhật thành công",
         "toast_update_failed": "Cập nhật thất bại, vui lòng thử lại",
         "toast_same_password": "Mật khẩu mới phải khác mật khẩu hiện tại",
-        "rating_count": "{count} đánh giá"
+        "rating_count": "{count} đánh giá",
+        "toast_welcome": "Chào mừng đến với Sariko! Hãy hoàn thiện hồ sơ của bạn.",
+        "toast_signed_out": "Đã đăng xuất.",
+        "toast_session_expired": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
     },
     "bottom_nav": {
+        "button_label_today": "Hôm nay",
+        "button_label_menu": "Thực đơn",
+        "button_label_inbox": "Hộp thư",
+        "button_label_me": "Tôi",
         "button_label_home": "Trang chủ",
         "button_label_cart": "Giỏ hàng",
         "button_label_orders": "Đơn hàng",
@@ -81,7 +101,13 @@
                 "input_label_email": "EMAIL",
                 "input_label_password": "MẬT KHẨU",
                 "input_label_full_name": "HỌ TÊN",
-                "input_label_role_selection": "TÔI MUỐN"
+                "input_label_role_selection": "TÔI MUỐN",
+                "placeholder_email": "Nhập địa chỉ email của bạn",
+                "placeholder_password": "Nhập mật khẩu của bạn",
+                "placeholder_full_name": "Nhập họ tên của bạn",
+                "hint_email": "VD: nguyenvana@gmail.com",
+                "hint_password": "Ít nhất 6 ký tự",
+                "hint_full_name": "VD: Nguyễn Văn A"
             },
             "signin": {
                 "greeting_text_signin": "Chào mừng trở lại!",
@@ -109,7 +135,8 @@
             },
             "section_delivery_address": {
                 "title": "Địa chỉ giao hàng",
-                "text_placeholder_address_details": "Chi tiết địa chỉ (tòa nhà, tầng, mốc)"
+                "text_placeholder_address_details": "Chi tiết địa chỉ (tòa nhà, tầng, mốc)",
+                "label_optional": "Không bắt buộc"
             },
             "section_preferred_language": {
                 "title": "Ngôn ngữ ưa thích"
@@ -183,7 +210,13 @@
         "item_count": "{count} món",
         "founding_seller": "Người bán tiên phong",
         "btn_chat": "Nhắn tin",
-        "btn_view_cart": "Xem giỏ hàng"
+        "btn_view_cart": "Xem giỏ hàng",
+        "menu_empty_category": "Chưa có món trong danh mục này",
+        "aria_back": "Quay lại",
+        "aria_search": "Tìm kiếm",
+        "aria_share": "Chia sẻ",
+        "aria_favorite": "Lưu vào yêu thích",
+        "link_copied": "Đã sao chép liên kết"
     },
     "seller_card": {
         "closed": "Đã đóng",
@@ -240,7 +273,12 @@
             "text_message_2": " Thêm sản phẩm từ cửa hàng khác sẽ thay thế giỏ hàng hiện tại",
             "button_label_go_to_cart": "Đi đến giỏ hàng",
             "button_label_clear_cart": "Xóa giỏ và thêm mới"
-        }
+        },
+        "empty_title": "Giỏ hàng đang trống",
+        "empty_subtitle": "Khám phá món Filipino nhà làm từ các người bán gần bạn.",
+        "empty_button": "Xem người bán",
+        "note_label": "Ghi chú",
+        "note_placeholder": "Dị ứng, độ cay, mã cổng..."
     },
     "checkout_page": {
         "section_cart_review": {
@@ -853,5 +891,18 @@
         "country_code_search": "Tìm quốc gia hoặc mã",
         "country_code_empty": "Không tìm thấy quốc gia",
         "country_code_close": "Đóng"
+    },
+    "notifications_page": {
+        "empty_title": "Chưa có thông báo",
+        "empty_subtitle": "Cập nhật đơn hàng và khuyến mãi sẽ hiện ở đây"
+    },
+    "search_page": {
+        "no_food": "Không có món phù hợp",
+        "no_category": "Không có danh mục phù hợp"
+    },
+    "not_found_page": {
+        "title": "Không tìm thấy trang",
+        "subtitle": "Trang bạn tìm không tồn tại.",
+        "button_home": "Về trang chủ"
     }
 }

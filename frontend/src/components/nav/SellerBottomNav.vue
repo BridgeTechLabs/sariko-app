@@ -40,17 +40,17 @@ export default {
                 <House size="18px" />
                 <span v-if="actionBadge > 0" class="action-badge">{{ actionBadge }}</span>
             </div>
-            <div class="nav-label">Today</div>
+            <div class="nav-label">{{ $t('bottom_nav.button_label_today') }}</div>
         </router-link>
 
         <router-link to="/seller/orders" class="nav-item" :class="{ active: isActive('/seller/orders') }">
             <ClipboardList size="18px" />
-            <div class="nav-label">Orders</div>
+            <div class="nav-label">{{ $t('bottom_nav.button_label_orders') }}</div>
         </router-link>
 
         <router-link to="/seller/menu" class="nav-item" :class="{ active: isActive('/seller/menu') }">
             <UtensilsCrossed size="18px" />
-            <div class="nav-label">Menu</div>
+            <div class="nav-label">{{ $t('bottom_nav.button_label_menu') }}</div>
         </router-link>
 
         <router-link to="/chat" class="nav-item" :class="{ active: isActive('/chat') }">
@@ -58,12 +58,12 @@ export default {
                 <Inbox size="18px" />
                 <span v-if="chatBadge > 0" class="action-badge">{{ chatBadge }}</span>
             </div>
-            <div class="nav-label">My inbox</div>
+            <div class="nav-label">{{ $t('bottom_nav.button_label_inbox') }}</div>
         </router-link>
 
         <router-link to="/seller/me" class="nav-item" :class="{ active: isActive('/seller/me') }">
             <CircleUserRound size="18px" />
-            <div class="nav-label">Me</div>
+            <div class="nav-label">{{ $t('bottom_nav.button_label_me') }}</div>
         </router-link>
     </nav>
 </template>

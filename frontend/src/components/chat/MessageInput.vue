@@ -41,7 +41,7 @@ export default {
             class="input-field"
             dense
             borderless
-            placeholder="Type a message…"
+            :placeholder="$t('chat.input_placeholder')"
             @keyup.enter="send"
         />
         <button class="send-btn" :disabled="!canSend" @click="send">

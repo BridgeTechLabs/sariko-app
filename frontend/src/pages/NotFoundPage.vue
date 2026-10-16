@@ -5,9 +5,9 @@ export default {}
 <template>
     <div class="not-found">
         <div class="code">404</div>
-        <div class="title">Page not found</div>
-        <div class="subtitle">The page you're looking for doesn't exist.</div>
-        <button class="btn-home" @click="$router.push('/home')">Back to Home</button>
+        <div class="title">{{ $t('not_found_page.title') }}</div>
+        <div class="subtitle">{{ $t('not_found_page.subtitle') }}</div>
+        <button class="btn-home" @click="$router.push('/home')">{{ $t('not_found_page.button_home') }}</button>
     </div>
 </template>
 

@@ -1,4 +1,16 @@
 {
+    "chat": {
+        "inbox_title": "My inbox",
+        "no_messages": "No messages yet",
+        "empty_list_hint": "Start a chat from a seller's page.",
+        "empty_thread": "No messages yet. Say hi 👋",
+        "input_placeholder": "Type a message…",
+        "delete": "Delete",
+        "pin": "Pin",
+        "unpin": "Unpin",
+        "toast_pin_failed": "Failed to update pin",
+        "toast_delete_failed": "Failed to delete"
+    },
     "api_errors": {
         "generic": "Something went wrong. Please try again.",
         "server": "Encountered an error. Please contact admin if the problem persists.",
@@ -47,7 +59,8 @@
         "privacy_page": "Privacy Policy",
         "change_password_page": "Change Password",
         "forgot_password_page": "Forgot Password",
-        "reset_password_page": "New Password"
+        "reset_password_page": "New Password",
+        "orders_page": "My Orders"
     },
     "common": {
         "duration_minutes": "{m} min",
@@ -59,9 +72,16 @@
         "toast_update_success": "Updated successfully",
         "toast_update_failed": "Update failed, please try again",
         "toast_same_password": "New password must be different from your current one",
-        "rating_count": "{count} review | {count} reviews"
+        "rating_count": "{count} review | {count} reviews",
+        "toast_welcome": "Welcome to Sariko! Let's set up your profile.",
+        "toast_signed_out": "Signed out successfully.",
+        "toast_session_expired": "Session expired. Please log in again."
     },
     "bottom_nav": {
+        "button_label_today": "Today",
+        "button_label_menu": "Menu",
+        "button_label_inbox": "My inbox",
+        "button_label_me": "Me",
         "button_label_home": "Home",
         "button_label_cart": "Cart",
         "button_label_orders": "Orders",
@@ -81,7 +101,13 @@
                 "input_label_email": "EMAIL",
                 "input_label_password": "PASSWORD",
                 "input_label_full_name": "FULLNAME",
-                "input_label_role_selection": "I WANT TO"
+                "input_label_role_selection": "I WANT TO",
+                "placeholder_email": "Please enter your email address",
+                "placeholder_password": "Please enter your password",
+                "placeholder_full_name": "Please enter your full name",
+                "hint_email": "e.g. johndoe@gmail.com",
+                "hint_password": "Min. 6 characters",
+                "hint_full_name": "e.g. John Doe"
             },
             "signin": {
                 "greeting_text_signin": "Welcome back, Ate!",
@@ -109,7 +135,8 @@
             },
             "section_delivery_address": {
                 "title": "Delivery Address",
-                "text_placeholder_address_details": "Address Details (building, floor, landmark)"
+                "text_placeholder_address_details": "Address Details (building, floor, landmark)",
+                "label_optional": "Optional"
             },
             "section_preferred_language": {
                 "title": "Preferred Language"
@@ -183,7 +210,13 @@
         "item_count": "{count} item | {count} items",
         "founding_seller": "Founding Seller",
         "btn_chat": "Chat",
-        "btn_view_cart": "View cart"
+        "btn_view_cart": "View cart",
+        "menu_empty_category": "No dishes in this category",
+        "aria_back": "Go back",
+        "aria_search": "Search",
+        "aria_share": "Share",
+        "aria_favorite": "Save to favorites",
+        "link_copied": "Link copied"
     },
     "seller_card": {
         "closed": "Closed",
@@ -240,7 +273,12 @@
             "text_message_2": " Adding items from will replace your current cart with",
             "button_label_go_to_cart": "Go to Cart",
             "button_label_clear_cart": "Clear Cart and Add new item"
-        }
+        },
+        "empty_title": "Your cart is empty",
+        "empty_subtitle": "Discover delicious homemade Filipino food from community sellers near you.",
+        "empty_button": "Browse Sellers",
+        "note_label": "Note",
+        "note_placeholder": "Allergies, spice level, gate code..."
     },
     "checkout_page": {
         "section_cart_review": {
@@ -850,5 +888,18 @@
         "country_code_search": "Search country or code",
         "country_code_empty": "No matching country",
         "country_code_close": "Close"
+    },
+    "notifications_page": {
+        "empty_title": "No notifications yet",
+        "empty_subtitle": "You'll see order updates and promotions here"
+    },
+    "search_page": {
+        "no_food": "No food matches",
+        "no_category": "No category matches"
+    },
+    "not_found_page": {
+        "title": "Page not found",
+        "subtitle": "The page you're looking for doesn't exist.",
+        "button_home": "Back to Home"
     }
 }
