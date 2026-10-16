@@ -196,7 +196,7 @@ export default {
 <style lang="scss" scoped>
 
 .agree {
-    margin-top: 8px;
+    margin: 8px 0 20px;
     font-size: 13px;
     color: var(--text-secondary);
 
