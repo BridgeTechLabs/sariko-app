@@ -9,25 +9,25 @@
 -- Expand-only: the running backend never reads this table.
 -- ============================================================
 
-create table if not exists public.menu_history (
+create table if not exists public.history_menu (
   id bigint generated always as identity,
   table_name text not null,
   row_id uuid not null,
   op text not null,
   old_row jsonb not null,
   changed_at timestamp with time zone not null default now(),
-  constraint menu_history_pkey primary key (id),
-  constraint menu_history_op_check check (op in ('UPDATE', 'DELETE'))
+  constraint history_menu_pkey primary key (id),
+  constraint history_menu_op_check check (op in ('UPDATE', 'DELETE'))
 );
 
-create index if not exists menu_history_row_idx on public.menu_history (table_name, row_id);
+create index if not exists history_menu_row_idx on public.history_menu (table_name, row_id);
 
 -- Backend-only table (service_role bypasses RLS); no policies → anon/authenticated get nothing.
-alter table public.menu_history enable row level security;
+alter table public.history_menu enable row level security;
 
 -- security definer: the history insert must not fail because the writer's role
--- has no policy on menu_history.
-create or replace function public.log_menu_history()
+-- has no policy on history_menu.
+create or replace function public.log_history_menu()
 returns trigger
 language plpgsql
 security definer
@@ -39,7 +39,7 @@ begin
      and (to_jsonb(old) - 'rating_avg' - 'rating_count') = (to_jsonb(new) - 'rating_avg' - 'rating_count') then
     return null;
   end if;
-  insert into public.menu_history (table_name, row_id, op, old_row)
+  insert into public.history_menu (table_name, row_id, op, old_row)
   values (tg_table_name, old.id, tg_op, to_jsonb(old));
   return null;
 end;
@@ -47,12 +47,12 @@ $$;
 
 drop trigger if exists menu_categories_history on public.menu_categories;
 create trigger menu_categories_history after update or delete on public.menu_categories
-  for each row execute function public.log_menu_history();
+  for each row execute function public.log_history_menu();
 
 drop trigger if exists food_items_history on public.food_items;
 create trigger food_items_history after update or delete on public.food_items
-  for each row execute function public.log_menu_history();
+  for each row execute function public.log_history_menu();
 
 drop trigger if exists food_item_variants_history on public.food_item_variants;
 create trigger food_item_variants_history after update or delete on public.food_item_variants
-  for each row execute function public.log_menu_history();
+  for each row execute function public.log_history_menu();

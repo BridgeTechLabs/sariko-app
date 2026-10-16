@@ -533,7 +533,7 @@ def delete_variant(variant_id: str, user=Depends(verify_token)):
 def upload_food_item_image(item_id: str, body: Schema.RequestUploadImage, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
-        # New path per upload: the previous photo stays in storage for menu_history (T31)
+        # New path per upload: the previous photo stays in storage for history_menu (T31)
         path = f"food-items/{seller_id}/{item_id}-{int(datetime.now(timezone.utc).timestamp())}"
         image_url = upload_image_base64(path, body.image_base64)
         return {"success": True, "image_url": image_url}
