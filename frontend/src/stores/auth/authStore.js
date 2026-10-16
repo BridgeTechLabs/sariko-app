@@ -378,7 +378,7 @@ export const useAuthStore = defineStore("authStore", {
                     }
                     Notify.create({
                         classes: 'quasar-notify-positive',
-                        message: "Welcome to Sariko! Let's set up your profile.",
+                        message: i18n.global.t("common.toast_welcome"),
                         progress: true,
                         icon: 'fa-regular fa-circle-check',
                         position: "bottom",
@@ -414,7 +414,7 @@ export const useAuthStore = defineStore("authStore", {
                 useCartStore().$reset();
                 Notify.create({
                     classes: 'quasar-notify-positive',
-                    message: "Signed out successfully.",
+                    message: i18n.global.t("common.toast_signed_out"),
                     progress: true,
                     icon: 'fa-regular fa-circle-check',
                     position: "bottom",
@@ -440,7 +440,7 @@ export const useAuthStore = defineStore("authStore", {
             useCartStore().$reset();
             Notify.create({
                 classes: 'quasar-notify-negative',
-                message: "Session expired. Please log in again.",
+                message: i18n.global.t("common.toast_session_expired"),
                 progress: true,
                 icon: 'fa-regular fa-circle-xmark',
                 position: "bottom",

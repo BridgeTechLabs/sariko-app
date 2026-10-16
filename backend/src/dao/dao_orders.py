@@ -117,7 +117,7 @@ class DAOOrders(DAOBase):
     def read_order_by_id(self, order_id: str, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url)), refunds(status)") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url)), refunds(status)") \
                 .eq("id", order_id) \
                 .eq("user_id", user_id) \
                 .maybe_single() \
@@ -136,7 +136,7 @@ class DAOOrders(DAOBase):
     def read_orders_by_seller_id(self, seller_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, created_at, users(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status)") \
+                .select("id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, created_at, paid_at, status_changed_at, users(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status)") \
                 .eq("seller_id", seller_id) \
                 .eq("payment_status", "paid") \
                 .order("created_at", desc=True) \
@@ -178,7 +178,7 @@ class DAOOrders(DAOBase):
     def read_order_by_id_for_seller(self, order_id: str, seller_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, created_at, users(name, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity)") \
+                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, created_at, paid_at, status_changed_at, users(name, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity)") \
                 .eq("id", order_id) \
                 .eq("seller_id", seller_id) \
                 .maybe_single() \
@@ -225,11 +225,11 @@ class DAOOrders(DAOBase):
             raise Exception(f"error update_order_status: {e}")
 
     def read_unconfirmed_paid_orders(self, paid_before: datetime):
-        """Paid orders still waiting for the seller, paid at least one confirm window ago,
-        with the store hours needed to decide whether they timed out."""
+        """Paid orders still waiting for the seller, paid before `paid_before`, with the
+        store hours needed to decide whether they timed out (or are about to)."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, total_amount, payment_status, transaction_ref, ipn_data, payment_create_date, paid_at, "
+                .select("id, seller_user_id, total_amount, payment_status, transaction_ref, ipn_data, payment_create_date, paid_at, "
                         "seller_profiles(is_open, opening_time, closing_time, opened_at)") \
                 .eq("status", "pending") \
                 .eq("payment_status", "paid") \

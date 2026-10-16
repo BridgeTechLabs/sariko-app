@@ -166,7 +166,7 @@ export default {
                 <MapPin class="icon-map-pin" :size="16" />
                 {{ $t('onboarding_page.buyer.section_delivery_address.title') }}
             </div>
-            <div class="optional">Optional</div>
+            <div class="optional">{{ $t('onboarding_page.buyer.section_delivery_address.label_optional') }}</div>
         </div>
 
         <!-- Search input -->

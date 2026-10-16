@@ -9,7 +9,7 @@ export default {
 <template>
     <div class="menu-empty">
         <UtensilsCrossed :size="36" class="menu-empty__icon" />
-        <p class="menu-empty__text">No dishes in this category</p>
+        <p class="menu-empty__text">{{ $t('seller_page.menu_empty_category') }}</p>
     </div>
 </template>
 

@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 
 from core.auth import verify_token
 from core.phone import to_e164_vn
+from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_deliveries import DAODeliveries
 from dao.dao_orders import DAOOrders
 from dao.dao_seller_profiles import DAOSellerProfiles
@@ -16,6 +17,11 @@ from services.lalamove_service import get_lalamove_service
 
 router = APIRouter(prefix="/deliveries")
 logger = logging.getLogger(__name__)
+
+
+def rebook_max() -> int:
+    """How many times a seller may rebook a driver after Lalamove ends a trip (admin_settings)."""
+    return DAOAdminConfig().get_positive_int("seller_rebook_max", 3)
 
 
 # --------------------------------------------------------------------------
@@ -266,6 +272,7 @@ def get_delivery_status_for_seller(order_id: str, user=Depends(verify_token)):
                 "driver_plate": delivery.get("driver_plate"),
                 "share_link": delivery.get("share_link"),
                 "rebook_count": delivery.get("rebook_count", 0),
+                "rebook_max": rebook_max(),
             }
         }
 
@@ -300,7 +307,7 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
             raise HTTPException(status_code=400, detail="No cancelled delivery to rebook")
 
         rebook_count = delivery.get("rebook_count", 0)
-        if rebook_count >= 3:
+        if rebook_count >= rebook_max():
             raise HTTPException(status_code=400, detail="Max rebook attempts reached")
 
         full_order = dao_orders.read_order_with_seller_coords(order_id)
@@ -314,11 +321,11 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
         try:
             sender_phone = to_e164_vn(seller.get("phone") or "")
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Seller phone invalid: {e}")
+            raise HTTPException(status_code=400, detail={"code": "seller_phone_invalid", "message": f"Seller phone invalid: {e}"})
         try:
             recipient_phone = to_e164_vn(buyer.get("phone") or "")
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Buyer phone invalid: {e}")
+            raise HTTPException(status_code=400, detail={"code": "buyer_phone_invalid", "message": f"Buyer phone invalid: {e}"})
 
         quotation = service.get_quotation(
             pickup_lat=float(seller.get("lat") or 0),
@@ -358,8 +365,11 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
                 logger.error(f"[Delivery] Rollback cancel also failed for {result.lalamove_order_id}: {cancel_err}")
             raise HTTPException(status_code=500, detail=f"Rebook DB update failed: {db_err}")
 
-        if order["status"] == "delivery_failed":
-            dao_orders.update_order_status(order_id, "ready")
+        # Conditional: the buyer may have cancelled the late order meanwhile (R6) → drop the new trip
+        if order["status"] == "delivery_failed" and not dao_orders.update_order_status(order_id, "ready", expected_status="delivery_failed"):
+            if not service.cancel_order(result.lalamove_order_id):
+                logger.error(f"[Delivery] order={order_id} changed while rebooking; cancel of lalamove={result.lalamove_order_id} failed — MANUAL INTERVENTION NEEDED")
+            raise HTTPException(status_code=409, detail="Order status changed, please refresh")
 
         logger.warning(f"[Delivery] Re-booked order={order_id} attempt={rebook_count + 1} lalamove={result.lalamove_order_id}")
 

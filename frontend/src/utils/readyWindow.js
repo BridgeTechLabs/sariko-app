@@ -1,3 +1,5 @@
+import { i18n } from '@/plugins/i18n'
+
 // Marking ready books Lalamove right away, so before this window opens the seller
 // has to confirm (the driver may come well before the delivery_appointment).
 export const READY_WINDOW_MINUTES = 45
@@ -9,10 +11,27 @@ export function minutesUntilReady(order, now = Date.now()) {
     return Math.max(0, Math.ceil((opensAt - now) / 60_000))
 }
 
-// 80 → "1h 20m", 5 → "5m"
+// 80 → "1 giờ 20 phút" / "1 hr 20 min", 5 → "5 phút" / "5 min" (current locale)
 export function formatWait(minutes) {
+    const t = i18n.global.t
     const h = Math.floor(minutes / 60)
-    return h ? `${h}h ${minutes % 60}m` : `${minutes}m`
+    const m = minutes % 60
+    if (!h) return t('common.duration_minutes', { m })
+    return m ? t('common.duration_hours_minutes', { h, m }) : t('common.duration_hours', { h })
+}
+
+// Line under the Accept / Ready button, from the backend `deadline`: pending → when the order
+// auto-cancels, confirmed → when the buyer may cancel for a refund. null = nothing to show
+// (no deadline, or a scheduled order still showing "Ready in …").
+export function deadlineHint(vm, order, now = Date.now()) {
+    if (!order.deadline || minutesUntilReady(order, now)) return null
+    const minutes = Math.ceil((new Date(order.deadline).getTime() - now) / 60_000)
+    const pending = order.status === 'pending'
+    if (minutes <= 0) {
+        return { text: vm.$t(pending ? 'seller_home.deadline_auto_cancel_now' : 'seller_home.deadline_buyer_can_cancel'), urgent: true }
+    }
+    const key = pending ? 'seller_home.deadline_auto_cancel' : 'seller_home.deadline_buyer_cancel'
+    return { text: vm.$t(key, { wait: formatWait(minutes) }), urgent: minutes <= 5 }
 }
 
 // Resolves true when it's time already, or the seller confirms booking the delivery early.

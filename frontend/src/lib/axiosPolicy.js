@@ -3,6 +3,7 @@ import { useRouter } from "vue-router";
 import { Notify } from "quasar";
 import { useAuthStore } from "@/stores/auth/authStore.js";
 import { supabase } from "@/lib/supabase";
+import { i18n } from "@/plugins/i18n";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/rest";
 
 // downloadClient.interceptors.request.use(function (config) {
@@ -30,32 +31,44 @@ function toast(message, type = "negative", timeout = 4000) {
     Notify.create({ type, timeout, message, position: "top-right" });
 }
 
-function extractMessage(data) {
-    if (!data) return null;
-    if (typeof data === "string") return data;
+// Backend `detail` is fixed English text (or {code, message, ...params}); this maps it to
+// api_errors.* in the locale files. Anything unmapped shows api_errors.generic, so users
+// never see raw English; the original stays in the console.
+const ERROR_KEYS = {
+    "Cart is empty": "cart_empty",
+    "Duplicate order detected. Please wait.": "duplicate_order",
+    "This store is closed now. Same-day dishes can't be ordered; pre-order dishes still can.": "store_closed",
+    "This dish is sold out": "dish_sold_out",
+    "This price option is sold out": "option_sold_out",
+    "Please choose a price option": "choose_option",
+    "Cart contains items from another seller": "another_seller",
+    "Seller location not configured": "seller_location_missing",
+    "Could not get a delivery fee quote. Please try again.": "delivery_quote_failed",
+    "This order can't be cancelled now": "cannot_cancel_now",
+    "Order status changed, please refresh": "order_status_changed",
+    "Order already paid": "order_already_paid",
+    "Order already reviewed": "already_reviewed",
+    "Max rebook attempts reached": "rebook_max_reached",
+    "Unable to book a delivery driver. Your order has been cancelled.": "booking_failed_cancelled",
+    "Missing pickup or dropoff address. Please update your store address in settings.": "store_address_missing",
+    "You already have a dish with this name in this category": "dish_name_taken",
+    "This price option is in a customer's cart. Hide it instead of deleting.": "option_in_cart",
+    "Cannot unset the default address; set another address as default instead": "cannot_unset_default_address",
+    "Invalid phone number": "invalid_phone",
+    "Cannot start a conversation with your own store": "own_store_chat",
+    "Driver has already picked up the order": "driver_picked_up",
+};
 
-    // FastAPI response messsage
-    if (data.detail) {
-        if (typeof data.detail === "string") return data.detail;
-        if (Array.isArray(data.detail)) {
-            // detail: [{ loc: [...], msg: '...', type: '...' }, ...]
-            return data.detail
-                .map((d) => {
-                    if (typeof d === "string") return d;
-                    const loc = Array.isArray(d.loc)
-                        ? d.loc.slice(1).join(".")
-                        : d.loc;
-                    const msg = d.msg || d.message || "";
-                    return loc ? `${loc}: ${msg}` : msg;
-                })
-                .filter(Boolean)
-                .join(", ");
-        }
-        if (typeof data.detail === "object" && data.detail.message)
-            return data.detail.message;
+export function apiErrorMessage(data, fallbackKey = "generic") {
+    const t = i18n.global.t;
+    const detail = data?.detail;
+    if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+        if (detail.code && i18n.global.te(`api_errors.${detail.code}`)) return t(`api_errors.${detail.code}`, detail);
+        if (ERROR_KEYS[detail.message]) return t(`api_errors.${ERROR_KEYS[detail.message]}`);
     }
-
-    return data.message || data.error_description || data.error || null;
+    if (typeof detail === "string" && ERROR_KEYS[detail]) return t(`api_errors.${ERROR_KEYS[detail]}`);
+    if (detail) console.warn("Untranslated API error:", detail);
+    return t(`api_errors.${fallbackKey}`);
 }
 
 async function getToken(authStore) {
@@ -133,20 +146,14 @@ export const setUpAxiosPolicy = () => {
             if (!error.response) {
                 if (!config._silent) {
                     if (error.code === "ECONNABORTED") {
-                        toast(
-                            "Request timed out. Please try again.",
-                            "warning"
-                        );
+                        toast(i18n.global.t("api_errors.timeout"), "warning");
                     } else if (
                         typeof navigator !== "undefined" &&
                         navigator.onLine === false
                     ) {
-                        toast(
-                            "You are offline. Please check your internet connection.",
-                            "warning"
-                        );
+                        toast(i18n.global.t("api_errors.offline"), "warning");
                     } else {
-                        toast("Network error. Please check your connection.");
+                        toast(i18n.global.t("api_errors.network"));
                     }
                 }
                 return Promise.reject(error);
@@ -197,31 +204,21 @@ export const setUpAxiosPolicy = () => {
             switch (status) {
                 case 403:
                     if (!config._silent)
-                        toast(
-                            "You do not have permission to access this resource.",
-                            "warning"
-                        );
+                        toast(i18n.global.t("api_errors.forbidden"), "warning");
                     break;
 
                 case 404:
                     if (!config._silent)
-                        toast(
-                            "The requested resource was not found.",
-                            "warning"
-                        );
+                        toast(i18n.global.t("api_errors.not_found"), "warning");
                     break;
 
                 case 422: {
-                    const msg = extractMessage(data) || "Validation failed";
-                    if (!config._silent) toast(msg, "negative", 5000);
+                    if (!config._silent) toast(apiErrorMessage(data), "negative", 5000);
                     break;
                 }
 
                 case 429: {
-                    const msg =
-                        extractMessage(data) ||
-                        "Too many requests. Please try again later.";
-                    if (!config._silent) toast(msg, "warning", 5000);
+                    if (!config._silent) toast(i18n.global.t("api_errors.too_many_requests"), "warning", 5000);
                     break;
                 }
 
@@ -229,18 +226,12 @@ export const setUpAxiosPolicy = () => {
                 case 502:
                 case 503:
                 case 504: {
-                    const msg =
-                        // extractMessage(data) || 
-                        "Encountered an error. Please contact admin if the problem persists.";
-                    if (!config._silent) toast(msg, "negative", 5000);
+                    if (!config._silent) toast(apiErrorMessage(data, "server"), "negative", 5000);
                     break;
                 }
 
                 default: {
-                    const msg =
-                        extractMessage(data) ||
-                        `Request failed with status ${status}`;
-                    if (!config._silent) toast(msg);
+                    if (!config._silent) toast(apiErrorMessage(data));
                 }
             }
 

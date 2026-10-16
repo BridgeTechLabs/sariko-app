@@ -17,7 +17,11 @@ export const apiOrders = {
             const response = await apiClient.post('/v1/orders', payload)
             return response
         } catch (error) {
-            throw new Error(error.response?.data?.detail || 'Failed to create order')
+            // detail is an object on 409 "delivery fee changed": { message, delivery_fee, quotation_id }
+            const detail = error.response?.data?.detail
+            const err = new Error(detail?.message || detail || 'Failed to create order')
+            err.detail = detail
+            throw err
         }
     },
 

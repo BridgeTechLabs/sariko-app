@@ -11,8 +11,8 @@ export default {
         <div class="empty-icon">
             <Bell size="48" />
         </div>
-        <p class="empty-text">No notifications yet</p>
-        <p class="empty-subtext">You'll see order updates and promotions here</p>
+        <p class="empty-text">{{ $t('notifications_page.empty_title') }}</p>
+        <p class="empty-subtext">{{ $t('notifications_page.empty_subtitle') }}</p>
     </div>
 </template>
 

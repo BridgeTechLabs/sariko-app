@@ -25,7 +25,7 @@ export default {
 </script>
 
 <template>
-    <LayoutBaseSettings title="⭐ Founding Sellers" back-to="/home">
+    <LayoutBaseSettings :title="'⭐ ' + $t('home_page.section_founding_sellers.title')" back-to="/home">
         <template #Content>
 
             <!-- Skeleton -->

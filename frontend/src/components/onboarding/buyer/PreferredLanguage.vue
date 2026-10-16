@@ -34,7 +34,7 @@ export default {
         :class="{'language-option': true, 'language-option-active': selectedPreferedLanguage === 'Fillipino'}" 
         v-on:click="selectedPreferedLanguage='Fillipino'"
         >
-            Fillipino
+            Filipino
         </div>
 
         <div 

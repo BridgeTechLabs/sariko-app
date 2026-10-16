@@ -36,7 +36,7 @@ export default {
         </template>
 
         <div v-else-if="messages.length === 0" class="empty-thread">
-            No messages yet. Say hi 👋
+            {{ $t('chat.empty_thread') }}
         </div>
 
         <div

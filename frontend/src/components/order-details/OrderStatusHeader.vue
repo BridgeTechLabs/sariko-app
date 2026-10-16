@@ -6,7 +6,9 @@ import { useOrderStore } from '@/stores/order/orderStore.js';
 // show those translated. Reasons a seller picked or typed are shown as written.
 const SYSTEM_REASON_KEYS = {
     'Seller did not confirm in time': 'order_detail.reason_seller_timeout',                      // services/order_expiry.py
-    'Driver booking failed after 3 attempts': 'seller_order_detail.cancel_reason_no_driver',   // apis/sellers.py
+    'Driver booking failed': 'seller_order_detail.cancel_reason_no_driver',                    // apis/sellers.py
+    'Driver booking failed after 3 attempts': 'seller_order_detail.cancel_reason_no_driver',   // same, orders before 2026-10-15
+    'Seller was late': 'order_detail.reason_seller_late',                                     // apis/orders.py
 }
 
 export default {

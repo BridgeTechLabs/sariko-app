@@ -1,4 +1,53 @@
 {
+    "chat": {
+        "inbox_title": "My inbox",
+        "no_messages": "No messages yet",
+        "empty_list_hint": "Start a chat from a seller's page.",
+        "empty_thread": "No messages yet. Say hi 👋",
+        "input_placeholder": "Type a message…",
+        "delete": "Delete",
+        "pin": "Pin",
+        "unpin": "Unpin",
+        "toast_pin_failed": "Failed to update pin",
+        "toast_delete_failed": "Failed to delete"
+    },
+    "api_errors": {
+        "generic": "Something went wrong. Please try again.",
+        "server": "Encountered an error. Please contact admin if the problem persists.",
+        "network": "Network error. Please check your connection.",
+        "timeout": "Request timed out. Please try again.",
+        "offline": "You are offline. Please check your internet connection.",
+        "forbidden": "You do not have permission to access this resource.",
+        "not_found": "The requested resource was not found.",
+        "too_many_requests": "Too many requests. Please try again later.",
+        "cart_empty": "Your cart is empty.",
+        "duplicate_order": "An order was just placed. Please wait a moment.",
+        "store_closed": "This store is closed now. Same-day dishes can't be ordered; pre-order dishes still can.",
+        "dish_sold_out": "This dish is sold out.",
+        "option_sold_out": "This price option is sold out.",
+        "choose_option": "Please choose a price option.",
+        "another_seller": "Your cart has dishes from another store.",
+        "no_longer_available": "No longer available: {names}",
+        "seller_location_missing": "This store hasn't set its location, so delivery isn't available.",
+        "delivery_fee_changed": "The delivery fee has changed. Please check the new fee and place your order again.",
+        "delivery_quote_failed": "Could not get a delivery fee. Please try again.",
+        "cancel_cutoff": "Orders can't be cancelled within {hours} hours of the delivery time.",
+        "cannot_cancel_now": "This order can't be cancelled now.",
+        "order_status_changed": "This order just changed. Please refresh.",
+        "order_already_paid": "This order is already paid.",
+        "already_reviewed": "You have already reviewed this order.",
+        "rebook_max_reached": "No driver rebooks left for this order.",
+        "booking_failed_cancelled": "Couldn't book a driver. The order was cancelled and the buyer will be refunded.",
+        "store_address_missing": "Missing pickup or drop-off address. Please update your store address in settings.",
+        "seller_phone_invalid": "Store phone number is invalid. Please update it in settings.",
+        "buyer_phone_invalid": "The buyer's phone number is invalid, so a driver can't be booked.",
+        "dish_name_taken": "You already have a dish with this name in this category.",
+        "option_in_cart": "This price option is in a customer's cart. Hide it instead of deleting.",
+        "cannot_unset_default_address": "You can't unset the default address; set another address as default instead.",
+        "invalid_phone": "Invalid phone number.",
+        "own_store_chat": "You can't start a conversation with your own store.",
+        "driver_picked_up": "The driver has already picked up the order."
+    },
     "breadcrumbs": {
         "cart_page": "Cart",
         "checkout_page": "Checkout",
@@ -10,18 +59,29 @@
         "privacy_page": "Privacy Policy",
         "change_password_page": "Change Password",
         "forgot_password_page": "Forgot Password",
-        "reset_password_page": "New Password"
+        "reset_password_page": "New Password",
+        "orders_page": "My Orders"
     },
     "common": {
+        "duration_minutes": "{m} min",
+        "duration_hours": "{h} hr",
+        "duration_hours_minutes": "{h} hr {m} min",
         "button_label_cancel": "Cancel",
         "button_label_save": "Save",
         "button_label_saving": "Saving...",
         "toast_update_success": "Updated successfully",
         "toast_update_failed": "Update failed, please try again",
         "toast_same_password": "New password must be different from your current one",
-        "rating_count": "{count} review | {count} reviews"
+        "rating_count": "{count} review | {count} reviews",
+        "toast_welcome": "Welcome to Sariko! Let's set up your profile.",
+        "toast_signed_out": "Signed out successfully.",
+        "toast_session_expired": "Session expired. Please log in again."
     },
     "bottom_nav": {
+        "button_label_today": "Today",
+        "button_label_menu": "Menu",
+        "button_label_inbox": "My inbox",
+        "button_label_me": "Me",
         "button_label_home": "Home",
         "button_label_cart": "Cart",
         "button_label_orders": "Orders",
@@ -41,7 +101,13 @@
                 "input_label_email": "EMAIL",
                 "input_label_password": "PASSWORD",
                 "input_label_full_name": "FULLNAME",
-                "input_label_role_selection": "I WANT TO"
+                "input_label_role_selection": "I WANT TO",
+                "placeholder_email": "Please enter your email address",
+                "placeholder_password": "Please enter your password",
+                "placeholder_full_name": "Please enter your full name",
+                "hint_email": "e.g. johndoe@gmail.com",
+                "hint_password": "Min. 6 characters",
+                "hint_full_name": "e.g. John Doe"
             },
             "signin": {
                 "greeting_text_signin": "Welcome back, Ate!",
@@ -69,7 +135,8 @@
             },
             "section_delivery_address": {
                 "title": "Delivery Address",
-                "text_placeholder_address_details": "Address Details (building, floor, landmark)"
+                "text_placeholder_address_details": "Address Details (building, floor, landmark)",
+                "label_optional": "Optional"
             },
             "section_preferred_language": {
                 "title": "Preferred Language"
@@ -143,7 +210,13 @@
         "item_count": "{count} item | {count} items",
         "founding_seller": "Founding Seller",
         "btn_chat": "Chat",
-        "btn_view_cart": "View cart"
+        "btn_view_cart": "View cart",
+        "menu_empty_category": "No dishes in this category",
+        "aria_back": "Go back",
+        "aria_search": "Search",
+        "aria_share": "Share",
+        "aria_favorite": "Save to favorites",
+        "link_copied": "Link copied"
     },
     "seller_card": {
         "closed": "Closed",
@@ -200,7 +273,12 @@
             "text_message_2": " Adding items from will replace your current cart with",
             "button_label_go_to_cart": "Go to Cart",
             "button_label_clear_cart": "Clear Cart and Add new item"
-        }
+        },
+        "empty_title": "Your cart is empty",
+        "empty_subtitle": "Discover delicious homemade Filipino food from community sellers near you.",
+        "empty_button": "Browse Sellers",
+        "note_label": "Note",
+        "note_placeholder": "Allergies, spice level, gate code..."
     },
     "checkout_page": {
         "section_cart_review": {
@@ -312,6 +390,9 @@
     "order_detail": {
         "cancelled_reason": "Reason",
         "reason_seller_timeout": "The seller didn't confirm your order in time",
+        "reason_seller_late": "Seller was late",
+        "late_cancel_hint": "Expected by {time}. After that you can cancel for a full refund.",
+        "btn_late_cancel": "Order is late: Cancel and refund",
         "title": "Order Detail",
         "status_title_awaiting_payment": "Awaiting Payment",
         "status_title_pending": "Order Placed!",
@@ -428,6 +509,10 @@
         "track_rider": "Track Rider"
     },
     "seller_home": {
+        "deadline_auto_cancel": "Auto-cancels in {wait} if not accepted",
+        "deadline_auto_cancel_now": "About to auto-cancel",
+        "deadline_buyer_cancel": "Buyer can cancel in {wait}",
+        "deadline_buyer_can_cancel": "Buyer can now cancel for a refund",
         "hours_label": "Opening hours",
         "hours_all_day": "All day",
         "hours_edit": "Edit",
@@ -557,8 +642,8 @@
         "action_rebook_delivery": "Re-book Delivery",
         "action_cancel_order": "Cancel Order",
         "action_self_deliver": "Mark as Complete",
-        "no_driver_notice": "No rider found after 3 attempts",
-        "cancel_reason_no_driver": "Unable to book delivery after 3 attempts — no rider available in your area",
+        "no_driver_notice": "No rider found after several attempts",
+        "cancel_reason_no_driver": "Unable to book delivery after several attempts — no rider available in your area",
         "contact_admin_notice": "There was an error with the delivery. If this keeps happening, please contact admin.",
         "toast_rebook_success": "Delivery re-booked!",
         "toast_rebook_failed": "Failed to re-book delivery",
@@ -803,5 +888,18 @@
         "country_code_search": "Search country or code",
         "country_code_empty": "No matching country",
         "country_code_close": "Close"
+    },
+    "notifications_page": {
+        "empty_title": "No notifications yet",
+        "empty_subtitle": "You'll see order updates and promotions here"
+    },
+    "search_page": {
+        "no_food": "No food matches",
+        "no_category": "No category matches"
+    },
+    "not_found_page": {
+        "title": "Page not found",
+        "subtitle": "The page you're looking for doesn't exist.",
+        "button_home": "Back to Home"
     }
 }
