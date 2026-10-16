@@ -121,7 +121,8 @@
                 "title_subtext_role_buyer": "Find Filipino goods",
                 "title_text_role_seller": "Sell",
                 "title_subtext_role_seller": "Become a seller",
-                "button_label_text_signup": "Create Account"
+                "button_label_text_signup": "Create Account",
+                "agree_terms": "I agree to Sariko's {terms} and {privacy}"
             }
         }
     },
@@ -180,7 +181,8 @@
         "section_footer": {
             "label_tax_code": "Tax code",
             "label_address": "Address",
-            "label_email": "Email"
+            "label_email": "Email",
+            "label_partners": "Payments: VNPAY · Delivery: Lalamove"
         }
     },
     "seller_page": {
@@ -252,7 +254,10 @@
             "title_subtotal": "Subtotal",
             "title_estimated_delivery_fee": "Estimated Delivery Fee",
             "title_total_amount": "Total Amount",
-            "button_label_checkout": "Checkout"
+            "button_label_checkout": "Checkout",
+            "partners_note": "Payments by VNPAY · Delivery by Lalamove",
+            "agree_order": "I have reviewed my order and agree to the {policy}",
+            "agree_order_policy": "Delivery & Refund Policy"
         },
         "validation": {
             "missing_phone": "Phone number is required to place an order.",
@@ -298,6 +303,7 @@
         "menu_label_about": "About Sariko",
         "menu_label_shipping": "Shipping Policy",
         "menu_label_payment_methods": "Payment Methods",
+        "menu_label_fees": "Fees",
         "menu_label_contact_support": "Contact Support",
         "menu_label_switch_to_buyer": "Switch to Buyer Mode",
         "menu_label_switch_to_seller": "Switch to Seller Mode",
@@ -669,6 +675,7 @@
         "menu_label_language": "Language",
         "menu_label_terms": "Terms of Service",
         "menu_label_privacy": "Privacy Policy",
+        "menu_label_fees": "Fees",
         "menu_label_new_order_alerts": "New order notifications",
         "section_title_promote": "Promote Your Store",
         "promote_subtitle": "Share your shop link or QR code with customers",

@@ -73,6 +73,7 @@ export const useAuthStore = defineStore("authStore", {
             inputSignUpEmail: '',
             inputSignUpPassword: '',
             isSelectedSignUpRoleSeller: false,
+            inputSignUpAgreed: false,
 
             // errors state
             errors: {
@@ -362,7 +363,7 @@ export const useAuthStore = defineStore("authStore", {
 
         async onClickedSignup() {
             const isValid = this.validateAllFields("signup");
-            if (!isValid) return;
+            if (!isValid || !this.inputSignUpAgreed) return;
 
             this.isLoading = true;
             try {

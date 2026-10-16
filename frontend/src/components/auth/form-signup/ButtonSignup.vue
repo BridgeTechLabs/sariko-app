@@ -14,6 +14,7 @@ export default {
             "inputSignUpFullName",
             "inputSignUpEmail",
             "inputSignUpPassword",
+            "inputSignUpAgreed",
             "isLoading"
         ])
     },
@@ -30,7 +31,7 @@ export default {
     <q-btn flat no-caps
     type="submit"
     :loading="isLoading"
-    :disable="Object.values(errors).some((e) => !!e) || !inputSignUpFullName || !inputSignUpEmail || !inputSignUpPassword"
+    :disable="Object.values(errors).some((e) => !!e) || !inputSignUpFullName || !inputSignUpEmail || !inputSignUpPassword || !inputSignUpAgreed"
     class="button-signup">
         <UserRoundPlus class="icon" /> {{ $t('auth_page.auth_input_fields.signup.button_label_text_signup') }}
     </q-btn>

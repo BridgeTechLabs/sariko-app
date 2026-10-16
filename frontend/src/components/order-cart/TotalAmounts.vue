@@ -15,6 +15,8 @@ export default {
     data() {
         return {
             submitting: false,
+            // Per order (Luật TMĐT Điều 12): resets every time the cart page opens
+            agreed: false,
             deliveryDate: null,
             deliveryTime: null,
         }
@@ -66,7 +68,7 @@ export default {
             return issues
         },
         canPlaceOrder() {
-            return this.cartItems.length > 0 && !this.submitting && !this.quotationLoading && this.validationIssues.length === 0
+            return this.cartItems.length > 0 && !this.submitting && !this.quotationLoading && this.validationIssues.length === 0 && this.agreed
         },
         appointmentDateOptions() {
             return (dateStr) => dateStr >= this.minAppointmentDate
@@ -100,7 +102,7 @@ export default {
             document.documentElement.style.setProperty('--total-amount-height', `${h}px`)
         },
         async onPlaceOrder() {
-            if (this.submitting || this.validationIssues.length > 0) return
+            if (this.submitting || this.validationIssues.length > 0 || !this.agreed) return
             this.submitting = true
             try {
                 const authStore = useAuthStore()
@@ -273,11 +275,20 @@ export default {
             </div>
         </div>
 
+        <q-checkbox v-model="agreed" dense color="amber" class="agree">
+            <i18n-t keypath="cart_page.section_total_amount.agree_order" tag="span">
+                <template #policy>
+                    <a href="/docs/sariko_shipping_policy.html" target="_blank" @click.stop>{{ $t('cart_page.section_total_amount.agree_order_policy') }}</a>
+                </template>
+            </i18n-t>
+        </q-checkbox>
+
         <div class="button-checkout">
             <q-btn class="button" dense no-caps :loading="submitting" :disable="!canPlaceOrder" @click="onPlaceOrder">
                 <ScanBarcode class="icon" /> Place Order · {{ totalAmountText }}
             </q-btn>
         </div>
+        <p class="partners-note">{{ $t('cart_page.section_total_amount.partners_note') }}</p>
     </div>
 </template>
 
@@ -305,6 +316,21 @@ export default {
 
 .sub-color {
     color: rgb(255, 255, 255, 0.5)
+}
+.agree {
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--text-secondary);
+
+    a {
+        color: $accent;
+    }
+}
+.partners-note {
+    margin: 10px 0 0;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
 }
 
 .dashed-line {

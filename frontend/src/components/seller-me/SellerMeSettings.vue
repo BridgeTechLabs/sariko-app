@@ -1,13 +1,13 @@
 <script>
 import { mapState, mapActions } from 'pinia';
-import { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight } from 'lucide-vue-next';
+import { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt } from 'lucide-vue-next';
 import { useAccountV2Store } from '@/stores/v2/account/accountStore';
 import BaseSwitch from '@/components/v2/shared/BaseSwitch.vue';
 
 export default {
     name: 'SellerMeSettings',
 
-    components: { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, BaseSwitch },
+    components: { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt, BaseSwitch },
 
     computed: {
         ...mapState(useAccountV2Store, ['notifications']),
@@ -62,6 +62,12 @@ export default {
             <a href="/docs/privacy-policy.html" target="_blank" class="menu-item">
                 <div class="menu-icon"><Shield size="18" /></div>
                 <span class="menu-label">{{ $t('seller_me.menu_label_privacy') }}</span>
+                <ChevronRight size="16" class="menu-arrow" />
+            </a>
+
+            <a href="/docs/sariko_fees.html" target="_blank" class="menu-item">
+                <div class="menu-icon"><Receipt size="18" /></div>
+                <span class="menu-label">{{ $t('seller_me.menu_label_fees') }}</span>
                 <ChevronRight size="16" class="menu-arrow" />
             </a>
 

@@ -121,7 +121,8 @@
                 "title_subtext_role_buyer": "Tìm đồ ăn Filipino",
                 "title_text_role_seller": "Bán",
                 "title_subtext_role_seller": "Trở thành người bán",
-                "button_label_text_signup": "Tạo tài khoản"
+                "button_label_text_signup": "Tạo tài khoản",
+                "agree_terms": "Tôi đồng ý với {terms} và {privacy} của Sariko"
             }
         }
     },
@@ -180,7 +181,8 @@
         "section_footer": {
             "label_tax_code": "MST",
             "label_address": "Địa chỉ",
-            "label_email": "Email"
+            "label_email": "Email",
+            "label_partners": "Thanh toán: VNPAY · Giao hàng: Lalamove"
         }
     },
     "seller_page": {
@@ -252,7 +254,10 @@
             "title_subtotal": "Tạm tính",
             "title_estimated_delivery_fee": "Phí giao hàng (ước tính)",
             "title_total_amount": "Tổng cộng",
-            "button_label_checkout": "Đặt hàng"
+            "button_label_checkout": "Đặt hàng",
+            "partners_note": "Thanh toán qua VNPAY · Giao hàng bởi Lalamove",
+            "agree_order": "Tôi đã kiểm tra đơn hàng và đồng ý với {policy}",
+            "agree_order_policy": "Chính sách giao hàng và hoàn tiền"
         },
         "validation": {
             "missing_phone": "Cần có số điện thoại để đặt hàng.",
@@ -298,6 +303,8 @@
         "menu_label_about": "Giới thiệu Sariko",
         "menu_label_shipping": "Chính sách vận chuyển",
         "menu_label_payment_methods": "Phương thức thanh toán",
+        "menu_label_fees": "Biểu phí",
+        "menu_label_fees": "Biểu phí",
         "menu_label_contact_support": "Liên hệ hỗ trợ",
         "menu_label_switch_to_buyer": "Chuyển sang chế độ Người mua",
         "menu_label_switch_to_seller": "Chuyển sang chế độ Người bán",
@@ -669,10 +676,12 @@
         "menu_label_language": "Ngôn ngữ",
         "menu_label_terms": "Điều khoản dịch vụ",
         "menu_label_privacy": "Chính sách bảo mật",
+        "menu_label_fees": "Biểu phí",
         "menu_label_new_order_alerts": "Thông báo đơn hàng mới",
         "menu_label_about": "Về Sariko",
         "menu_label_shipping": "Chính sách vận chuyển",
         "menu_label_payment_methods": "Phương thức thanh toán",
+        "menu_label_fees": "Biểu phí",
         "section_title_promote": "Quảng bá cửa hàng",
         "promote_subtitle": "Chia sẻ link hoặc mã QR với khách hàng của bạn",
         "promote_copy": "Sao chép link",
