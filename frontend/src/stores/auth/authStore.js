@@ -239,13 +239,16 @@ export const useAuthStore = defineStore("authStore", {
                         : "Invalid email format.";
                     break;
                 }
+                // Sign-in only checks presence: accounts created before the 8-char rule still have 6-7 char passwords
                 case "inputSignInPassword":
+                    this.errors[field] = !this[field] ? "Password is required." : null;
+                    break;
                 case "inputSignUpPassword": {
                     const value = this[field];
                     this.errors[field] = !value
                         ? "Password is required."
-                        : value.length < 6
-                        ? "Password must be at least 6 characters."
+                        : value.length < 8
+                        ? "Password must be at least 8 characters."
                         : null;
                     break;
                 }

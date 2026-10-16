@@ -23,7 +23,7 @@ export const PHONE_SUPPORTED_COUNTRY = 'VN'
 
 const isPhoneValidVN = (country, phone) => country === PHONE_SUPPORTED_COUNTRY && /^\+84\d{9}$/.test(phone)
 
-const PASSWORD_MIN_LENGTH = 6
+const PASSWORD_MIN_LENGTH = 8
 
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024
 
