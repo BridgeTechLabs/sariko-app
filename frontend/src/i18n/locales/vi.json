@@ -50,6 +50,9 @@
         "reset_password_page": "Mật khẩu mới"
     },
     "common": {
+        "duration_minutes": "{m} phút",
+        "duration_hours": "{h} giờ",
+        "duration_hours_minutes": "{h} giờ {m} phút",
         "button_label_cancel": "Hủy",
         "button_label_save": "Lưu",
         "button_label_saving": "Đang lưu...",

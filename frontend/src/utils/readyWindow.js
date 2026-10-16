@@ -1,3 +1,5 @@
+import { i18n } from '@/plugins/i18n'
+
 // Marking ready books Lalamove right away, so before this window opens the seller
 // has to confirm (the driver may come well before the delivery_appointment).
 export const READY_WINDOW_MINUTES = 45
@@ -9,10 +11,13 @@ export function minutesUntilReady(order, now = Date.now()) {
     return Math.max(0, Math.ceil((opensAt - now) / 60_000))
 }
 
-// 80 → "1h 20m", 5 → "5m"
+// 80 → "1 giờ 20 phút" / "1 hr 20 min", 5 → "5 phút" / "5 min" (current locale)
 export function formatWait(minutes) {
+    const t = i18n.global.t
     const h = Math.floor(minutes / 60)
-    return h ? `${h}h ${minutes % 60}m` : `${minutes}m`
+    const m = minutes % 60
+    if (!h) return t('common.duration_minutes', { m })
+    return m ? t('common.duration_hours_minutes', { h, m }) : t('common.duration_hours', { h })
 }
 
 // Line under the Accept / Ready button, from the backend `deadline`: pending → when the order

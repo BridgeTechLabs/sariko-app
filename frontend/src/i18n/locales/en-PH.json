@@ -50,6 +50,9 @@
         "reset_password_page": "New Password"
     },
     "common": {
+        "duration_minutes": "{m} min",
+        "duration_hours": "{h} hr",
+        "duration_hours_minutes": "{h} hr {m} min",
         "button_label_cancel": "Cancel",
         "button_label_save": "Save",
         "button_label_saving": "Saving...",
