@@ -83,7 +83,7 @@ export default {
                     await navigator.share({ title, url });
                 } else {
                     await navigator.clipboard.writeText(url);
-                    Notify.create({ message: 'Link copied', color: 'positive', timeout: 1500 });
+                    Notify.create({ message: this.$t('seller_page.link_copied'), color: 'positive', timeout: 1500 });
                 }
             } catch (e) {
                 // user dismissed the share sheet — ignore
@@ -124,14 +124,14 @@ export default {
             <img :src="coverImage" class="hero-img" :alt="seller?.store_name ? `${seller.store_name} cover` : ''">
             <div class="hero-scrim"></div>
 
-            <button class="hero-btn hero-back" @click="goBack" aria-label="Go back">
+            <button class="hero-btn hero-back" @click="goBack" :aria-label="$t('seller_page.aria_back')">
                 <ArrowLeft :size="18" />
             </button>
 
             <div class="hero-actions">
-                <button class="hero-btn" @click="goSearch" aria-label="Search"><Search :size="18" /></button>
-                <button class="hero-btn" @click="share" aria-label="Share"><Share2 :size="18" /></button>
-                <button class="hero-btn" @click="toggleFavorite" :aria-pressed="isFavorite" aria-label="Save to favorites">
+                <button class="hero-btn" @click="goSearch" :aria-label="$t('seller_page.aria_search')"><Search :size="18" /></button>
+                <button class="hero-btn" @click="share" :aria-label="$t('seller_page.aria_share')"><Share2 :size="18" /></button>
+                <button class="hero-btn" @click="toggleFavorite" :aria-pressed="isFavorite" :aria-label="$t('seller_page.aria_favorite')">
                     <Heart :size="18" :fill="isFavorite ? '#f5A623' : 'none'" :color="isFavorite ? '#f5A623' : '#fff'" />
                 </button>
             </div>

@@ -15,7 +15,7 @@ export default {
     <LayoutBaseNotifications>
 
         <template #Header>
-            <h1 class="page-title">Notifications</h1>
+            <h1 class="page-title">{{ $t('bottom_nav.button_label_notifications') }}</h1>
         </template>
 
         <template #Content>

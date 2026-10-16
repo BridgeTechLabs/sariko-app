@@ -63,7 +63,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("id, store_name, slug, avatar_url, address, phone, lat, lon, rating_avg, rating_count, is_open, opening_time, closing_time")
+                .select("id, store_name, slug, avatar_url, address, phone, lat, lon, rating_avg, rating_count, is_open, opening_time, closing_time, opened_at")
                 .eq("user_id", user_id)
                 .maybe_single()
                 .execute()

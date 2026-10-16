@@ -13,11 +13,11 @@ export default {
         <div class="empty-icon-wrapper">
             <ShoppingBag :size="44" />
         </div>
-        <h2 class="empty-title">Your cart is empty</h2>
-        <p class="empty-subtitle">Discover delicious homemade Filipino food from community sellers near you.</p>
+        <h2 class="empty-title">{{ $t('cart_page.empty_title') }}</h2>
+        <p class="empty-subtitle">{{ $t('cart_page.empty_subtitle') }}</p>
         <q-btn class="btn-browse" dense no-caps @click="$router.push('/home')">
             <Search :size="18" style="margin-right: 8px;" />
-            Browse Sellers
+            {{ $t('cart_page.empty_button') }}
         </q-btn>
     </div>
 </template>

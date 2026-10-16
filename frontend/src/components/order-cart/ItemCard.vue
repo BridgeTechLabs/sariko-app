@@ -1,5 +1,5 @@
 <script>
-import { Plus, Minus, Star } from 'lucide-vue-next';
+import { Plus, Minus } from 'lucide-vue-next';
 import { useCartStore } from '@/stores/cart/cartStore.js';
 
 export default {
@@ -53,7 +53,7 @@ export default {
     },
 
     components: {
-        Plus, Minus, Star
+        Plus, Minus
     },
 
     setup() {
@@ -113,7 +113,7 @@ export default {
                                 <span v-if="itemVariantName" class="item-variant">{{ itemVariantName }}</span>
                             </div>
                             <div class="item-category">
-                                <div>{{ itemCategory }}</div> &nbsp; | &nbsp; <Star color="#f5A623" size="12px"/> &nbsp; 4.5
+                                <div>{{ itemCategory }}</div>
                             </div>
                         </div>
                         <div class="group-2">

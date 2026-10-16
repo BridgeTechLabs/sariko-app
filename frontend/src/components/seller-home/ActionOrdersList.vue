@@ -3,7 +3,7 @@ import { apiErrorMessage } from '@/lib/axiosPolicy.js';
 import { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin } from 'lucide-vue-next';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
-import { minutesUntilReady, formatWait, confirmEarlyReady } from '@/utils/readyWindow';
+import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '@/utils/readyWindow';
 
 const STATUS_DISPLAY_KEY = {
     pending:          'seller_home.status_new',
@@ -98,6 +98,7 @@ export default {
                     time: new Date(/[Z+]/.test(order.created_at) ? order.created_at : order.created_at + 'Z').toLocaleString(this.$i18n.locale === 'vi' ? 'vi-VN' : 'en-PH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', hour12: false }),
                     nextLabel: STATUS_NEXT[order.status] === 'confirmed' ? this.$t('seller_home.action_accept') : this.$t('seller_home.action_ready_delivery'),
                     readyWaitMinutes: minutesUntilReady(order, this.now),
+                    deadlineHint: deadlineHint(this, order, this.now),
                     appointmentText: order.delivery_appointment ? this.formatAppointment(order.delivery_appointment) : null,
                 }))
         },
@@ -416,6 +417,9 @@ export default {
                             <Check :size="14" style="margin-right: 4px;" /> {{ order.readyWaitMinutes ? $t('seller_order_detail.ready_available_in', { time: formatWait(order.readyWaitMinutes) }) : order.nextLabel }}
                         </q-btn>
                     </div>
+                </div>
+                <div v-if="order.deadlineHint" class="deadline-hint" :class="{ urgent: order.deadlineHint.urgent }">
+                    <AlertTriangle :size="13" /> {{ order.deadlineHint.text }}
                 </div>
 
                 <!-- delivery_failed: rebook action (below contact row) -->
@@ -750,6 +754,21 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
+}
+
+.deadline-hint {
+    margin-top: 6px;
+    justify-content: flex-end;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    color: #facc15;
+
+    &.urgent {
+        color: #f87171;
+    }
 }
 
 .order-actions-right {

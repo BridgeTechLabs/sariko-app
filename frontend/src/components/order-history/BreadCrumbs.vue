@@ -7,5 +7,5 @@ export default {
 </script>
 
 <template>
-    <PageBreadcrumbs title="My Orders" />
+    <PageBreadcrumbs :title="$t('breadcrumbs.orders_page')" />
 </template>

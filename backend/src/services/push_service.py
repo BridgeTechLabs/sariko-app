@@ -58,6 +58,10 @@ MESSAGES = {
         "en": ("Order cancelled by customer", "A customer cancelled a paid order. Tap to see details."),
         "vi": ("Khách đã hủy đơn", "Khách vừa hủy một đơn đã thanh toán. Nhấn để xem chi tiết."),
     },
+    "seller_order_expiring": {
+        "en": ("Order about to auto-cancel", "A paid order hasn't been accepted yet. Accept it in the next few minutes or it will be cancelled and refunded."),
+        "vi": ("Đơn sắp tự hủy", "Một đơn đã thanh toán chưa được nhận. Hãy nhận đơn trong vài phút tới, nếu không đơn sẽ tự hủy và hoàn tiền cho khách."),
+    },
     "seller_order_expired": {
         "en": ("Order cancelled: not confirmed in time", "A paid order wasn't confirmed in time, so it was cancelled and the customer will be refunded."),
         "vi": ("Đơn đã tự hủy", "Một đơn đã thanh toán không được xác nhận kịp thời nên đã bị hủy, khách sẽ được hoàn tiền."),
@@ -90,6 +94,11 @@ def notify_buyer_cancelled(order: dict):
     if order.get("payment_status") != "paid":
         return
     _send_async(order.get("seller_user_id"), "seller_buyer_cancelled", f"/seller/orders/{order['id']}")
+
+
+def notify_seller_order_expiring(order: dict):
+    """Seller side: a paid order is close to auto-cancelling (admin_settings.order_confirm_reminder_minutes)."""
+    _send_async(order.get("seller_user_id"), "seller_order_expiring", f"/seller/orders/{order['id']}")
 
 
 def notify_seller_order_expired(order: dict):

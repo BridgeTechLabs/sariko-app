@@ -30,7 +30,7 @@ export default {
         <template #Header>
             <div class="header">
                 <button class="back-btn" @click="goBack"><ArrowLeft :size="22" /></button>
-                <div class="title">My inbox</div>
+                <div class="title">{{ $t('chat.inbox_title') }}</div>
             </div>
         </template>
 

@@ -59,7 +59,7 @@ export default {
             type="text"
             class="input"
             bg-color="bgInputField"
-            placeholder="Please enter your email address"
+            :placeholder="$t('auth_page.auth_input_fields.common.placeholder_email')"
             :error="!!errors.inputSignInEmail"
             :error-message="errors.inputSignInEmail"
             @blur="validateField('inputSignInEmail')"
@@ -70,7 +70,7 @@ export default {
                 </template>
 
                 <template v-slot:hint>
-                    <span class="hint-text">e.g. johndoe@gmail.com</span>
+                    <span class="hint-text">{{ $t('auth_page.auth_input_fields.common.hint_email') }}</span>
                 </template>
 
             </q-input>
@@ -90,7 +90,7 @@ export default {
             type="password"
             class="input"
             bg-color="bgInputField"
-            placeholder="Please enter your password"
+            :placeholder="$t('auth_page.auth_input_fields.common.placeholder_password')"
             :error="!!errors.inputSignInPassword"
             :error-message="errors.inputSignInPassword"
             @blur="validateField('inputSignInPassword')"
@@ -101,7 +101,7 @@ export default {
                 </template>
 
                 <template v-slot:hint>
-                    <span class="hint-text">Min. 6 characters</span>
+                    <span class="hint-text">{{ $t('auth_page.auth_input_fields.common.hint_password') }}</span>
                 </template>
             </q-input>
         </div>

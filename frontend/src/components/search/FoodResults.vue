@@ -42,7 +42,7 @@ export default {
             </div>
         </div>
 
-        <div v-if="!foodResults.length" class="empty">No food matches</div>
+        <div v-if="!foodResults.length" class="empty">{{ $t('search_page.no_food') }}</div>
     </div>
 </template>
 

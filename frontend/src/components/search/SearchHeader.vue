@@ -19,7 +19,7 @@ export default {
         <button class="back-btn" @click="$router.back()">
             <ArrowLeft :size="20" />
         </button>
-        <input v-model="query" class="search-input" placeholder="Search..." />
+        <input v-model="query" class="search-input" :placeholder="$t('home_page.section_search_bar.placeholder')" />
     </div>
 </template>
 

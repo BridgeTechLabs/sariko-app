@@ -46,13 +46,13 @@ class FakeOrders:
 class FakeConfig(DAOAdminConfig):
     """Only the DB read is faked; the real get_minutes validation runs."""
     value = 30
+    reminder = 10
 
     def __init__(self):
         pass  # no Supabase client
 
     def get_setting(self, key):
-        assert key == "order_confirm_minutes"
-        return self.value
+        return {"order_confirm_minutes": self.value, "order_confirm_reminder_minutes": self.reminder}[key]
 
 
 @pytest.fixture
@@ -82,6 +82,14 @@ def seller_pushes(monkeypatch):
 
 
 @pytest.fixture
+def reminders(monkeypatch):
+    sent = []
+    order_expiry._reminded.clear()
+    monkeypatch.setattr(order_expiry.push_service, "notify_seller_order_expiring", lambda order: sent.append(order["id"]))
+    return sent
+
+
+@pytest.fixture
 def refunds(monkeypatch):
     queued = []
     monkeypatch.setattr(order_expiry.DAORefunds, "__init__", lambda self: None)
@@ -95,7 +103,7 @@ def _order(oid, paid, is_open=True, opens=None, closes=None):
             "seller_profiles": {"is_open": is_open, "opening_time": opens, "closing_time": closes, "opened_at": None}}
 
 
-def test_expiry_cancels_and_refunds_only_timed_out_orders(monkeypatch, config, refunds, seller_pushes):
+def test_expiry_cancels_and_refunds_only_timed_out_orders(monkeypatch, config, refunds, seller_pushes, reminders):
     fake = FakeOrders([
         _order("late", at("11:00")),
         _order("fresh", at("11:45")),                        # 15 min, not yet
@@ -110,10 +118,29 @@ def test_expiry_cancels_and_refunds_only_timed_out_orders(monkeypatch, config, r
     assert seller_pushes == ["late"]          # not "raced": the seller acted, nothing to tell them
 
 
-def test_expiry_uses_the_configured_window(monkeypatch, config, refunds, seller_pushes):
+def test_expiry_uses_the_configured_window(monkeypatch, config, refunds, seller_pushes, reminders):
     config.value = 90
     fake = FakeOrders([_order("hour_old", at("11:00"))])
     monkeypatch.setattr(order_expiry, "DAOOrders", lambda: fake)
 
     assert order_expiry.expire_unconfirmed_orders(now=at("12:00")) == 0   # 60 < 90 minutes
     assert order_expiry.expire_unconfirmed_orders(now=at("12:30")) == 1
+
+
+def test_reminds_seller_once_before_auto_cancel(monkeypatch, config, refunds, seller_pushes, reminders):
+    fake = FakeOrders([
+        _order("soon", at("11:40")),                           # deadline 12:10, reminder from 12:00
+        _order("early", at("11:55")),                          # deadline 12:25: too early to remind
+        _order("closed", at("11:40"), is_open=False),          # clock paused: no reminder either
+    ])
+    monkeypatch.setattr(order_expiry, "DAOOrders", lambda: fake)
+
+    assert order_expiry.expire_unconfirmed_orders(now=at("12:00")) == 0
+    assert reminders == ["soon"]
+    order_expiry.expire_unconfirmed_orders(now=at("12:01"))
+    assert reminders == ["soon"]                               # once only
+    assert order_expiry.expire_unconfirmed_orders(now=at("12:10")) == 1
+    assert fake.cancelled == ["soon"]
+    assert reminders == ["soon"]                               # "early" reminds at 12:25 - 10 min
+    order_expiry.expire_unconfirmed_orders(now=at("12:15"))
+    assert reminders == ["soon", "early"]

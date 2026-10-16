@@ -22,7 +22,7 @@ export default {
             </div>
         </div>
 
-        <div v-if="!categoryResults.length" class="empty">No category matches</div>
+        <div v-if="!categoryResults.length" class="empty">{{ $t('search_page.no_category') }}</div>
     </div>
 </template>
 

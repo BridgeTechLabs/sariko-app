@@ -1,6 +1,7 @@
 <script>
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
-import { minutesUntilReady, formatWait, confirmEarlyReady } from '@/utils/readyWindow';
+import { AlertTriangle } from 'lucide-vue-next';
+import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '@/utils/readyWindow';
 
 const STATUS_NEXT = {
     pending:   'confirmed',
@@ -11,6 +12,8 @@ const STATUS_NEXT = {
 const REJECT_REASONS = ['out_of_ingredients', 'too_busy', 'store_closing', 'other']
 
 export default {
+    components: { AlertTriangle },
+
     name: 'SellerOrderActionBar',
 
     props: {
@@ -39,6 +42,10 @@ export default {
             return minutesUntilReady(this.order)
         },
         canReject()  { return ['pending', 'confirmed'].includes(this.order.status) },
+        deadlineHint() {
+            void this.tick
+            return this.canAccept ? deadlineHint(this, this.order) : null
+        },
         rebookCount() { return this.delivery?.rebook_count || 0 },
         rebookMax() { return this.delivery?.rebook_max || 3 },  // admin_settings.seller_rebook_max
         canRebook() {
@@ -218,6 +225,10 @@ export default {
             <div v-else-if="order.status === 'cancelled'" class="status-message cancelled">{{ $t('seller_order_detail.action_bar_cancelled') }}</div>
         </div>
 
+        <div v-if="deadlineHint" class="deadline-hint" :class="{ urgent: deadlineHint.urgent }">
+            <AlertTriangle :size="14" /> {{ deadlineHint.text }}
+        </div>
+
         <!-- Reject dialog -->
         <q-dialog v-model="showRejectDialog">
             <q-card class="reject-dialog">
@@ -264,6 +275,21 @@ export default {
     border-radius: 10px;
     margin-bottom: 10px;
     line-height: 1.5;
+}
+
+.deadline-hint {
+    margin-top: 8px;
+    justify-content: center;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    color: #facc15;
+
+    &.urgent {
+        color: #f87171;
+    }
 }
 
 .action-row {
