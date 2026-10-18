@@ -49,7 +49,7 @@ SETTINGS_DEFAULTS = {
     "onboarding_max_preorder_days": 14,
     "onboarding_min_age": 18,               # đề án III.1
     "onboarding_review_days": 2,
-    "seller_agreement_version": 20261016,   # change together with public/docs/sariko_seller_agreement.html
+    "seller_agreement_version": 20261018,   # change together with public/docs/sariko_seller_agreement.html
     "founding_slots": 50,                   # also GET /sellers/founding/slots
     "founding_free_months": 4,
 }
