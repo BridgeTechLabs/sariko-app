@@ -232,7 +232,7 @@ def test_rate_limit_sixth_is_429(env):
 
 def test_settings_endpoint_serves_defaults_and_plan_limits(env):
     res = env["client"].get("/onboarding/settings").json()
-    assert res["max_dish_price"] == 10_000_000 and res["min_age"] == 18 and res["agreement_version"] == 20261016
+    assert res["max_dish_price"] == 10_000_000 and res["min_age"] == 18 and res["agreement_version"] == 20261018
     assert [t["tier"] for t in res["tiers"]] == ["community", "tindahan", "negosyo", "enterprise"]
     assert res["tiers"][0]["max_items"] == 3 and res["tiers"][3]["max_items"] is None
     assert res["tiers"][1]["monthly_fee_vnd"] == 720000
