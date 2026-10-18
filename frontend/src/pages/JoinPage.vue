@@ -1,4 +1,5 @@
 <script>
+import { defineAsyncComponent } from 'vue'
 import LayoutJoin from '@/layouts/join/LayoutJoin.vue'
 import JoinHeader from '@/components/join/JoinHeader.vue'
 import JoinMobileTip from '@/components/join/JoinMobileTip.vue'
@@ -6,9 +7,19 @@ import JoinWizard from '@/components/join/JoinWizard.vue'
 import JoinDone from '@/components/join/JoinDone.vue'
 import { useJoinStore } from '@/stores/join/joinStore'
 
+// DEV autofill button only in builds with VITE_DEV_PANEL=true (local, DEV), like
+// App.vue's HackerPanel: Vite inlines the flag, so the prod bundle has no such chunk.
+const DevAutofill = import.meta.env.VITE_DEV_PANEL === 'true'
+    ? defineAsyncComponent(() => import('@/components/join/JoinDevAutofill.vue'))
+    : null
+
 export default {
     name: 'JoinPage',
     components: { LayoutJoin, JoinHeader, JoinMobileTip, JoinWizard, JoinDone },
+
+    setup() {
+        return { DevAutofill }
+    },
 
     computed: {
         store() {
@@ -47,6 +58,7 @@ export default {
                 <q-btn flat no-caps color="amber" :label="$t('join_page.button_reload')" @click="store.loadSettings()" />
             </div>
             <div v-else class="settings-loading"><q-spinner color="amber" size="32px" /></div>
+            <component :is="DevAutofill" v-if="DevAutofill && store.settings && !store.reference" />
         </template>
     </LayoutJoin>
 </template>
