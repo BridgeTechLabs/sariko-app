@@ -2,6 +2,7 @@
 import { mapState, mapActions } from 'pinia';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import { liveDeliveryKey } from '@/utils/deliveryBadge';
+import { formatVnTime, vnDay } from '@/utils/vnTime';
 
 const FILTER_KEYS = ['all', 'new', 'preparing', 'ready', 'delivery_failed', 'done', 'cancelled']
 
@@ -68,16 +69,16 @@ export default {
         },
 
         groupedOrders() {
-            const today = new Date().toDateString()
-            const yesterday = new Date(Date.now() - 86400000).toDateString()
+            const today = vnDay(new Date())
+            const yesterday = vnDay(new Date(Date.now() - 86400000))
             const groups = {}
 
             for (const order of this.filteredOrders) {
-                const d = new Date(order.created_at).toDateString()
+                const d = vnDay(order.created_at)
                 let label
                 if (d === today)          label = this.$t('seller_orders.group_today')
                 else if (d === yesterday) label = this.$t('seller_orders.group_yesterday')
-                else label = new Date(order.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                else label = formatVnTime(order.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' })
 
                 if (!groups[label]) groups[label] = []
                 groups[label].push({
@@ -87,9 +88,9 @@ export default {
                     customerName:  order.users?.name || order.users?.email || 'Customer',
                     itemCount:     (order.order_items || []).length,
                     totalText:     new Intl.NumberFormat('vi-VN').format(order.total_amount || 0) + ' ₫',
-                    timeText:      new Date(order.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                    timeText:      formatVnTime(order.created_at, { hour: '2-digit', minute: '2-digit' }),
                     appointmentText: order.delivery_appointment
-                        ? new Date(order.delivery_appointment).toLocaleString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                        ? formatVnTime(order.delivery_appointment, { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
                         : null,
                 })
             }

@@ -1,5 +1,6 @@
 <script>
 import { Phone } from 'lucide-vue-next';
+import { formatVnTime } from '@/utils/vnTime';
 
 const STATUS_DISPLAY_KEY = {
     pending:   'seller_order_detail.status_new',
@@ -7,6 +8,7 @@ const STATUS_DISPLAY_KEY = {
     ready:     'seller_order_detail.status_ready',
     done:      'seller_order_detail.status_done',
     cancelled: 'seller_order_detail.status_cancelled',
+    delivery_failed: 'seller_orders.status_delivery_failed',
 }
 
 const STATUS_CLASS = {
@@ -15,7 +17,10 @@ const STATUS_CLASS = {
     ready:     'badge-ready',
     done:      'badge-done',
     cancelled: 'badge-cancelled',
+    delivery_failed: 'badge-delivery-failed',
 }
+
+const PAYMENT_METHOD_LABEL = { vnpay: 'VNPay' }
 
 const DELIVERY_STATUS_ORDER = ['ASSIGNING_DRIVER', 'ON_GOING', 'PICKED_UP', 'COMPLETED']
 const DELIVERY_CANCELLED_STATUSES = ['CANCELED', 'REJECTED', 'EXPIRED']
@@ -56,6 +61,16 @@ export default {
 
         customerPhone() {
             return this.order.users?.phone || null
+        },
+
+        // From the charge row in payments; force-paid DEV orders have none, so the row hides.
+        paymentMethod() {
+            const method = (this.order.payments || []).find(p => p.type === 'charge')?.method
+            return method ? (PAYMENT_METHOD_LABEL[method] || method) : null
+        },
+
+        placedAt() {
+            return formatVnTime(this.order.created_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
         },
 
         subtotal() {
@@ -160,7 +175,7 @@ export default {
                 {{ $t('seller_order_detail.label_reason') }}: {{ order.cancellation_reason }}
             </div>
             <div class="order-time-text">
-                {{ $t('seller_order_detail.label_placed') }} {{ new Date(order.created_at).toLocaleString('vi-VN') }}
+                {{ $t('seller_order_detail.label_placed') }} {{ placedAt }}
             </div>
         </div>
 
@@ -212,9 +227,9 @@ export default {
         <!-- Payment -->
         <div class="card">
             <div class="section-label" style="margin-bottom:12px;">{{ $t('seller_order_detail.section_payment') }}</div>
-            <div class="info-row">
+            <div v-if="paymentMethod" class="info-row">
                 <span class="info-key">{{ $t('seller_order_detail.label_method') }}</span>
-                <span class="info-val">{{ order.payment_method || 'VNPay' }}</span>
+                <span class="info-val">{{ paymentMethod }}</span>
             </div>
             <div class="info-row">
                 <span class="info-key">{{ $t('seller_order_detail.label_status') }}</span>
@@ -296,6 +311,7 @@ export default {
 .badge-ready     { background: rgba(139,92,246,0.15);  color: #a78bfa; }
 .badge-done      { background: rgba(34,197,94,0.15);   color: var(--color-success); }
 .badge-cancelled { background: rgba(239,68,68,0.1);    color: #ef4444; }
+.badge-delivery-failed { background: rgba(245,158,11,0.15); color: #f59e0b; }
 
 .order-time-text, .cancellation-reason {
     font-size: 12px;

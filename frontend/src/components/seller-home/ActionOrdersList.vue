@@ -4,6 +4,7 @@ import { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin } from 'l
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
 import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '@/utils/readyWindow';
+import { formatVnTime } from '@/utils/vnTime';
 
 const STATUS_DISPLAY_KEY = {
     pending:          'seller_home.status_new',
@@ -95,7 +96,7 @@ export default {
                     customerName: order.users?.name || order.users?.email || 'Customer',
                     items: order.order_items || [],
                     totalText: new Intl.NumberFormat('vi-VN').format(order.total_amount || 0) + ' ₫',
-                    time: new Date(/[Z+]/.test(order.created_at) ? order.created_at : order.created_at + 'Z').toLocaleString(this.$i18n.locale === 'vi' ? 'vi-VN' : 'en-PH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', hour12: false }),
+                    time: formatVnTime(order.created_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
                     nextLabel: STATUS_NEXT[order.status] === 'confirmed' ? this.$t('seller_home.action_accept') : this.$t('seller_home.action_ready_delivery'),
                     readyWaitMinutes: minutesUntilReady(order, this.now),
                     deadlineHint: deadlineHint(this, order, this.now),
@@ -244,10 +245,7 @@ export default {
         },
 
         formatAppointment(isoStr) {
-            if (!isoStr) return ''
-            const d = new Date(isoStr)
-            const locale = this.$i18n.locale === 'vi' ? 'vi-VN' : 'en-PH'
-            return d.toLocaleString(locale, { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', hour12: false })
+            return formatVnTime(isoStr, { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
         },
 
         openRejectDialog(order) {
