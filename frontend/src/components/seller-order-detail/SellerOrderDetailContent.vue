@@ -94,7 +94,8 @@ export default {
 
         timelineSteps() {
             const isCancelled = this.order.status === 'cancelled'
-            const orderStatusIdx = { pending: 0, confirmed: 1, ready: 2, done: 3 }
+            // delivery_failed comes after ready: placed / accepted / ready are all behind it
+            const orderStatusIdx = { pending: 0, confirmed: 1, ready: 2, delivery_failed: 3, done: 3 }
             const currentOrderIdx = orderStatusIdx[this.order.status] ?? -1
             const hasDelivery = this.order.delivery_method === 'delivery' && !!this.delivery
             const deliveryCancelled = hasDelivery && DELIVERY_CANCELLED_STATUSES.includes(this.delivery.status)

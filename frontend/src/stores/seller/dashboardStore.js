@@ -120,7 +120,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
                 const res = await apiSellerDashboard.getOrderDetail(orderId)
                 this.orderDetails = res.order || null
                 if (this.orderDetails?.delivery_method === 'delivery'
-                    && ['ready', 'done'].includes(this.orderDetails?.status)) {
+                    && ['ready', 'delivery_failed', 'done'].includes(this.orderDetails?.status)) {
                     await this._fetchDelivery(orderId)
                 }
             } catch (e) {
