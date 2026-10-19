@@ -639,6 +639,8 @@
         "section_timeline": "Timeline",
         "label_name": "Name",
         "label_phone": "Phone",
+        "section_driver": "Rider",
+        "label_plate": "Plate",
         "label_address": "Address",
         "label_note": "Note",
         "label_subtotal": "Subtotal",

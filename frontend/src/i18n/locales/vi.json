@@ -639,6 +639,8 @@
         "section_timeline": "Tiến trình",
         "label_name": "Tên",
         "label_phone": "Điện thoại",
+        "section_driver": "Tài xế",
+        "label_plate": "Biển số",
         "label_address": "Địa chỉ",
         "label_note": "Ghi chú",
         "label_subtotal": "Tạm tính",
