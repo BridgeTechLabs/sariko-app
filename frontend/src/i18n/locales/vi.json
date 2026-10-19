@@ -546,6 +546,7 @@
         "track_rider": "Theo dõi tài xế"
     },
     "seller_home": {
+        "push_reminder": "Bật thông báo để không lỡ đơn",
         "not_available": "Chưa có",
         "deadline_auto_cancel": "Tự hủy sau {wait} nếu chưa nhận",
         "deadline_auto_cancel_now": "Sắp tự hủy",

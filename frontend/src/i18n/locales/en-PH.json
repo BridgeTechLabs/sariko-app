@@ -546,6 +546,7 @@
         "track_rider": "Track Rider"
     },
     "seller_home": {
+        "push_reminder": "Turn on notifications so you don't miss orders",
         "not_available": "N/A",
         "deadline_auto_cancel": "Auto-cancels in {wait} if not accepted",
         "deadline_auto_cancel_now": "About to auto-cancel",
