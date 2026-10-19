@@ -2,6 +2,7 @@
 import { mapState } from 'pinia';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import { BellRing, ChefHat, CheckCircle2, TrendingUp } from 'lucide-vue-next';
+import { vnDay } from '@/utils/vnTime';
 
 const CARD_CONFIGS = [
     { key: 'new',      icon: BellRing,      accent: '#facc15', iconBg: 'rgba(250,204,21,0.12)' },
@@ -18,9 +19,17 @@ export default {
     computed: {
         ...mapState(useDashboardStore, ['orders']),
 
+        // Done and food sales count orders finished today (Vietnam time); New / Preparing are the live queue.
+        todayOrders() {
+            const today = vnDay(new Date())
+            return this.orders.filter(o => o.status_changed_at && vnDay(o.status_changed_at) === today)
+        },
+
         stats() {
-            const doneOrders = this.orders.filter(o => o.status === 'done')
-            const salesTotal = doneOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0)
+            const doneOrders = this.todayOrders.filter(o => o.status === 'done')
+            // Food sales: dish prices only (no delivery fee, before Sariko fees); whole VND integers.
+            const salesTotal = doneOrders.reduce((sum, o) =>
+                sum + (o.order_items || []).reduce((s, i) => s + i.price_snapshot * i.quantity, 0), 0)
 
             const values = [
                 this.orders.filter(o => o.status === 'pending').length,
