@@ -37,6 +37,10 @@ VALID_STATUS_TRANSITIONS = {
     "delivery_failed":  ["done", "cancelled"],
 }
 
+# A Lalamove trip is over once it reaches one of these; before that the COMPLETED
+# webhook closes the order, so the seller can't mark it done (P0-6).
+DELIVERY_ENDED_STATUSES = {"COMPLETED", "REJECTED", "CANCELLED", "CANCELED", "EXPIRED"}
+
 @router.get("/")
 def get_sellers(user=Depends(verify_token)):
     pass
@@ -241,6 +245,15 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                 status_code=400,
                 detail=f"Cannot transition from '{order['status']}' to '{body.status}'"
             )
+
+        if order["status"] == "ready" and body.status == "done" and order.get("delivery_method") == "delivery":
+            from dao.dao_deliveries import DAODeliveries
+            delivery = DAODeliveries().read_delivery_by_order_id(order_id)
+            if delivery and delivery.get("status") not in DELIVERY_ENDED_STATUSES:
+                raise HTTPException(status_code=409, detail={
+                    "code": "delivery_in_progress",
+                    "message": "The rider is still delivering; the order completes itself when the delivery is done.",
+                })
 
         # Pass cancellation_reason when rejecting
         cancellation_reason = body.cancellation_reason if body.status == "cancelled" else None

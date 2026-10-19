@@ -672,7 +672,7 @@
         "ready_early_confirm": "Book delivery now",
         "action_mark_done": "Mark as Done",
         "action_reject": "Reject",
-        "action_bar_driver_on_way": "🚴 Driver is on the way",
+        "action_bar_driver_on_way": "🚴 The rider is delivering. The order completes itself once it is delivered.",
         "action_bar_completed": "✅ Order completed",
         "action_bar_cancelled": "❌ Order cancelled",
         "action_bar_delivery_failed": "⚠️ Delivery failed — no driver found",

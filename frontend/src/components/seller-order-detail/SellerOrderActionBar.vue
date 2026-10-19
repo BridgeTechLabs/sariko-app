@@ -11,6 +11,9 @@ const STATUS_NEXT = {
 
 const REJECT_REASONS = ['out_of_ingredients', 'too_busy', 'store_closing', 'other']
 
+// Trip over: before that the Lalamove COMPLETED webhook closes the order, not the seller.
+const DELIVERY_ENDED = ['COMPLETED', 'REJECTED', 'CANCELLED', 'CANCELED', 'EXPIRED']
+
 export default {
     components: { AlertTriangle },
 
@@ -36,7 +39,12 @@ export default {
     },
 
     computed: {
-        canAccept() { return !!STATUS_NEXT[this.order.status] },
+        canAccept() { return !!STATUS_NEXT[this.order.status] && !this.tripRunning },
+        // Unknown delivery (not loaded yet) counts as running, so Done never flashes up.
+        tripRunning() {
+            return this.order.status === 'ready' && this.order.delivery_method === 'delivery'
+                && !DELIVERY_ENDED.includes(this.delivery?.status)
+        },
         readyWaitMinutes() {
             void this.tick
             return minutesUntilReady(this.order)

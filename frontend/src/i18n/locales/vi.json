@@ -680,7 +680,7 @@
         "contact_admin_notice": "Có lỗi khi đặt đơn giao hàng. Nếu lỗi tiếp tục xảy ra, hãy liên hệ admin.",
         "toast_rebook_success": "Đã đặt lại giao hàng!",
         "toast_rebook_failed": "Đặt lại giao hàng thất bại",
-        "action_bar_driver_on_way": "🚴 Tài xế đang đến",
+        "action_bar_driver_on_way": "🚴 Tài xế đang giao, đơn tự hoàn tất khi giao xong",
         "action_bar_completed": "✅ Đơn hoàn tất",
         "action_bar_cancelled": "❌ Đơn đã huỷ",
         "action_bar_delivery_failed": "⚠️ Giao hàng thất bại — không tìm được tài xế",
