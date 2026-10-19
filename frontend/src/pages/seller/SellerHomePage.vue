@@ -37,14 +37,14 @@ export default {
 
         filterOptions() {
             return [
-                { key: 'all',       label: 'All',       count: this.allActionOrders.length },
-                { key: 'pending',   label: 'New',       count: this.allActionOrders.filter(o => o.status === 'pending').length },
-                { key: 'confirmed', label: 'Preparing', count: this.allActionOrders.filter(o => o.status === 'confirmed').length },
+                { key: 'all',       label: this.$t('seller_orders.filter_all'),     count: this.allActionOrders.length },
+                { key: 'pending',   label: this.$t('seller_orders.filter_new'),     count: this.allActionOrders.filter(o => o.status === 'pending').length },
+                { key: 'confirmed', label: this.$t('seller_home.status_preparing'), count: this.allActionOrders.filter(o => o.status === 'confirmed').length },
             ]
         },
 
         activeFilterLabel() {
-            return this.filterOptions.find(f => f.key === this.activeFilter)?.label || 'All'
+            return this.filterOptions.find(f => f.key === this.activeFilter)?.label || this.$t('seller_orders.filter_all')
         },
 
         actionDisplayCount() {

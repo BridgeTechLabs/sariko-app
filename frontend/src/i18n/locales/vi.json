@@ -545,6 +545,7 @@
         "track_rider": "Theo dõi tài xế"
     },
     "seller_home": {
+        "not_available": "Chưa có",
         "deadline_auto_cancel": "Tự hủy sau {wait} nếu chưa nhận",
         "deadline_auto_cancel_now": "Sắp tự hủy",
         "deadline_buyer_cancel": "Khách được hủy sau {wait}",
@@ -612,6 +613,8 @@
         "empty_tab_upcoming_sub": "Đơn đặt trước của khách sẽ hiển thị ở đây."
     },
     "seller_orders": {
+        "customer_fallback": "Khách hàng",
+        "item_count": "{count} món",
         "filter_all": "Tất cả",
         "filter_new": "Mới",
         "filter_preparing": "Đang làm",

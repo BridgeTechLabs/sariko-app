@@ -57,7 +57,7 @@ export default {
         },
 
         customerName() {
-            return this.order.users?.name || this.order.users?.email || 'Customer'
+            return this.order.users?.name || this.order.users?.email || this.$t('seller_orders.customer_fallback')
         },
 
         customerPhone() {

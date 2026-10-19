@@ -545,6 +545,7 @@
         "track_rider": "Track Rider"
     },
     "seller_home": {
+        "not_available": "N/A",
         "deadline_auto_cancel": "Auto-cancels in {wait} if not accepted",
         "deadline_auto_cancel_now": "About to auto-cancel",
         "deadline_buyer_cancel": "Buyer can cancel in {wait}",
@@ -612,6 +613,8 @@
         "empty_tab_upcoming_sub": "Pre-orders from customers will appear here."
     },
     "seller_orders": {
+        "customer_fallback": "Customer",
+        "item_count": "{count} item | {count} items",
         "filter_all": "All",
         "filter_new": "New",
         "filter_preparing": "Prep",

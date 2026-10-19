@@ -85,7 +85,7 @@ export default {
                     ...order,
                     displayStatus: this.$t(liveDeliveryKey(order) || STATUS_DISPLAY_KEY[order.status] || order.status),
                     statusClass:   STATUS_CLASS[order.status] || '',
-                    customerName:  order.users?.name || order.users?.email || 'Customer',
+                    customerName:  order.users?.name || order.users?.email || this.$t('seller_orders.customer_fallback'),
                     itemCount:     (order.order_items || []).length,
                     totalText:     new Intl.NumberFormat('vi-VN').format(order.total_amount || 0) + ' ₫',
                     timeText:      formatVnTime(order.created_at, { hour: '2-digit', minute: '2-digit' }),
@@ -171,7 +171,7 @@ export default {
                     <div class="order-row">
                         <div class="order-info">
                             <div class="customer-name">{{ order.customerName }}</div>
-                            <div class="order-meta">{{ order.itemCount }} item{{ order.itemCount !== 1 ? 's' : '' }} · {{ order.totalText }}</div>
+                            <div class="order-meta">{{ $t('seller_orders.item_count', order.itemCount, { count: order.itemCount }) }} · {{ order.totalText }}</div>
                             <div v-if="order.appointmentText" class="appointment-text">📅 {{ order.appointmentText }}</div>
                         </div>
                         <div class="order-right">

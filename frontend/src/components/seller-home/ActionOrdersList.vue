@@ -93,7 +93,7 @@ export default {
                 .map(order => ({
                     ...order,
                     displayStatus: STATUS_DISPLAY_KEY[order.status] ? this.$t(STATUS_DISPLAY_KEY[order.status]) : order.status,
-                    customerName: order.users?.name || order.users?.email || 'Customer',
+                    customerName: order.users?.name || order.users?.email || this.$t('seller_orders.customer_fallback'),
                     items: order.order_items || [],
                     totalText: new Intl.NumberFormat('vi-VN').format(order.total_amount || 0) + ' ₫',
                     time: formatVnTime(order.created_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -389,7 +389,7 @@ export default {
                                             <Copy v-else :size="12" />
                                         </button>
                                     </div>
-                                    <span v-else class="buyer-info-na">N/A</span>
+                                    <span v-else class="buyer-info-na">{{ $t('seller_home.not_available') }}</span>
                                 </div>
                                 <div class="buyer-info-row">
                                     <span class="buyer-info-label"><MapPin :size="11" /> {{ $t('seller_home.buyer_address') }}</span>
@@ -400,7 +400,7 @@ export default {
                                             <Copy v-else :size="12" />
                                         </button>
                                     </div>
-                                    <span v-else class="buyer-info-na">N/A</span>
+                                    <span v-else class="buyer-info-na">{{ $t('seller_home.not_available') }}</span>
                                 </div>
                             </div>
                         </q-popup-proxy>
