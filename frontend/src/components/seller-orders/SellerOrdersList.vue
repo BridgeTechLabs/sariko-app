@@ -2,6 +2,8 @@
 import { mapState, mapActions } from 'pinia';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import { liveDeliveryKey } from '@/utils/deliveryBadge';
+import { formatVnTime, vnDay } from '@/utils/vnTime';
+import { orderCode } from '@/utils/orderCode';
 
 const FILTER_KEYS = ['all', 'new', 'preparing', 'ready', 'delivery_failed', 'done', 'cancelled']
 
@@ -68,28 +70,29 @@ export default {
         },
 
         groupedOrders() {
-            const today = new Date().toDateString()
-            const yesterday = new Date(Date.now() - 86400000).toDateString()
+            const today = vnDay(new Date())
+            const yesterday = vnDay(new Date(Date.now() - 86400000))
             const groups = {}
 
             for (const order of this.filteredOrders) {
-                const d = new Date(order.created_at).toDateString()
+                const d = vnDay(order.created_at)
                 let label
                 if (d === today)          label = this.$t('seller_orders.group_today')
                 else if (d === yesterday) label = this.$t('seller_orders.group_yesterday')
-                else label = new Date(order.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                else label = formatVnTime(order.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' })
 
                 if (!groups[label]) groups[label] = []
                 groups[label].push({
                     ...order,
                     displayStatus: this.$t(liveDeliveryKey(order) || STATUS_DISPLAY_KEY[order.status] || order.status),
                     statusClass:   STATUS_CLASS[order.status] || '',
-                    customerName:  order.users?.name || order.users?.email || 'Customer',
+                    code:          orderCode(order.id),
+                    customerName:  order.users?.name || order.users?.email || this.$t('seller_orders.customer_fallback'),
                     itemCount:     (order.order_items || []).length,
                     totalText:     new Intl.NumberFormat('vi-VN').format(order.total_amount || 0) + ' ₫',
-                    timeText:      new Date(order.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                    timeText:      formatVnTime(order.created_at, { hour: '2-digit', minute: '2-digit' }),
                     appointmentText: order.delivery_appointment
-                        ? new Date(order.delivery_appointment).toLocaleString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                        ? formatVnTime(order.delivery_appointment, { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
                         : null,
                 })
             }
@@ -169,8 +172,8 @@ export default {
                 >
                     <div class="order-row">
                         <div class="order-info">
-                            <div class="customer-name">{{ order.customerName }}</div>
-                            <div class="order-meta">{{ order.itemCount }} item{{ order.itemCount !== 1 ? 's' : '' }} · {{ order.totalText }}</div>
+                            <div class="customer-name">{{ order.customerName }} <span class="order-code">{{ order.code }}</span></div>
+                            <div class="order-meta">{{ $t('seller_orders.item_count', order.itemCount, { count: order.itemCount }) }} · {{ order.totalText }}</div>
                             <div v-if="order.appointmentText" class="appointment-text">📅 {{ order.appointmentText }}</div>
                         </div>
                         <div class="order-right">
@@ -267,6 +270,12 @@ export default {
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 4px;
+}
+
+.order-code {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
 }
 
 .order-meta {

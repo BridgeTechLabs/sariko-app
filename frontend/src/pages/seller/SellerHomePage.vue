@@ -1,6 +1,8 @@
 <script>
-import { mapActions } from 'pinia';
+import { mapActions, mapState } from 'pinia';
+import { BellRing } from 'lucide-vue-next';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
+import { useAccountV2Store } from '@/stores/v2/account/accountStore';
 import LayoutSellerHome from '@/layouts/seller/LayoutSellerHome.vue';
 import SellerGreeting from '@/components/seller-home/SellerGreeting.vue';
 import SellerStatsGrid from '@/components/seller-home/SellerStatsGrid.vue';
@@ -9,18 +11,17 @@ import ActionOrdersList from '@/components/seller-home/ActionOrdersList.vue';
 export default {
     name: 'SellerHomePage',
 
-    components: { LayoutSellerHome, SellerGreeting, SellerStatsGrid, ActionOrdersList },
+    components: { LayoutSellerHome, SellerGreeting, SellerStatsGrid, ActionOrdersList, BellRing },
 
     data() {
         return {
             activeFilter: 'all',
-            newOrderAudio: null,
-            unlockAudioHandler: null,
-            soundArmed: false,
         }
     },
 
     computed: {
+        ...mapState(useAccountV2Store, ['notifications']),
+
         allActionOrders() {
             return useDashboardStore().orders.filter(o =>
                 o.status === 'pending' ||
@@ -37,14 +38,14 @@ export default {
 
         filterOptions() {
             return [
-                { key: 'all',       label: 'All',       count: this.allActionOrders.length },
-                { key: 'pending',   label: 'New',       count: this.allActionOrders.filter(o => o.status === 'pending').length },
-                { key: 'confirmed', label: 'Preparing', count: this.allActionOrders.filter(o => o.status === 'confirmed').length },
+                { key: 'all',       label: this.$t('seller_orders.filter_all'),     count: this.allActionOrders.length },
+                { key: 'pending',   label: this.$t('seller_orders.filter_new'),     count: this.allActionOrders.filter(o => o.status === 'pending').length },
+                { key: 'confirmed', label: this.$t('seller_home.status_preparing'), count: this.allActionOrders.filter(o => o.status === 'confirmed').length },
             ]
         },
 
         activeFilterLabel() {
-            return this.filterOptions.find(f => f.key === this.activeFilter)?.label || 'All'
+            return this.filterOptions.find(f => f.key === this.activeFilter)?.label || this.$t('seller_orders.filter_all')
         },
 
         actionDisplayCount() {
@@ -61,68 +62,18 @@ export default {
 
     methods: {
         ...mapActions(useDashboardStore, ['fetchOrders', 'fetchSellerInfo', 'startWatchingOrders', 'stopWatchingOrders']),
-
-        playNewOrderSound() {
-            if (!this.newOrderAudio) {
-                this.newOrderAudio = new Audio('/sounds/new-order.mp3')
-            }
-            this.newOrderAudio.currentTime = 0
-            this.newOrderAudio.play().catch(err => {
-                console.warn('SellerHomePage - playNewOrderSound -', err)
-            })
-        },
-
-        setupAudioUnlock() {
-            this.unlockAudioHandler = () => {
-                if (!this.newOrderAudio) {
-                    this.newOrderAudio = new Audio('/sounds/new-order.mp3')
-                }
-                this.newOrderAudio.play().then(() => {
-                    this.newOrderAudio.pause()
-                    this.newOrderAudio.currentTime = 0
-                }).catch(() => {})
-                window.removeEventListener('pointerdown', this.unlockAudioHandler)
-                window.removeEventListener('keydown', this.unlockAudioHandler)
-                window.removeEventListener('touchstart', this.unlockAudioHandler)
-                this.unlockAudioHandler = null
-            }
-            window.addEventListener('pointerdown', this.unlockAudioHandler)
-            window.addEventListener('keydown', this.unlockAudioHandler)
-            window.addEventListener('touchstart', this.unlockAudioHandler)
-        },
-
-        cleanup() {
-            this.stopWatchingOrders()
-            if (this.unlockAudioHandler) {
-                window.removeEventListener('pointerdown', this.unlockAudioHandler)
-                window.removeEventListener('keydown', this.unlockAudioHandler)
-                window.removeEventListener('touchstart', this.unlockAudioHandler)
-            }
-        },
+        ...mapActions(useAccountV2Store, ['syncPushState']),
     },
 
-    watch: {
-        // A paid order the seller hasn't seen yet → play sound. Armed after the first
-        // load, so opening the page is silent but the first order into an empty list
-        // still rings; a delivery_failed order coming back to the list is not new.
-        allActionOrders(newOrders, oldOrders) {
-            if (!this.soundArmed) return
-            const oldIds = new Set((oldOrders || []).map(o => o.id))
-            const hasNew = newOrders.some(o => o.status === 'pending' && !oldIds.has(o.id))
-            if (hasNew) this.playNewOrderSound()
-        },
-    },
-
+    // The new-order chime lives in SellerOrderAlert (App.vue), so it rings on every seller page.
     async mounted() {
-        this.setupAudioUnlock()
+        this.syncPushState()
         await Promise.all([this.fetchOrders(), this.fetchSellerInfo()])
-        await this.$nextTick()  // let the watcher see the first load before arming the sound
-        this.soundArmed = true
         this.startWatchingOrders()
     },
 
     beforeUnmount() {
-        this.cleanup()
+        this.stopWatchingOrders()
     },
 }
 </script>
@@ -135,6 +86,10 @@ export default {
         </template>
 
         <template #Stats>
+            <!-- Push off: orders only ring while the app is open, so nudge towards the switch on Me -->
+            <router-link v-if="!notifications.orderUpdates" to="/seller/me" class="push-reminder">
+                <BellRing :size="16" /> {{ $t('seller_home.push_reminder') }}
+            </router-link>
             <SellerStatsGrid />
         </template>
 
@@ -199,6 +154,21 @@ export default {
 </template>
 
 <style lang="scss" scoped>
+.push-reminder {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(245, 166, 35, 0.12);
+    border: 1px solid rgba(245, 166, 35, 0.35);
+    color: var(--color-accent);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
 .section-header {
     display: flex;
     align-items: center;

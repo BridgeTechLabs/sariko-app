@@ -162,3 +162,8 @@ html, body {
     font-size: 20px;
     color: var(--status-success);
 }
+
+/* OpenStreetMap only has light tiles: recolour them for the dark theme (utils/mapTiles.js) */
+[data-theme='dark'] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}

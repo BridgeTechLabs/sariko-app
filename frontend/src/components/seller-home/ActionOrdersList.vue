@@ -4,6 +4,9 @@ import { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin } from 'l
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
 import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '@/utils/readyWindow';
+import { formatVnTime } from '@/utils/vnTime';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
+import { orderCode } from '@/utils/orderCode';
 
 const STATUS_DISPLAY_KEY = {
     pending:          'seller_home.status_new',
@@ -49,6 +52,8 @@ export default {
             activeTab: 'today',
             copiedKey: null,
             now: Date.now(),      // ticks every minute for the "Ready in …" countdown
+            supportEmail: SUPPORT_EMAIL,
+            supportMailto: SUPPORT_MAILTO,
         }
     },
 
@@ -92,10 +97,11 @@ export default {
                 .map(order => ({
                     ...order,
                     displayStatus: STATUS_DISPLAY_KEY[order.status] ? this.$t(STATUS_DISPLAY_KEY[order.status]) : order.status,
-                    customerName: order.users?.name || order.users?.email || 'Customer',
+                    code: orderCode(order.id),
+                    customerName: order.users?.name || order.users?.email || this.$t('seller_orders.customer_fallback'),
                     items: order.order_items || [],
                     totalText: new Intl.NumberFormat('vi-VN').format(order.total_amount || 0) + ' ₫',
-                    time: new Date(/[Z+]/.test(order.created_at) ? order.created_at : order.created_at + 'Z').toLocaleString(this.$i18n.locale === 'vi' ? 'vi-VN' : 'en-PH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', hour12: false }),
+                    time: formatVnTime(order.created_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
                     nextLabel: STATUS_NEXT[order.status] === 'confirmed' ? this.$t('seller_home.action_accept') : this.$t('seller_home.action_ready_delivery'),
                     readyWaitMinutes: minutesUntilReady(order, this.now),
                     deadlineHint: deadlineHint(this, order, this.now),
@@ -244,10 +250,7 @@ export default {
         },
 
         formatAppointment(isoStr) {
-            if (!isoStr) return ''
-            const d = new Date(isoStr)
-            const locale = this.$i18n.locale === 'vi' ? 'vi-VN' : 'en-PH'
-            return d.toLocaleString(locale, { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh', hour12: false })
+            return formatVnTime(isoStr, { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
         },
 
         openRejectDialog(order) {
@@ -322,7 +325,12 @@ export default {
         <div v-else class="orders-list">
             <div v-for="order in displayOrders" :key="order.id" class="order-card">
                 <div class="order-header">
-                    <div class="customer-name">{{ order.customerName }}</div>
+                    <div>
+                        <div class="customer-name">{{ order.customerName }}</div>
+                        <div class="order-code-line">
+                            {{ order.code }} · {{ order.delivery_method === 'pickup' ? $t('order_detail.delivery_method_pickup') : $t('order_detail.delivery_method_delivery') }}
+                        </div>
+                    </div>
                     <span class="status-badge" :class="order.status === 'pending' ? 'badge-new' : order.status === 'delivery_failed' ? 'badge-delivery-failed' : 'badge-preparing'">
                         {{ order.displayStatus }}
                     </span>
@@ -332,6 +340,11 @@ export default {
                     <div v-if="order.appointmentText" class="appointment-badge">
                         📅 <span class="order-time-label">{{ $t('seller_home.label_deliver_at') }}</span> {{ order.appointmentText }}
                     </div>
+                </div>
+
+                <!-- The buyer's note decides accept / reject, so it sits above the items -->
+                <div v-if="order.note" class="customer-note">
+                    <span class="customer-note-label">{{ $t('seller_order_detail.label_note') }}:</span> {{ order.note }}
                 </div>
 
                 <q-separator style="background: rgba(255,255,255,0.08); margin: 10px 0;" />
@@ -391,7 +404,7 @@ export default {
                                             <Copy v-else :size="12" />
                                         </button>
                                     </div>
-                                    <span v-else class="buyer-info-na">N/A</span>
+                                    <span v-else class="buyer-info-na">{{ $t('seller_home.not_available') }}</span>
                                 </div>
                                 <div class="buyer-info-row">
                                     <span class="buyer-info-label"><MapPin :size="11" /> {{ $t('seller_home.buyer_address') }}</span>
@@ -402,7 +415,7 @@ export default {
                                             <Copy v-else :size="12" />
                                         </button>
                                     </div>
-                                    <span v-else class="buyer-info-na">N/A</span>
+                                    <span v-else class="buyer-info-na">{{ $t('seller_home.not_available') }}</span>
                                 </div>
                             </div>
                         </q-popup-proxy>
@@ -424,9 +437,9 @@ export default {
 
                 <!-- delivery_failed: rebook action (below contact row) -->
                 <template v-if="order.status === 'delivery_failed'">
-                    <div v-if="rebookErrors[order.id] === 'max_attempts' || rebookErrors[order.id] === 'error'" class="rebook-admin-notice">
-                        {{ $t('seller_home.contact_admin_notice') }}
-                    </div>
+                    <a v-if="rebookErrors[order.id] === 'max_attempts' || rebookErrors[order.id] === 'error'" :href="supportMailto" class="rebook-admin-notice">
+                        {{ $t('seller_home.contact_admin_notice', { email: supportEmail }) }}
+                    </a>
                     <div class="delivery-rebook-row">
                         <button class="btn-delivery-issue" @click="$router.push({ name: 'seller-order-detail', params: { orderId: order.id } })">
                             <AlertTriangle :size="13" />
@@ -578,6 +591,29 @@ export default {
     font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
+}
+
+.order-code-line {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.customer-note {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(245, 166, 35, 0.1);
+    border: 1px solid rgba(245, 166, 35, 0.35);
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.customer-note-label {
+    font-weight: 700;
+    color: var(--color-accent);
 }
 
 .order-meta {
@@ -740,6 +776,8 @@ export default {
 }
 
 .rebook-admin-notice {
+    display: block;
+    text-decoration: underline;
     font-size: 11px;
     color: #ef4444;
     background: rgba(239, 68, 68, 0.08);

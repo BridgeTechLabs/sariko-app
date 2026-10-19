@@ -2,6 +2,7 @@
 import { Camera } from 'lucide-vue-next';
 import { mapState } from 'pinia';
 import { useAuthStore } from '@/stores/auth/authStore';
+import { useDashboardStore } from '@/stores/seller/dashboardStore';
 
 export default {
     name: 'SellerMeHeader',
@@ -10,6 +11,7 @@ export default {
 
     computed: {
         ...mapState(useAuthStore, ['user']),
+        ...mapState(useDashboardStore, ['sellerInfo']),
 
         initials() {
             if (!this.user?.fullName) return '?'
@@ -17,8 +19,12 @@ export default {
         },
 
         storeName() {
-            return this.user?.storeName || this.user?.fullName || 'My Store'
+            return this.sellerInfo?.store_name || this.user?.fullName || ''
         },
+    },
+
+    mounted() {
+        if (!this.sellerInfo) useDashboardStore().fetchSellerInfo()
     },
 
     methods: {
