@@ -424,6 +424,7 @@
         "empty_subtitle": "Đơn hàng của bạn sẽ hiện ở đây sau khi đặt."
     },
     "order_detail": {
+        "label_order_code": "Mã đơn",
         "cancelled_reason": "Lý do",
         "reason_seller_timeout": "Người bán không xác nhận đơn kịp thời",
         "reason_seller_late": "Người bán trễ hạn",

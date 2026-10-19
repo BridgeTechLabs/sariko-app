@@ -424,6 +424,7 @@
         "empty_subtitle": "Your orders will appear here once you place one."
     },
     "order_detail": {
+        "label_order_code": "Order code",
         "cancelled_reason": "Reason",
         "reason_seller_timeout": "The seller didn't confirm your order in time",
         "reason_seller_late": "Seller was late",

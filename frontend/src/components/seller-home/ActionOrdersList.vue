@@ -6,6 +6,7 @@ import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
 import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '@/utils/readyWindow';
 import { formatVnTime } from '@/utils/vnTime';
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
+import { orderCode } from '@/utils/orderCode';
 
 const STATUS_DISPLAY_KEY = {
     pending:          'seller_home.status_new',
@@ -96,6 +97,7 @@ export default {
                 .map(order => ({
                     ...order,
                     displayStatus: STATUS_DISPLAY_KEY[order.status] ? this.$t(STATUS_DISPLAY_KEY[order.status]) : order.status,
+                    code: orderCode(order.id),
                     customerName: order.users?.name || order.users?.email || this.$t('seller_orders.customer_fallback'),
                     items: order.order_items || [],
                     totalText: new Intl.NumberFormat('vi-VN').format(order.total_amount || 0) + ' ₫',
@@ -323,7 +325,12 @@ export default {
         <div v-else class="orders-list">
             <div v-for="order in displayOrders" :key="order.id" class="order-card">
                 <div class="order-header">
-                    <div class="customer-name">{{ order.customerName }}</div>
+                    <div>
+                        <div class="customer-name">{{ order.customerName }}</div>
+                        <div class="order-code-line">
+                            {{ order.code }} · {{ order.delivery_method === 'pickup' ? $t('order_detail.delivery_method_pickup') : $t('order_detail.delivery_method_delivery') }}
+                        </div>
+                    </div>
                     <span class="status-badge" :class="order.status === 'pending' ? 'badge-new' : order.status === 'delivery_failed' ? 'badge-delivery-failed' : 'badge-preparing'">
                         {{ order.displayStatus }}
                     </span>
@@ -333,6 +340,11 @@ export default {
                     <div v-if="order.appointmentText" class="appointment-badge">
                         📅 <span class="order-time-label">{{ $t('seller_home.label_deliver_at') }}</span> {{ order.appointmentText }}
                     </div>
+                </div>
+
+                <!-- The buyer's note decides accept / reject, so it sits above the items -->
+                <div v-if="order.note" class="customer-note">
+                    <span class="customer-note-label">{{ $t('seller_order_detail.label_note') }}:</span> {{ order.note }}
                 </div>
 
                 <q-separator style="background: rgba(255,255,255,0.08); margin: 10px 0;" />
@@ -579,6 +591,29 @@ export default {
     font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
+}
+
+.order-code-line {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.customer-note {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(245, 166, 35, 0.1);
+    border: 1px solid rgba(245, 166, 35, 0.35);
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.customer-note-label {
+    font-weight: 700;
+    color: var(--color-accent);
 }
 
 .order-meta {

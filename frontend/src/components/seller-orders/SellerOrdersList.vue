@@ -3,6 +3,7 @@ import { mapState, mapActions } from 'pinia';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import { liveDeliveryKey } from '@/utils/deliveryBadge';
 import { formatVnTime, vnDay } from '@/utils/vnTime';
+import { orderCode } from '@/utils/orderCode';
 
 const FILTER_KEYS = ['all', 'new', 'preparing', 'ready', 'delivery_failed', 'done', 'cancelled']
 
@@ -85,6 +86,7 @@ export default {
                     ...order,
                     displayStatus: this.$t(liveDeliveryKey(order) || STATUS_DISPLAY_KEY[order.status] || order.status),
                     statusClass:   STATUS_CLASS[order.status] || '',
+                    code:          orderCode(order.id),
                     customerName:  order.users?.name || order.users?.email || this.$t('seller_orders.customer_fallback'),
                     itemCount:     (order.order_items || []).length,
                     totalText:     new Intl.NumberFormat('vi-VN').format(order.total_amount || 0) + ' ₫',
@@ -170,7 +172,7 @@ export default {
                 >
                     <div class="order-row">
                         <div class="order-info">
-                            <div class="customer-name">{{ order.customerName }}</div>
+                            <div class="customer-name">{{ order.customerName }} <span class="order-code">{{ order.code }}</span></div>
                             <div class="order-meta">{{ $t('seller_orders.item_count', order.itemCount, { count: order.itemCount }) }} · {{ order.totalText }}</div>
                             <div v-if="order.appointmentText" class="appointment-text">📅 {{ order.appointmentText }}</div>
                         </div>
@@ -268,6 +270,12 @@ export default {
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 4px;
+}
+
+.order-code {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
 }
 
 .order-meta {

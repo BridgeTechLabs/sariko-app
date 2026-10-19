@@ -1,6 +1,7 @@
 <script>
 import { Phone } from 'lucide-vue-next';
 import { formatVnTime } from '@/utils/vnTime';
+import { orderCode } from '@/utils/orderCode';
 
 const STATUS_DISPLAY_KEY = {
     pending:   'seller_order_detail.status_new',
@@ -75,6 +76,10 @@ export default {
             const d = this.delivery
             return this.order.status === 'ready' && !!d && !DELIVERY_CANCELLED_STATUSES.includes(d.status)
                 && !!(d.driver_name || d.share_link)
+        },
+
+        code() {
+            return orderCode(this.order.id)
         },
 
         placedAt() {
@@ -183,7 +188,7 @@ export default {
                 {{ $t('seller_order_detail.label_reason') }}: {{ order.cancellation_reason }}
             </div>
             <div class="order-time-text">
-                {{ $t('seller_order_detail.label_placed') }} {{ placedAt }}
+                {{ code }} · {{ $t('seller_order_detail.label_placed') }} {{ placedAt }}
             </div>
         </div>
 
