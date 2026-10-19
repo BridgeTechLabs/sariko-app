@@ -9,6 +9,7 @@ import BaseCountryCodeSelect from '@/components/v2/shared/BaseCountryCodeSelect.
 import apiAddress from '@/apis/address/apiAddress';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { addOsmTiles } from '@/utils/mapTiles';
 
 const LABELS = ['home', 'work', 'other']
 const LABEL_ICONS = { home: 'home', work: 'store', other: 'map-pin' }
@@ -120,16 +121,11 @@ export default {
                 center: hasCoords ? [lat, lon] : DEFAULT_CENTER,
                 zoom: hasCoords ? 16 : 13,
                 zoomControl: false,
-                attributionControl: false,
                 doubleClickZoom: false,
                 scrollWheelZoom: 'center',
                 touchZoom: 'center',
             })
-            const tiles = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark_all' : 'light_all'
-            L.tileLayer(`https://{s}.basemaps.cartocdn.com/${tiles}/{z}/{x}/{y}{r}.png`, {
-                maxZoom: 19,
-                subdomains: 'abcd',
-            }).addTo(this.map)
+            addOsmTiles(this.map)
             this.map.on('dragend', this.onMapDragEnd)
         },
 

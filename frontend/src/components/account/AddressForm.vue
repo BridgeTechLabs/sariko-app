@@ -1,6 +1,7 @@
 <script>
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { addOsmTiles } from '@/utils/mapTiles';
 import { MapPin, LocateFixed, Search, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth/authStore';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
@@ -132,16 +133,12 @@ export default {
                 center: [lat, lon],
                 zoom: 16,
                 zoomControl: false,
-                attributionControl: false,
                 dragging: false,
                 scrollWheelZoom: false,
                 doubleClickZoom: false,
                 touchZoom: false,
             })
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                maxZoom: 19,
-                subdomains: 'abcd'
-            }).addTo(this._map)
+            addOsmTiles(this._map)
             const icon = L.divIcon({
                 className: '',
                 html: `<div class="preview-pin"></div>`,
