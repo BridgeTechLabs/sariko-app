@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPin, LocateFixed, Search, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth/authStore';
+import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiUsers from '@/apis/users/apiUsers';
 import { apiClient } from '@/lib/axiosPolicy.js';
 
@@ -31,16 +32,29 @@ export default {
         authStore() {
             return useAuthStore()
         },
+        // Sellers edit the store pickup address (seller_profiles), not a buyer delivery address.
+        isSeller() {
+            return !!this.authStore.user?.isSeller
+        },
         canSave() {
             return !!this.address && !this.saving
         }
     },
 
-    mounted() {
-        this.address = this.authStore.inputAddress || ''
-        this.addressDetails = this.authStore.inputAddressDetails || ''
-        this.lat = this.authStore.inputLat || null
-        this.lon = this.authStore.inputLon || null
+    async mounted() {
+        if (this.isSeller) {
+            const dashboardStore = useDashboardStore()
+            await dashboardStore.fetchSellerInfo()
+            const info = dashboardStore.sellerInfo || {}
+            this.address = info.address || ''
+            this.lat = info.lat || null
+            this.lon = info.lon || null
+        } else {
+            this.address = this.authStore.inputAddress || ''
+            this.addressDetails = this.authStore.inputAddressDetails || ''
+            this.lat = this.authStore.inputLat || null
+            this.lon = this.authStore.inputLon || null
+        }
         if (this.address) this.query = this.address
         if (this.lat && this.lon) {
             this.$nextTick(() => this.showMapAt(this.lat, this.lon))
@@ -176,10 +190,14 @@ export default {
                     lat: this.lat,
                     lon: this.lon,
                 })
-                this.authStore.inputAddress = this.address
-                this.authStore.inputAddressDetails = this.addressDetails
-                this.authStore.inputLat = this.lat
-                this.authStore.inputLon = this.lon
+                if (this.isSeller) {
+                    await useDashboardStore().fetchSellerInfo()
+                } else {
+                    this.authStore.inputAddress = this.address
+                    this.authStore.inputAddressDetails = this.addressDetails
+                    this.authStore.inputLat = this.lat
+                    this.authStore.inputLon = this.lon
+                }
                 this.$q.notify({
                     classes: 'quasar-notify-positive',
                     message: `✔️ ${this.$t('common.toast_update_success')}`,
@@ -260,8 +278,8 @@ export default {
             <div class="address-text">{{ address }}</div>
         </div>
 
-        <!-- Address details -->
-        <div class="form-field">
+        <!-- Address details (buyers only: seller_profiles has no column for it) -->
+        <div v-if="!isSeller" class="form-field">
             <label class="field-label">{{ $t('delivery_address_page.label_address_details') }}</label>
             <q-input
                 v-model="addressDetails"

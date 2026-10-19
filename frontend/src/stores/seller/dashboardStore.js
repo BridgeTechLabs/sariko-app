@@ -73,6 +73,8 @@ export const useDashboardStore = defineStore("dashboardStore", {
                     slug: res.slug,
                     store_name: res.store_name,
                     address: res.address,
+                    lat: res.lat,
+                    lon: res.lon,
                     phone: res.phone,
                     has_address: res.has_address,
                     has_phone: res.has_phone,

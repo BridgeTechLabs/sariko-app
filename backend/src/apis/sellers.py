@@ -107,6 +107,8 @@ def get_seller_info(user=Depends(verify_token)):
             "slug": profile.get("slug"),
             "store_name": profile.get("store_name"),
             "address": profile.get("address"),
+            "lat": profile.get("lat"),
+            "lon": profile.get("lon"),
             "phone": profile.get("phone"),
             "has_address": bool(profile.get("address") and profile.get("lat") and profile.get("lon")),
             "has_phone": bool(profile.get("phone")),
