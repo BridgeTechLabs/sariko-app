@@ -1,13 +1,18 @@
 <script>
 import { mapState, mapActions } from 'pinia';
-import { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt } from 'lucide-vue-next';
+import { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt, MessageCircle, ExternalLink } from 'lucide-vue-next';
 import { useAccountV2Store } from '@/stores/v2/account/accountStore';
 import BaseSwitch from '@/components/v2/shared/BaseSwitch.vue';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
 
 export default {
     name: 'SellerMeSettings',
 
-    components: { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt, BaseSwitch },
+    components: { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt, MessageCircle, ExternalLink, BaseSwitch },
+
+    data() {
+        return { supportEmail: SUPPORT_EMAIL, supportMailto: SUPPORT_MAILTO }
+    },
 
     computed: {
         ...mapState(useAccountV2Store, ['notifications']),
@@ -53,9 +58,15 @@ export default {
                 <ChevronRight size="16" class="menu-arrow" />
             </router-link>
 
-            <a href="https://buyerdox.sariko.store/" target="_blank" class="menu-item">
+            <a :href="supportMailto" class="menu-item">
+                <div class="menu-icon"><MessageCircle size="18" /></div>
+                <span class="menu-label">{{ $t('seller_me.menu_label_support') }}<span class="menu-sub">{{ supportEmail }}</span></span>
+                <ExternalLink size="14" class="menu-arrow" />
+            </a>
+
+            <a href="/docs/sariko_seller_agreement.html" target="_blank" class="menu-item">
                 <div class="menu-icon"><FileText size="18" /></div>
-                <span class="menu-label">{{ $t('seller_me.menu_label_terms') }}</span>
+                <span class="menu-label">{{ $t('seller_me.menu_label_seller_agreement') }}</span>
                 <ChevronRight size="16" class="menu-arrow" />
             </a>
 
@@ -102,6 +113,12 @@ export default {
     color: var(--text-primary);
     transition: background 0.15s ease;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.menu-sub {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
 }
 
 .menu-item:last-child {

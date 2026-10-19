@@ -2,6 +2,7 @@
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import { AlertTriangle } from 'lucide-vue-next';
 import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '@/utils/readyWindow';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
 
 const STATUS_NEXT = {
     pending:   'confirmed',
@@ -34,6 +35,8 @@ export default {
             rebooking: false,
             rebookError: false,
             tick: 0,
+            supportEmail: SUPPORT_EMAIL,
+            supportMailto: SUPPORT_MAILTO,
             _tickInterval: null,
         }
     },
@@ -192,9 +195,9 @@ export default {
 <template>
     <div>
         <!-- Contact admin notice — infra errors requiring admin intervention -->
-        <div v-if="showContactAdmin" class="contact-admin-notice">
-            {{ $t('seller_order_detail.contact_admin_notice') }}
-        </div>
+        <a v-if="showContactAdmin" :href="supportMailto" class="contact-admin-notice">
+            {{ $t('seller_order_detail.contact_admin_notice', { email: supportEmail }) }}
+        </a>
 
         <!-- Action buttons -->
         <div class="action-row">
@@ -274,6 +277,8 @@ export default {
 
 <style lang="scss" scoped>
 .contact-admin-notice {
+    display: block;
+    text-decoration: underline;
     font-size: 12px;
     color: var(--text-secondary);
     text-align: center;

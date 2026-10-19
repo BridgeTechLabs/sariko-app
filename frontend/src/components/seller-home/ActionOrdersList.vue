@@ -5,6 +5,7 @@ import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
 import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '@/utils/readyWindow';
 import { formatVnTime } from '@/utils/vnTime';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
 
 const STATUS_DISPLAY_KEY = {
     pending:          'seller_home.status_new',
@@ -50,6 +51,8 @@ export default {
             activeTab: 'today',
             copiedKey: null,
             now: Date.now(),      // ticks every minute for the "Ready in …" countdown
+            supportEmail: SUPPORT_EMAIL,
+            supportMailto: SUPPORT_MAILTO,
         }
     },
 
@@ -422,9 +425,9 @@ export default {
 
                 <!-- delivery_failed: rebook action (below contact row) -->
                 <template v-if="order.status === 'delivery_failed'">
-                    <div v-if="rebookErrors[order.id] === 'max_attempts' || rebookErrors[order.id] === 'error'" class="rebook-admin-notice">
-                        {{ $t('seller_home.contact_admin_notice') }}
-                    </div>
+                    <a v-if="rebookErrors[order.id] === 'max_attempts' || rebookErrors[order.id] === 'error'" :href="supportMailto" class="rebook-admin-notice">
+                        {{ $t('seller_home.contact_admin_notice', { email: supportEmail }) }}
+                    </a>
                     <div class="delivery-rebook-row">
                         <button class="btn-delivery-issue" @click="$router.push({ name: 'seller-order-detail', params: { orderId: order.id } })">
                             <AlertTriangle :size="13" />
@@ -738,6 +741,8 @@ export default {
 }
 
 .rebook-admin-notice {
+    display: block;
+    text-decoration: underline;
     font-size: 11px;
     color: #ef4444;
     background: rgba(239, 68, 68, 0.08);
