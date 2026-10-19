@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import { registerSW } from 'virtual:pwa-register'
 import VueAxios from 'vue-axios'
 import axios from 'axios'
 import App from './App.vue'
@@ -23,15 +24,7 @@ for (const path in plugins) {
 
 app.mount('#app')
 
-// Register service worker
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' })
-            .then((registration) => {
-                console.log('SW registered:', registration)
-            })
-            .catch((error) => {
-                console.log('SW registration failed:', error)
-            })
-    })
-}
+// Service worker via vite-plugin-pwa (registerType 'autoUpdate'): when a deploy ships a new
+// sw.js it takes over and the open page reloads, so nobody keeps running the old bundle.
+// The /join draft is kept in localStorage, so that reload loses no typed form data.
+registerSW({ immediate: true })
