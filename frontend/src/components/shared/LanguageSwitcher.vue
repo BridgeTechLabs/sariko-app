@@ -95,9 +95,11 @@ export default {
     letter-spacing: 0.3px;
 }
 
+/* Background and text both follow the theme tokens: a fixed dark background with the
+   theme's text colour was navy on navy in the light theme. */
 .lang-sheet {
-    background-color: #1f2940;
-    color: var(--text-primary);
+    background-color: var(--popover);
+    color: var(--popover-foreground);
     border-radius: 16px 16px 0 0;
     padding: 16px 12px calc(16px + env(safe-area-inset-bottom, 0));
     width: 100%;
@@ -108,7 +110,7 @@ export default {
     font-size: 15px;
     font-weight: 700;
     padding: 4px 8px 12px;
-    color: var(--text-primary);
+    color: var(--popover-foreground);
 }
 
 .lang-row {
@@ -120,7 +122,7 @@ export default {
     background: transparent;
     border: 1px solid transparent;
     border-radius: 12px;
-    color: var(--text-primary);
+    color: var(--popover-foreground);
     font-family: inherit;
     text-align: left;
     cursor: pointer;

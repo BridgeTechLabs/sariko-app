@@ -141,7 +141,7 @@ export default {
     position: fixed;
     left: 4px;
     bottom: 12px;
-    z-index: 9000;
+    z-index: 5000; /* above the page, below Quasar dialogs (6000), e.g. the language sheet */
     width: 52px;
     padding: 4px 2px;
     border: 2px dashed #fff;
