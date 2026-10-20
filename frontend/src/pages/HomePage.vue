@@ -9,6 +9,7 @@ import Banner from '@/components/home-page/Banner.vue'
 import ZenPromoBanner from '@/components/home-page/ZenPromoBanner.vue'
 import ZenPromoFloating from '@/components/home-page/ZenPromoFloating.vue'
 import HomeFooter from '@/components/home-page/HomeFooter.vue'
+import BuyerMissingBanner from '@/components/home-page/BuyerMissingBanner.vue'
 
 const ZEN_AD_VARIANT = import.meta.env.VITE_ZEN_AD_VARIANT || 'banner'
 
@@ -24,7 +25,8 @@ export default {
         Banner,
         ZenPromoBanner,
         ZenPromoFloating,
-        HomeFooter
+        HomeFooter,
+        BuyerMissingBanner
     },
     computed: {
         showZenBanner() {
@@ -44,6 +46,7 @@ export default {
 
         <template #Header>
             <Header />
+            <BuyerMissingBanner />
         </template>
 
         <template v-if="showZenBanner" #ZenPromo>

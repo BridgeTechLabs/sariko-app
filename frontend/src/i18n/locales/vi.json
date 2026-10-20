@@ -213,6 +213,12 @@
             "label_email": "Email",
             "label_partners": "Thanh toán: VNPAY · Giao hàng: Lalamove",
             "link_sell": "Bán hàng trên SariKo"
+        },
+        "missing_banner": {
+            "title": "Bổ sung để đặt được hàng",
+            "phone": "Số điện thoại",
+            "address": "Địa chỉ giao hàng",
+            "action": "Thêm"
         }
     },
     "seller_page": {
