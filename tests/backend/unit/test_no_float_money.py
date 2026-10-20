@@ -17,7 +17,6 @@ MONEY = re.compile(r"price|amount|fee|commission|payout|refund|total|subtotal|va
 
 # Lines per file on 2026-10-20 (TODO T89). Lower the count when T89 fixes one.
 BASELINE = {
-    "apis/admin_refunds.py": 3,
     "apis/payments.py": 2,
     "apis/sellers.py": 1,
     "dao/dao_admin_config.py": 1,
