@@ -147,6 +147,12 @@ const routes = [
         meta: { requiresAuth: true, requiresSeller: true }
     },
     {
+        path: '/seller/me/profile',
+        name: 'seller-profile-completion',
+        component: () => import('@/pages/seller/SellerProfileCompletionPage.vue'),
+        meta: { requiresAuth: true, requiresSeller: true }
+    },
+    {
         path: '/account',
         name: 'account',
         component: () => import('@/pages/AccountPage.vue'),
