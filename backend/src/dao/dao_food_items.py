@@ -89,7 +89,7 @@ class DAOFoodItems(DAOBase):
         """is_available + preorder_day + the seller's switch and hours: enough to decide if the dish can be ordered now."""
         result = (
             self._supabase_client.table(self._table_name)
-            .select("is_available, preorder_day, seller_profiles(is_open, opening_time, closing_time)")
+            .select("is_available, preorder_day, seller_profiles(status, lat, lon, is_open, opening_time, closing_time)")
             .eq("id", item_id)
             .limit(1)
             .execute()
