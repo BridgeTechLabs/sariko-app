@@ -3,7 +3,7 @@ import { ScanBarcode, AlertCircle, Calendar } from 'lucide-vue-next';
 import { mapGetters, mapState } from 'pinia';
 import { useCartStore } from '@/stores/cart/cartStore.js';
 import { useOrderStore } from '@/stores/order/orderStore.js';
-import { useAuthStore } from '@/stores/auth/authStore.js';
+import { useAuthStore, BUYER_MISSING_ROUTES } from '@/stores/auth/authStore.js';
 import { useDeliveryStore } from '@/stores/delivery/deliveryStore.js';
 import apiPayments from '@/apis/payments/apiPayments.js';
 
@@ -61,9 +61,8 @@ export default {
         },
         validationIssues() {
             const auth = useAuthStore()
-            const issues = []
-            if (!auth.user?.phone) issues.push({ msg: this.$t('cart_page.validation.missing_phone'), route: '/account/profile' })
-            if (!auth.inputAddress) issues.push({ msg: this.$t('cart_page.validation.missing_address'), route: '/account/address' })
+            // same list as the home banner (authStore.buyerMissing)
+            const issues = auth.buyerMissing.map((k) => ({ msg: this.$t(`cart_page.validation.missing_${k}`), route: BUYER_MISSING_ROUTES[k] }))
             if (this.isPreorder && !this.deliveryAppointment) issues.push({ msg: this.$t('cart_page.validation.missing_appointment'), route: null })
             return issues
         },

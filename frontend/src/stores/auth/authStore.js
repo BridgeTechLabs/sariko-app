@@ -61,6 +61,9 @@ function applyLocale(preferredLanguage) {
     localStorage.setItem('lang', locale);
 }
 
+// What a buyer still needs before checkout: the cart blocks Place order on these, the home banner lists them.
+export const BUYER_MISSING_ROUTES = { phone: '/account/profile', address: '/account/address' };
+
 export const useAuthStore = defineStore("authStore", {
     state() {
         return {
@@ -97,11 +100,17 @@ export const useAuthStore = defineStore("authStore", {
             user: null,
             isLoading: false,
             sellerId: null,
+            buyerInfoLoaded: false,  // profile + address fetched for this session (no banner flash while loading)
 
             // auth subscription
             _authSub: null,
             isPasswordRecovery: false,
         }
+    },
+
+    getters: {
+        buyerMissing: (state) => Object.keys(BUYER_MISSING_ROUTES).filter((k) =>
+            k === 'phone' ? !state.user?.phone : !state.inputAddress),
     },
 
     actions: {
@@ -173,6 +182,7 @@ export const useAuthStore = defineStore("authStore", {
                     } catch (e) {
                         console.error(`authStore - bootstrap - address fetch failed: ${e}`);
                     }
+                    this.buyerInfoLoaded = true;
 
                     try {
                         const cartStore = useCartStore();
@@ -289,6 +299,7 @@ export const useAuthStore = defineStore("authStore", {
                 // Setting user triggers App.vue to load conversations — token must be stored first
                 const session = await waitForStoredSession(res.session.access_token);
                 this._setFromSession(session);
+                this.buyerInfoLoaded = false;
 
                 try {
                     const profile = await apiUsers.getProfile()
@@ -318,6 +329,7 @@ export const useAuthStore = defineStore("authStore", {
                 } catch (e) {
                     console.error(`authStore - onClickedSignin - address fetch failed: ${e}`);
                 }
+                this.buyerInfoLoaded = true;
 
                 try {
                     const cartStore = useCartStore();

@@ -213,6 +213,12 @@
             "label_email": "Email",
             "label_partners": "Payments: VNPAY · Delivery: Lalamove",
             "link_sell": "Sell on SariKo"
+        },
+        "missing_banner": {
+            "title": "Add these so you can order",
+            "phone": "Phone number",
+            "address": "Delivery address",
+            "action": "Add"
         }
     },
     "seller_page": {
