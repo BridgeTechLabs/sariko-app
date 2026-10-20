@@ -1,6 +1,6 @@
 <script>
 import { Phone } from 'lucide-vue-next';
-import { formatVnTime } from '@/utils/vnTime';
+import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { orderCode } from '@/utils/orderCode';
 
 const STATUS_DISPLAY_KEY = {
@@ -169,6 +169,18 @@ export default {
     },
 
     methods: {
+        // When the order reached this status (history_order_status), Vietnam time;
+        // the date too unless it was today. Orders before 2026-10-16 have no history.
+        stepTime(step) {
+            if (!step.done && !step.current) return ''
+            const hit = (this.order.status_history || []).filter(h => h.status === step.key).pop()
+            if (!hit) return ''
+            const sameDay = vnDay(hit.changed_at) === vnDay(new Date())
+            return formatVnTime(hit.changed_at, sameDay
+                ? { hour: '2-digit', minute: '2-digit' }
+                : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+        },
+
         fmt(amount) {
             return new Intl.NumberFormat('vi-VN').format(amount || 0) + ' ₫'
         },
@@ -295,6 +307,7 @@ export default {
                             }"
                         >
                             {{ step.label }}
+                            <span v-if="stepTime(step)" class="timeline-time">{{ stepTime(step) }}</span>
                         </div>
                         <div v-if="step.errorMessage" class="delivery-error-inline">
                             {{ step.errorMessage }}
@@ -456,6 +469,13 @@ export default {
     &.label-done    { color: var(--text-primary); font-weight: 500; }
     &.label-current { color: var(--color-accent); font-weight: 600; }
     &.label-error   { color: #ef4444; font-weight: 600; }
+}
+
+.timeline-time {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-muted);
 }
 
 .delivery-error-inline {

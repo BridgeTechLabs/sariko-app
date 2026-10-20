@@ -249,9 +249,11 @@ def search_seller_orders(user=Depends(verify_token), q: str = Query(min_length=2
 def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
     try:
         seller = _get_seller(user)
-        order = DAOOrders().read_order_by_id_for_seller(order_id, seller["id"])
+        dao = DAOOrders()
+        order = dao.read_order_by_id_for_seller(order_id, seller["id"])
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        order["status_history"] = dao.read_status_history(order_id)
         return {"success": True, "order": _with_deadlines([order], seller)[0]}
     except HTTPException:
         raise
@@ -301,6 +303,18 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
 
             seller  = full_order.get("seller_profiles") or {}
             buyer   = full_order.get("users") or {}
+
+            # Same check as the Ready buttons (P1-4): no pickup point or phone, no quote.
+            missing = [field for field, ok in (
+                ("address", seller.get("address") and seller.get("lat") and seller.get("lon")),  # as has_address
+                ("phone", seller.get("phone")),
+            ) if not ok]
+            if missing:
+                raise HTTPException(status_code=409, detail={
+                    "code": "seller_profile_incomplete",
+                    "missing": missing,
+                    "message": "Set your store address and phone before marking the order ready.",
+                })
 
             pickup_address  = seller.get("address") or ""
             dropoff_address = full_order.get("delivery_address") or ""

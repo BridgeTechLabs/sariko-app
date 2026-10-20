@@ -228,6 +228,23 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_order_by_id_for_seller: {e}")
 
+    def read_status_history(self, order_id: str):
+        """[{status, changed_at}] oldest first, written by the log_order_status trigger.
+        Orders older than that trigger (2026-10-16) have none."""
+        try:
+            result = self._supabase_client.table("history_order_status") \
+                .select("status, changed_at") \
+                .eq("order_id", order_id) \
+                .order("changed_at") \
+                .execute()
+
+            return result.data or []
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_status_history: {e}")
+        except Exception as e:
+            raise Exception(f"error read_status_history: {e}")
+
     def update_order_status(self, order_id: str, status: str, cancellation_reason: Optional[str] = None,
                             expected_status: Optional[str] = None):
         """expected_status makes the write conditional: if someone else changed the
