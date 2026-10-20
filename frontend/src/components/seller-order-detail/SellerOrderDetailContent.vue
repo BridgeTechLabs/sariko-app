@@ -170,7 +170,8 @@ export default {
 
     methods: {
         // When the order reached this status (history_order_status), Vietnam time;
-        // the date too unless it was today. Orders before 2026-10-16 have no history.
+        // the date too unless it was today (with the year: vi-VN writes day + month
+        // alone as "16-10"). Orders before 2026-10-16 have no history.
         stepTime(step) {
             if (!step.done && !step.current) return ''
             const hit = (this.order.status_history || []).filter(h => h.status === step.key).pop()
@@ -178,7 +179,7 @@ export default {
             const sameDay = vnDay(hit.changed_at) === vnDay(new Date())
             return formatVnTime(hit.changed_at, sameDay
                 ? { hour: '2-digit', minute: '2-digit' }
-                : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                : { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
         },
 
         fmt(amount) {
