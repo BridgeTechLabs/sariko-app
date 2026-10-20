@@ -82,6 +82,8 @@ export const useDashboardStore = defineStore("dashboardStore", {
                     opening_time: res.opening_time,
                     closing_time: res.closing_time,
                     open_now: res.open_now,        // switch + hours: what buyers see
+                    rating_avg: res.rating_avg,
+                    rating_count: res.rating_count,
                 }
             } catch (e) {
                 console.error('dashboardStore - fetchSellerInfo -', e)

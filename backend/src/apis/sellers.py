@@ -120,6 +120,8 @@ def get_seller_info(user=Depends(verify_token)):
             "opening_time": profile.get("opening_time"),
             "closing_time": profile.get("closing_time"),
             "open_now": is_open_now(profile.get("is_open"), profile.get("opening_time"), profile.get("closing_time")),
+            "rating_avg": profile.get("rating_avg"),
+            "rating_count": profile.get("rating_count") or 0,
         }
     except HTTPException:
         raise

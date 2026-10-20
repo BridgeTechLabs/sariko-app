@@ -35,6 +35,11 @@ export const apiSellerDashboard = {
         return response.data
     },
 
+    getReviews: async (limit, offset) => {
+        const response = await apiClient.get('/v1/sellers/me/reviews', { params: { limit, offset } })
+        return response.data
+    },
+
 }
 
 export default apiSellerDashboard
