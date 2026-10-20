@@ -2,7 +2,7 @@ import logging
 import re
 
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from apis.orders import cancel_after
 from core.store_hours import VN_TZ, confirm_deadline, is_open_now
@@ -648,6 +648,11 @@ def _money(value) -> Decimal:
     return Decimal(str(value or 0))
 
 
+def _vnd(amount: Decimal) -> int:
+    """Whole đồng for the JSON, rounded half up like the admin screens (DB keeps 2 decimals)."""
+    return int(amount.quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
 @router.get("/me/earnings")
 def get_seller_earnings(user=Depends(verify_token)):
     """Done orders of the last seller_order_history_days with their split (food, commission,
@@ -676,10 +681,10 @@ def get_seller_earnings(user=Depends(verify_token)):
             orders.append({
                 "id": row["id"],
                 "done_at": row.get("status_changed_at"),
-                "subtotal": int(_money(row.get("subtotal"))),
-                "commission_amount": int(_money(row.get("commission_amount"))),
-                "vat_amount": int(_money(row.get("vat_amount"))),
-                "payout_amount": int(payout),
+                "subtotal": _vnd(_money(row.get("subtotal"))),
+                "commission_amount": _vnd(_money(row.get("commission_amount"))),
+                "vat_amount": _vnd(_money(row.get("vat_amount"))),
+                "payout_amount": _vnd(payout),
                 "payout_state": state,
                 "expected_payout_date": expected,
             })
@@ -691,16 +696,17 @@ def get_seller_earnings(user=Depends(verify_token)):
                 received += net
             payouts.append({
                 **row,
-                "net_payout": int(net),
-                "total_deductions": int(_money(row.get("total_deductions"))),
+                "net_payout": _vnd(net),
+                "total_deductions": _vnd(_money(row.get("total_deductions"))),
             })
 
         return {
             "success": True,
             "history_days": history_days,
             "payout_delay_days": delay_days,
-            "awaiting_total": int(awaiting),
-            "received_total": int(received),
+            "awaiting_total": _vnd(awaiting),
+            "received_total": _vnd(received),
+            "payouts_limit": EARNINGS_PAYOUTS_LIMIT,   # received_total covers only these batches
             "orders": orders,
             "payouts": payouts,
         }

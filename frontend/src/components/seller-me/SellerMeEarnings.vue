@@ -133,7 +133,7 @@ export default {
                         <div class="total-value">{{ vnd(data.awaiting_total) }}</div>
                     </div>
                     <div class="total">
-                        <div class="total-label">{{ $t('seller_me.earnings_received') }}</div>
+                        <div class="total-label">{{ $t('seller_me.earnings_received', { n: data.payouts_limit }) }}</div>
                         <div class="total-value total-value--paid">{{ vnd(data.received_total) }}</div>
                     </div>
                 </div>

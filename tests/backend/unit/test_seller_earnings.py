@@ -139,3 +139,15 @@ def test_get_int_in_range(monkeypatch, value, want):
     monkeypatch.setattr(DAOAdminConfig, "__init__", lambda self: None)
     monkeypatch.setattr(DAOAdminConfig, "get_setting", lambda self, key: value)
     assert DAOAdminConfig().get_int_in_range("payout_delay_days", 3, 0, 30) == want
+
+
+def test_money_rounds_half_up(earnings):  # TC-25: DB keeps 2 decimals; JSON rounds like the admin screens
+    res, _ = earnings(orders=[_order(1, payout_amount="49060.50", vat_amount="440.49")],
+                      payouts=[{"id": "p1", "net_payout": "98120.50", "total_deductions": "0.50", "status": "completed"}])
+    body = res.json()
+    assert body["orders"][0]["payout_amount"] == 49061
+    assert body["orders"][0]["vat_amount"] == 440
+    assert body["awaiting_total"] == 49061
+    assert body["payouts"][0]["net_payout"] == 98121 and body["payouts"][0]["total_deductions"] == 1
+    assert body["received_total"] == 98121
+    assert body["payouts_limit"] == 12

@@ -727,7 +727,7 @@
         "promote_download": "Save QR",
         "section_title_earnings": "Earnings",
         "earnings_awaiting": "Awaiting payout",
-        "earnings_received": "Received",
+        "earnings_received": "Received (last {n} payouts)",
         "earnings_orders_title": "Completed orders, last {days} days",
         "earnings_split": "Food {food} · Commission −{commission} · VAT −{vat}",
         "earnings_state_pending": "Awaiting payout",

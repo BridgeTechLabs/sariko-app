@@ -730,7 +730,7 @@
         "promote_download": "Tải QR",
         "section_title_earnings": "Thu nhập",
         "earnings_awaiting": "Chờ chi trả",
-        "earnings_received": "Đã nhận",
+        "earnings_received": "Đã nhận ({n} kỳ gần nhất)",
         "earnings_orders_title": "Đơn đã xong, {days} ngày gần nhất",
         "earnings_split": "Tiền món {food} · Hoa hồng −{commission} · VAT −{vat}",
         "earnings_state_pending": "Chờ chi trả",
