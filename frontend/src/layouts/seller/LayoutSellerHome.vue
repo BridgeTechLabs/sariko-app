@@ -1,23 +1,13 @@
 <template>
+    <!-- One scroll area for the whole page: greeting + stats scroll away so the orders get the screen -->
     <div class="seller-home-page">
-
-        <!-- Fixed top: greeting + stats -->
-        <div class="top-fixed">
-            <div class="header-section">
-                <slot name="Header" />
-            </div>
-            <div class="stats-section">
-                <slot name="Stats" />
-            </div>
+        <div class="header-section">
+            <slot name="Header" />
         </div>
-
-        <!-- Scrollable action area -->
-        <div class="action-section">
-            <q-scroll-area class="action-scroll">
-                <slot name="ActionOrders" />
-            </q-scroll-area>
+        <div class="stats-section">
+            <slot name="Stats" />
         </div>
-
+        <slot name="ActionOrders" />
     </div>
 </template>
 
@@ -25,17 +15,12 @@
 .seller-home-page {
     height: 100vh;
     height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
     background: var(--bg-main);
     font-family: $sariko-font-family-secondary;
-}
-
-.top-fixed {
-    flex-shrink: 0;
-    padding: 20px 16px 0;
+    padding: 20px 16px;
     padding-top: calc(20px + env(safe-area-inset-top, 0));
+    padding-bottom: calc(var(--bottom-nav-height, 72px) + 16px);
 }
 
 .header-section {
@@ -44,16 +29,5 @@
 
 .stats-section {
     margin-bottom: 20px;
-}
-
-.action-section {
-    flex: 1;
-    overflow: hidden;
-}
-
-.action-scroll {
-    height: 100%;
-    padding: 0 16px;
-    padding-bottom: calc(var(--bottom-nav-height, 72px) + 16px);
 }
 </style>
