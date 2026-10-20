@@ -23,6 +23,11 @@ export const apiSellerDashboard = {
         return response.data
     },
 
+    searchOrders: async (q) => {
+        const response = await apiClient.get('/v1/sellers/me/orders/search', { params: { q } })
+        return response.data
+    },
+
     getOrderDetail: async (orderId) => {
         const response = await apiClient.get(`/v1/sellers/me/orders/${orderId}`)
         return response.data

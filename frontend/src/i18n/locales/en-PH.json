@@ -633,7 +633,11 @@
         "group_today": "Today",
         "group_yesterday": "Yesterday",
         "empty": "No orders yet",
-        "empty_subtitle": "New orders will appear here automatically."
+        "empty_subtitle": "New orders will appear here automatically.",
+        "search_placeholder": "Search order code or customer name",
+        "search_empty": "No orders found",
+        "search_empty_subtitle": "Check the order code (e.g. #54CB066E) or the customer's name.",
+        "history_note": "Completed and cancelled orders from the last day are shown. Search by order code or customer name to find older ones. | Completed and cancelled orders from the last {days} days are shown. Search by order code or customer name to find older ones."
     },
     "seller_order_detail": {
         "page_title": "Order Detail",

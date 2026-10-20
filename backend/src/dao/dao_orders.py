@@ -133,12 +133,18 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_order_by_id: {e}")
 
-    def read_orders_by_seller_id(self, seller_id: str):
+    _SELLER_LIST_SELECT = "id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, created_at, paid_at, status_changed_at, users{join}(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status)"
+
+    def read_orders_by_seller_id(self, seller_id: str, finished_since: datetime):
+        """Running orders of any age + done / cancelled orders created since `finished_since` (UTC)."""
+        # orders.created_at is timestamp without time zone holding UTC: compare against naive UTC.
+        since = finished_since.astimezone(timezone.utc).replace(tzinfo=None).isoformat()
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, created_at, paid_at, status_changed_at, users(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status)") \
+                .select(self._SELLER_LIST_SELECT.format(join="")) \
                 .eq("seller_id", seller_id) \
                 .eq("payment_status", "paid") \
+                .or_(f"status.not.in.(done,cancelled),created_at.gte.{since}") \
                 .order("created_at", desc=True) \
                 .execute()
 
@@ -148,6 +154,37 @@ class DAOOrders(DAOBase):
             raise Exception(f"Supabase error - read_orders_by_seller_id: {e}")
         except Exception as e:
             raise Exception(f"error read_orders_by_seller_id: {e}")
+
+    def search_orders_for_seller(self, seller_id: str, code: Optional[str], name: Optional[str], limit: int):
+        """Seller order search, any age. `code`: lowercase hex prefix of the order id;
+        `name`: substring of the buyer's name (caller strips filter characters)."""
+        def query(join):
+            return self._supabase_client.table(self._table_name) \
+                .select(self._SELLER_LIST_SELECT.format(join=join)) \
+                .eq("seller_id", seller_id) \
+                .eq("payment_status", "paid") \
+                .order("created_at", desc=True) \
+                .limit(limit)
+
+        def as_uuid(hex32):
+            return f"{hex32[:8]}-{hex32[8:12]}-{hex32[12:16]}-{hex32[16:20]}-{hex32[20:]}"
+
+        try:
+            found = {}
+            if code:
+                # uuid has no LIKE: a prefix is the range [prefix000…, prefixfff…].
+                rows = query("").gte("id", as_uuid((code + "0" * 32)[:32])) \
+                    .lte("id", as_uuid((code + "f" * 32)[:32])).execute().data or []
+                found.update({r["id"]: r for r in rows})
+            if name:
+                rows = query("!inner").ilike("users.name", f"*{name}*").execute().data or []
+                found.update({r["id"]: r for r in rows})
+            return sorted(found.values(), key=lambda r: r["created_at"], reverse=True)[:limit]
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - search_orders_for_seller: {e}")
+        except Exception as e:
+            raise Exception(f"error search_orders_for_seller: {e}")
 
     def read_orders_head_by_seller_id(self, seller_id: str):
         """Signature of the seller's order list: newest updated_at + row count.

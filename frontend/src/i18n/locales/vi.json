@@ -633,7 +633,11 @@
         "group_today": "Hôm nay",
         "group_yesterday": "Hôm qua",
         "empty": "Chưa có đơn hàng",
-        "empty_subtitle": "Đơn hàng mới sẽ tự động xuất hiện ở đây."
+        "empty_subtitle": "Đơn hàng mới sẽ tự động xuất hiện ở đây.",
+        "search_placeholder": "Tìm mã đơn hoặc tên khách",
+        "search_empty": "Không tìm thấy đơn",
+        "search_empty_subtitle": "Kiểm tra lại mã đơn (vd #54CB066E) hoặc tên khách.",
+        "history_note": "Đang hiện đơn đã xong và đã huỷ trong {days} ngày gần nhất. Tìm theo mã đơn hoặc tên khách để xem đơn cũ hơn."
     },
     "seller_order_detail": {
         "page_title": "Chi tiết đơn hàng",

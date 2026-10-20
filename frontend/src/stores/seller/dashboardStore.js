@@ -13,6 +13,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
             sellerId: null,
             sellerInfo: null,
             orders: [],
+            historyDays: null,   // done / cancelled orders older than this are only found by search
             orderDetails: null,
             orderDelivery: null,
             deliveryStatuses: {},
@@ -108,6 +109,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
             try {
                 const res = await apiSellerDashboard.getOrders()
                 this.orders = res.orders || []
+                this.historyDays = res.history_days ?? null
             } catch (e) {
                 console.error('dashboardStore - fetchOrders -', e)
             } finally {

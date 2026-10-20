@@ -1,6 +1,7 @@
 import logging
+import re
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from apis.orders import cancel_after
 from core.store_hours import confirm_deadline, is_open_now
@@ -40,6 +41,9 @@ VALID_STATUS_TRANSITIONS = {
 # A Lalamove trip is over once it reaches one of these; before that the COMPLETED
 # webhook closes the order, so the seller can't mark it done (P0-6).
 DELIVERY_ENDED_STATUSES = {"COMPLETED", "REJECTED", "CANCELLED", "CANCELED", "EXPIRED"}
+
+# Rows one order search returns (a page size, not a business rule).
+SEARCH_LIMIT = 20
 
 @router.get("/")
 def get_sellers(user=Depends(verify_token)):
@@ -178,8 +182,11 @@ def set_store_hours(body: Schema.RequestSetStoreHours, user=Depends(verify_token
 def get_seller_orders(user=Depends(verify_token)):
     try:
         seller = _get_seller(user)
-        orders = DAOOrders().read_orders_by_seller_id(seller["id"])
-        return {"success": True, "orders": _with_deadlines(orders, seller), "seller_id": seller["id"]}
+        history_days = DAOAdminConfig().get_positive_int("seller_order_history_days", 30)
+        since = datetime.now(timezone.utc) - timedelta(days=history_days)
+        orders = DAOOrders().read_orders_by_seller_id(seller["id"], since)
+        return {"success": True, "orders": _with_deadlines(orders, seller), "seller_id": seller["id"],
+                "history_days": history_days}
     except HTTPException:
         raise
     except Exception as e:
@@ -213,6 +220,28 @@ def get_seller_orders_head(user=Depends(verify_token)):
         raise
     except Exception as e:
         logger.exception(f"Exception in GET /sellers/me/orders/head: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Must stay above /me/orders/{order_id}, like /head.
+@router.get("/me/orders/search")
+def search_seller_orders(user=Depends(verify_token), q: str = Query(min_length=2, max_length=60)):
+    """Find an order of any age by its code (#54CB066E, or the start of it) or the buyer's name."""
+    try:
+        seller = _get_seller(user)
+        term = q.strip().lstrip("#").strip()
+        code = term.lower() if re.fullmatch(r"[0-9a-fA-F-]{2,36}", term) else None
+        if code:
+            code = code.replace("-", "")
+        # Keep letters, digits, spaces and . ' - : anything else could act as a PostgREST
+        # filter or LIKE character.
+        name = re.sub(r"[^\w\s.'-]|_", "", term).strip() or None
+        orders = DAOOrders().search_orders_for_seller(seller["id"], code, name, limit=SEARCH_LIMIT)
+        return {"success": True, "orders": _with_deadlines(orders, seller)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Exception in GET /sellers/me/orders/search: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

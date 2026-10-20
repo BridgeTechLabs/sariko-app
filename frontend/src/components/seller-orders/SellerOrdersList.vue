@@ -1,9 +1,14 @@
 <script>
 import { mapState, mapActions } from 'pinia';
+import { Search } from 'lucide-vue-next';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
+import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
 import { liveDeliveryKey } from '@/utils/deliveryBadge';
 import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { orderCode } from '@/utils/orderCode';
+
+const SEARCH_MIN_LENGTH = 2   // the API rejects shorter terms
+const SEARCH_DEBOUNCE_MS = 300
 
 const FILTER_KEYS = ['all', 'new', 'preparing', 'ready', 'delivery_failed', 'done', 'cancelled']
 
@@ -28,14 +33,28 @@ const STATUS_CLASS = {
 export default {
     name: 'SellerOrdersList',
 
+    components: { Search },
+
     data() {
         return {
             activeFilter: 'all',
+            searchTerm: '',
+            searchResults: [],
+            searchLoading: false,
         }
     },
 
     computed: {
-        ...mapState(useDashboardStore, ['orders', 'isLoading']),
+        ...mapState(useDashboardStore, ['isLoading', 'historyDays']),
+
+        isSearching() {
+            return this.searchTerm.trim().length >= SEARCH_MIN_LENGTH
+        },
+
+        // Search results (any age) replace the list; the filter chips apply to either.
+        orders() {
+            return this.isSearching ? this.searchResults : useDashboardStore().orders
+        },
 
         filters() {
             return FILTER_KEYS.map(key => ({
@@ -101,8 +120,34 @@ export default {
         },
     },
 
+    watch: {
+        searchTerm() {
+            clearTimeout(this._searchTimer)
+            if (!this.isSearching) {
+                this.searchResults = []
+                this.searchLoading = false
+                return
+            }
+            this.searchLoading = true
+            this._searchTimer = setTimeout(this.runSearch, SEARCH_DEBOUNCE_MS)
+        },
+    },
+
     methods: {
         ...mapActions(useDashboardStore, ['fetchOrders', 'startWatchingOrders', 'stopWatchingOrders']),
+
+        async runSearch() {
+            const term = this.searchTerm.trim()
+            try {
+                const res = await apiSellerDashboard.searchOrders(term)
+                if (term === this.searchTerm.trim()) this.searchResults = res.orders || []
+            } catch (e) {
+                console.error('SellerOrdersList - runSearch -', e)
+                if (term === this.searchTerm.trim()) this.searchResults = []
+            } finally {
+                if (term === this.searchTerm.trim()) this.searchLoading = false
+            }
+        },
 
         goToDetail(orderId) {
             this.$router.push({ name: 'seller-order-detail', params: { orderId } })
@@ -116,6 +161,7 @@ export default {
     },
 
     beforeUnmount() {
+        clearTimeout(this._searchTimer)
         this.stopWatchingOrders()
     },
 }
@@ -123,6 +169,17 @@ export default {
 
 <template>
     <div>
+        <!-- Search -->
+        <div class="search-box">
+            <Search :size="16" class="search-icon" />
+            <input
+                v-model="searchTerm"
+                type="search"
+                class="search-input"
+                :placeholder="$t('seller_orders.search_placeholder')"
+            />
+        </div>
+
         <!-- Filter chips -->
         <div class="filter-scroll">
             <button
@@ -138,7 +195,7 @@ export default {
         </div>
 
         <!-- Loading -->
-        <div v-if="isLoading" class="skeleton-list">
+        <div v-if="isLoading || (isSearching && searchLoading)" class="skeleton-list">
             <div v-for="n in 4" :key="n" class="sk-card">
                 <div class="sk-row">
                     <div class="sk-left">
@@ -156,8 +213,14 @@ export default {
         <!-- Empty -->
         <div v-else-if="filteredOrders.length === 0" class="empty-state">
             <div class="empty-icon">🧾</div>
-            <div class="empty-title">{{ $t('seller_orders.empty') }}</div>
-            <div class="empty-subtitle">{{ $t('seller_orders.empty_subtitle') }}</div>
+            <template v-if="isSearching">
+                <div class="empty-title">{{ $t('seller_orders.search_empty') }}</div>
+                <div class="empty-subtitle">{{ $t('seller_orders.search_empty_subtitle') }}</div>
+            </template>
+            <template v-else>
+                <div class="empty-title">{{ $t('seller_orders.empty') }}</div>
+                <div class="empty-subtitle">{{ $t('seller_orders.empty_subtitle') }}</div>
+            </template>
         </div>
 
         <!-- Grouped list -->
@@ -184,10 +247,50 @@ export default {
                 </div>
             </div>
         </div>
+
+        <div v-if="!isSearching && !isLoading && historyDays" class="history-note">
+            {{ $t('seller_orders.history_note', { days: historyDays }, historyDays) }}
+        </div>
     </div>
 </template>
 
 <style lang="scss" scoped>
+.search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 16px 0;
+    padding: 0 14px;
+    height: 42px;
+    border-radius: 21px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.search-icon {
+    flex-shrink: 0;
+    color: var(--text-muted);
+}
+
+.search-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    &::placeholder { color: var(--text-muted); }
+}
+
+.history-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 16px 8px 8px;
+}
+
 .filter-scroll {
     display: flex;
     gap: 8px;
