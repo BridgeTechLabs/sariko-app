@@ -136,16 +136,21 @@ export default {
 
 <style scoped>
 .dev-autofill {
+    /* Narrow (wraps to 2 lines) so it sits in the left gutter: the vertical
+       stepper rail on phones, the page margin on desktop, not over form text. */
     position: fixed;
-    left: 12px;
+    left: 4px;
     bottom: 12px;
     z-index: 9000;
-    padding: 6px 10px;
+    width: 52px;
+    padding: 4px 2px;
     border: 2px dashed #fff;
     border-radius: 8px;
     background: #d10fd1;
     color: #fff;
-    font: 600 12px monospace;
+    font: 600 9px/1.3 monospace;
+    text-align: center;
+    word-break: break-word;
     cursor: pointer;
     opacity: 0.85;
 }
