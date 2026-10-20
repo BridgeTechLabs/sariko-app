@@ -36,6 +36,10 @@
     align-items: center;
     background-color: #121b2f;
     color: var(--text-primary); /* re-resolved inside data-theme="dark"; body's colour is the light one */
+    /* Legacy aliases from main.css are resolved on :root (light there), so re-declare the
+       ones the auth components use, here, where data-theme="dark" applies. */
+    --bg-main: var(--background);
+    --bg-surface: var(--card);
     padding: 50px 0px 100px 0px;
 }
 

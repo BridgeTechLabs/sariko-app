@@ -2,9 +2,7 @@
 
 /* Color tokens (light/dark) live in tokens.css — generated from the Figma export. */
 
-/* [data-theme] too: an alias like var(--background) is resolved where it is declared, so a
-   subtree pinned to a theme (data-theme="dark" on the always-dark auth layout) must re-declare them. */
-:root, [data-theme] {
+:root {
   /* Legacy aliases → semantic tokens. Prefer the semantic names (--background, --card, --primary...) in new code. */
   --bg-main: var(--background);
   --bg-surface: var(--card);
@@ -163,9 +161,4 @@ html, body {
     margin-right: 0;
     font-size: 20px;
     color: var(--status-success);
-}
-
-/* OpenStreetMap only has light tiles: recolour them for the dark theme (utils/mapTiles.js) */
-[data-theme='dark'] .leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
 }
