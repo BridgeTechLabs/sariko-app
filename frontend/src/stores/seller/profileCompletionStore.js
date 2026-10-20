@@ -8,7 +8,7 @@ export const useProfileCompletionStore = defineStore('profileCompletion', {
     state: () => ({
         data: null,             // { complete, missing, agreement_version_current, limits, prefill, id_document_files }
         loading: false,
-        bannerCollapsed: false, // for this session only: the banner comes back on reload while something is missing
+        bannerCollapsed: true,  // starts collapsed (title row only); comes back collapsed on every reload while something is missing
     }),
 
     getters: {
