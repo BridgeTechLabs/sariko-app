@@ -2,7 +2,9 @@
 </script>
 
 <template>
-    <div class="background">
+    <!-- The auth page is always dark (#121b2f below): dark tokens for everything inside,
+         or the light theme puts navy text on this navy background. -->
+    <div class="background" data-theme="dark">
 
         <div class="container">
 
@@ -33,6 +35,7 @@
     flex-direction: column;
     align-items: center;
     background-color: #121b2f;
+    color: var(--text-primary); /* re-resolved inside data-theme="dark"; body's colour is the light one */
     padding: 50px 0px 100px 0px;
 }
 

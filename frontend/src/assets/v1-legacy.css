@@ -1,0 +1,29 @@
+/*
+ * V1 colour palette (as on main at abf0a27, before the V2 redesign tokens).
+ * main.css maps these legacy names onto the V2 Figma tokens (tokens.css); V2 code uses
+ * only the new tokens, so pinning the legacy names back here restores V1's look without
+ * touching V2. Loaded right after main.css in main.js, so it wins.
+ * [data-theme] too: the always-dark auth layout carries data-theme="dark" and must get
+ * the same literal values.
+ * Owner: Jack. DELETE this file and its import in main.js when V2 replaces V1.
+ * (--text-primary / --text-secondary stay on tokens.css: V2 shares them.)
+ */
+:root, [data-theme] {
+  --bg-main: #040A14;
+  --bg-surface: #1f2940;
+  --bg-surface-2: #111620;
+  --bg-card-hover: #2a375a;
+  --text-muted: rgba(255, 255, 255, 0.5);
+  --text-active: #f5A623;
+  --accent-dim: rgba(250, 204, 21, 0.12);
+
+  --color-primary: #121b2f;
+  --color-accent: #facc15;
+
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  --border-color: #374151;
+}

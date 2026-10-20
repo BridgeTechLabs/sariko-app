@@ -7,6 +7,7 @@ import '@/assets/quasar/main.scss'
 import './assets/tokens.css'
 import './assets/tokens-layout.css'
 import './assets/main.css'
+import './assets/v1-legacy.css' // V1 palette over the V2 tokens; remove when V2 replaces V1
 import '@fontsource/open-sans/400.css'
 import '@fontsource/open-sans/600.css'
 import '@fontsource/open-sans/700.css'
