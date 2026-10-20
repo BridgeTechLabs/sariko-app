@@ -155,6 +155,25 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_orders_by_seller_id: {e}")
 
+    def read_done_orders_for_earnings(self, seller_id: str, done_since: datetime):
+        """Seller's paid orders that became done since `done_since`, with their money split."""
+        try:
+            result = self._supabase_client.table(self._table_name) \
+                .select("id, subtotal, commission_amount, vat_amount, payout_amount, payout_status, payout_hold, status_changed_at") \
+                .eq("seller_id", seller_id) \
+                .eq("payment_status", "paid") \
+                .eq("status", "done") \
+                .gte("status_changed_at", done_since.isoformat()) \
+                .order("status_changed_at", desc=True) \
+                .execute()
+
+            return result.data or []
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_done_orders_for_earnings: {e}")
+        except Exception as e:
+            raise Exception(f"error read_done_orders_for_earnings: {e}")
+
     def search_orders_for_seller(self, seller_id: str, code: Optional[str], name: Optional[str], limit: int):
         """Seller order search, any age. `code`: lowercase hex prefix of the order id;
         `name`: substring of the buyer's name (caller strips filter characters)."""

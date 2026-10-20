@@ -76,5 +76,14 @@ class DAOAdminConfig(DAOBase):
         logger.error(f"[Settings] invalid {key}={value!r}, using {default}")
         return default
 
+    def get_int_in_range(self, key: str, default: int, lo: int, hi: int) -> int:
+        """An integer setting that may be 0 (e.g. payout_delay_days 0..30). Missing or
+        out of range falls back to the default, like get_positive_int."""
+        value = self.get_setting(key)
+        if isinstance(value, int) and not isinstance(value, bool) and lo <= value <= hi:
+            return value
+        logger.error(f"[Settings] invalid {key}={value!r} (integer {lo}..{hi}), using {default}")
+        return default
+
     def get_minutes(self, key: str, default: int) -> timedelta:
         return timedelta(minutes=self.get_positive_int(key, default))

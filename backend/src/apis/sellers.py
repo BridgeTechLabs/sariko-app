@@ -2,12 +2,14 @@ import logging
 import re
 
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from apis.orders import cancel_after
-from core.store_hours import confirm_deadline, is_open_now
+from core.store_hours import VN_TZ, confirm_deadline, is_open_now
 from services.order_expiry import confirm_window
 
 from dao.dao_admin_config import DAOAdminConfig
+from dao.dao_admin_payouts import DAOAdminPayouts
 from dao.dao_seller_profiles import DAOSellerProfiles
 from dao.dao_food_items import DAOFoodItems, FoodItemNameTaken
 from dao.dao_menu_categories import DAOMenuCategories
@@ -44,6 +46,8 @@ DELIVERY_ENDED_STATUSES = {"COMPLETED", "REJECTED", "CANCELLED", "CANCELED", "EX
 
 # Rows one order search returns (a page size, not a business rule).
 SEARCH_LIMIT = 20
+# Payout batches shown on the earnings page (a page size, not a business rule).
+EARNINGS_PAYOUTS_LIMIT = 12
 
 @router.get("/")
 def get_sellers(user=Depends(verify_token)):
@@ -637,6 +641,73 @@ def get_seller_reviews(
         raise
     except Exception as e:
         logger.exception(f"Exception in GET /sellers/me/reviews: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _money(value) -> Decimal:
+    return Decimal(str(value or 0))
+
+
+@router.get("/me/earnings")
+def get_seller_earnings(user=Depends(verify_token)):
+    """Done orders of the last seller_order_history_days with their split (food, commission,
+    VAT, payout) and payout state, plus the seller's payout batches. Sums in Decimal,
+    int only in the JSON."""
+    try:
+        seller_id = _get_seller_id(user)
+        config = DAOAdminConfig()
+        history_days = config.get_positive_int("seller_order_history_days", 30)
+        delay_days = config.get_int_in_range("payout_delay_days", 3, 0, 30)
+        since = datetime.now(timezone.utc) - timedelta(days=history_days)
+
+        orders, awaiting = [], Decimal(0)
+        for row in DAOOrders().read_done_orders_for_earnings(seller_id, since):
+            payout = _money(row.get("payout_amount"))
+            state = row.get("payout_status") or "pending"
+            if state == "pending" and row.get("payout_hold"):
+                state = "held"
+            expected = None
+            if state == "pending":
+                awaiting += payout
+                done_day = datetime.fromisoformat(row["status_changed_at"]).astimezone(VN_TZ).date()
+                expected = (done_day + timedelta(days=delay_days)).isoformat()
+            elif state == "processing":
+                awaiting += payout
+            orders.append({
+                "id": row["id"],
+                "done_at": row.get("status_changed_at"),
+                "subtotal": int(_money(row.get("subtotal"))),
+                "commission_amount": int(_money(row.get("commission_amount"))),
+                "vat_amount": int(_money(row.get("vat_amount"))),
+                "payout_amount": int(payout),
+                "payout_state": state,
+                "expected_payout_date": expected,
+            })
+
+        payouts, received = [], Decimal(0)
+        for row in DAOAdminPayouts().read_payouts_by_seller_id(seller_id, EARNINGS_PAYOUTS_LIMIT):
+            net = _money(row.get("net_payout"))
+            if row.get("status") == "completed":
+                received += net
+            payouts.append({
+                **row,
+                "net_payout": int(net),
+                "total_deductions": int(_money(row.get("total_deductions"))),
+            })
+
+        return {
+            "success": True,
+            "history_days": history_days,
+            "payout_delay_days": delay_days,
+            "awaiting_total": int(awaiting),
+            "received_total": int(received),
+            "orders": orders,
+            "payouts": payouts,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Exception in GET /sellers/me/earnings: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
