@@ -31,7 +31,7 @@ IDENTITY_FIELDS = ("first_name", "last_name", "date_of_birth", "nationality", "i
                    "id_expiry_date", "residential_address")
 BANK_FIELDS = ("bank_name", "bank_account_number", "bank_account_holder")
 DONE_STATUSES = ("submitted", "approved")
-SETTINGS_DEFAULTS = {**join.SETTINGS_DEFAULTS, "onboarding_min_id_validity_months": 6}
+SETTINGS_DEFAULTS = join.SETTINGS_DEFAULTS
 _error = join._error
 
 

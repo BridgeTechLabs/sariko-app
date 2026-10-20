@@ -35,6 +35,7 @@ export default {
                     [t('label_date_of_birth'), p.date_of_birth],
                     [t('label_nationality'), p.nationality],
                     [t(`id_type_${p.id_type}`), p.id_number],
+                    [t('label_id_expiry'), p.id_expiry_date],
                     [t('label_email'), p.email],
                     [t('label_phone'), p.phone],
                     [t('label_residential_address'), p.residential_address],
