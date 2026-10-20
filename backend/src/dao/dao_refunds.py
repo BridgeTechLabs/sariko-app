@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime, timezone
 from typing import Optional
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
@@ -68,70 +67,8 @@ class DAORefunds(DAOBase):
             logger.error(f"Failed to create {reason} refund for order {order['id']}: {e}")
             return None
 
-    def read_refunds(self, status: Optional[str] = None):
-        try:
-            query = self._supabase_client.table(self._table_name) \
-                .select("*") \
-                .order("created_at", desc=True)
-
-            if status:
-                query = query.eq("status", status)
-
-            result = query.execute()
-            return result.data if result and result.data else []
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - read_refunds: {e}")
-        except Exception as e:
-            raise Exception(f"error read_refunds: {e}")
-
-    def read_refund_by_id(self, refund_id: str):
-        try:
-            result = self._supabase_client.table(self._table_name) \
-                .select("*") \
-                .eq("id", refund_id) \
-                .maybe_single() \
-                .execute()
-
-            return result.data if result and result.data else None
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - read_refund_by_id: {e}")
-        except Exception as e:
-            raise Exception(f"error read_refund_by_id: {e}")
-
-    def update_refund_processed(self, refund_id: str, vnpay_refund_ref: str):
-        try:
-            result = self._supabase_client.table(self._table_name) \
-                .update({
-                    "status": "processed",
-                    "vnpay_refund_ref": vnpay_refund_ref,
-                    "processed_at": datetime.now(timezone.utc).isoformat(),
-                }) \
-                .eq("id", refund_id) \
-                .execute()
-
-            return result.data[0] if result and result.data else None
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - update_refund_processed: {e}")
-        except Exception as e:
-            raise Exception(f"error update_refund_processed: {e}")
-
-    def update_refund_failed(self, refund_id: str, note: str):
-        try:
-            result = self._supabase_client.table(self._table_name) \
-                .update({
-                    "status": "failed",
-                    "note": note,
-                    "processed_at": datetime.now(timezone.utc).isoformat(),
-                }) \
-                .eq("id", refund_id) \
-                .execute()
-
-            return result.data[0] if result and result.data else None
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - update_refund_failed: {e}")
-        except Exception as e:
-            raise Exception(f"error update_refund_failed: {e}")
+    def read_txn_refs(self, order_id: str) -> set:
+        """original_txn_ref of every refund of the order (main + duplicate payments)."""
+        rows = self._supabase_client.table(self._table_name) \
+            .select("original_txn_ref").eq("order_id", order_id).execute().data or []
+        return {r["original_txn_ref"] for r in rows}

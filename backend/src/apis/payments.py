@@ -10,8 +10,10 @@ from fastapi import APIRouter, HTTPException, Depends, Request, status
 from fastapi.responses import JSONResponse
 
 from core.auth import verify_token
+from core.client_ip import client_ip
 from dao.dao_orders import DAOOrders
 from dao.dao_payments import DAOPayments
+from dao.dao_refunds import DAORefunds
 
 router = APIRouter(prefix="/payments")
 logger = logging.getLogger(__name__)
@@ -28,8 +30,9 @@ def _hmac_sha512(key: str, data: str) -> str:
 
 
 def _build_vnpay_url(params: dict) -> str:
-    """Sort params alphabetically, URL encode values, hash, append to VNPay URL.
-    Per VNPay spec v2.1.0: hash data uses raw values, query string uses URL-encoded values."""
+    """Sort params alphabetically, URL encode keys and values, hash, append to VNPay URL.
+    The hash data and the query string are the same URL-encoded string (as in VNPay's online
+    docs and demo code; the old v2.1.0 PDF said raw values)."""
     # Filter empty values
     filtered = {k: v for k, v in params.items() if v is not None and v != ''}
 
@@ -52,6 +55,60 @@ def _build_vnpay_url(params: dict) -> str:
     return f"{VNPAY_URL}?{query_string}&vnp_SecureHash={secure_hash}"
 
 
+def _order_id_from_txn_ref(txn_ref: str) -> str:
+    """"<32 hex>_<yyyyMMddHHmmss>" (or the older "<32 hex>_<HHmmss>") -> order UUID, or ""."""
+    hex_id = (txn_ref or "").split("_")[0]
+    if len(hex_id) != 32:
+        return ""
+    return f"{hex_id[:8]}-{hex_id[8:12]}-{hex_id[12:16]}-{hex_id[16:20]}-{hex_id[20:]}"
+
+
+def _refund_extra_payment(order: dict, params: dict, txn_ref: str, reason: str) -> JSONResponse:
+    """VNPay took money the order must not keep, so queue a full refund of it for the admin
+    and ack so VNPay stops retrying. Never changes the order.
+      late_payment: the order no longer waited for payment (cancelled while the buyer paid).
+      duplicate_payment: a second payment (another TxnRef) for an order already paid, or a
+        second late payment; it gets its own refund next to the order's main one.
+    A VNPay retry of the same IPN finds its TxnRef among the refunds and gets RspCode 02."""
+    order_id = order["id"]
+    suffix = txn_ref.rsplit("_", 1)[-1]
+    amount = int(Decimal(params["vnp_Amount"]) / 100)   # this payment, VND (checked = order total)
+    try:
+        refunds = DAORefunds()
+        known = refunds.read_txn_refs(order_id)
+        if txn_ref in known:
+            logger.warning(f"VNPay IPN: {txn_ref} of order {order_id} already queued for refund")
+            return JSONResponse(content={"RspCode": "02", "Message": "Order already confirmed"})
+        if reason == "late_payment" and known:   # the order already has its main refund
+            reason = "duplicate_payment"
+        refund = refunds.create_refund(
+            order_id=order_id,
+            amount=amount,
+            reason=reason,
+            original_txn_ref=txn_ref,
+            ipn_data=params,
+            # the date the admin must send as vnp_TransactionDate (None for an old-style ref)
+            payment_create_date=suffix if len(suffix) == 14 else None,
+        )
+    except Exception as e:
+        if "23505" in str(e) or "duplicate key" in str(e):   # the same IPN racing itself
+            logger.warning(f"VNPay IPN: {txn_ref} of order {order_id} already queued for refund")
+            return JSONResponse(content={"RspCode": "02", "Message": "Order already confirmed"})
+        logger.error(f"VNPay IPN: could not queue the {reason} refund for order {order_id}: {type(e).__name__}")
+        return JSONResponse(content={"RspCode": "99", "Message": "Unknown error"})
+    try:
+        DAOPayments().create_payment(
+            order_id=order_id, method="vnpay", amount=amount,
+            status="succeeded", transaction_ref=txn_ref, type="charge",
+            vnp_transaction_no=params.get("vnp_TransactionNo"),
+        )
+    except Exception as e:   # the refund (with the IPN data) is what matters; keep the ack
+        logger.error(f"VNPay IPN: late payment row not saved for order {order_id}: {type(e).__name__}")
+    logger.warning(f"VNPay IPN: {reason}: order {order_id} ({order.get('status')}, {order.get('payment_status')}) unchanged, "
+                   f"refund {(refund or {}).get('id')} queued, txn_ref={txn_ref}")
+    return JSONResponse(content={"RspCode": "00", "Message": "Confirm Success"})
+
+
 @router.post("/vnpay/create/{order_id}")
 def create_vnpay_payment(order_id: str, request: Request, user=Depends(verify_token)):
     """Create VNPay payment URL for an order."""
@@ -66,17 +123,19 @@ def create_vnpay_payment(order_id: str, request: Request, user=Depends(verify_to
     if order["payment_status"] == "paid":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order already paid")
 
-    # Get client IP
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    # The buyer's IP (VNPay: "Địa chỉ IP của khách hàng"), not nginx's
+    ip = client_ip(request)
 
     # Timestamps (GMT+7)
     now = datetime.utcnow() + timedelta(hours=7)
     create_date = now.strftime("%Y%m%d%H%M%S")
     expire_date = (now + timedelta(minutes=15)).strftime("%Y%m%d%H%M%S")
 
-    # Unique txn ref: full order UUID (no dashes) + timestamp — unique per day per VNPay spec
+    # Unique txn ref: full order UUID (no dashes) + vnp_CreateDate. A refund / querydr must
+    # send this URL's vnp_CreateDate as vnp_TransactionDate; the admin app reads it from here.
+    # Refs made before 2026-10-20 end in HHMMSS only (the admin falls back to payment_create_date).
     order_id_nodash = order["id"].replace("-", "")
-    txn_ref = f"{order_id_nodash}_{now.strftime('%H%M%S')}"
+    txn_ref = f"{order_id_nodash}_{create_date}"
 
     # Amount × 100 (VNPay requirement). Use Decimal to avoid float precision drift.
     amount = int(Decimal(str(order["total_amount"])) * 100)
@@ -88,10 +147,10 @@ def create_vnpay_payment(order_id: str, request: Request, user=Depends(verify_to
         "vnp_Amount": str(amount),
         "vnp_TxnRef": txn_ref,
         "vnp_OrderInfo": f"Thanh toan don hang Sariko {order_id_nodash[:8]}",
-        "vnp_OrderType": "food",
+        "vnp_OrderType": "other",   # sample value in VNPay's online docs; Jack is asking VNPay for our category
         "vnp_Locale": "vn",
         "vnp_ReturnUrl": VNPAY_RETURN_URL,
-        "vnp_IpAddr": client_ip,
+        "vnp_IpAddr": ip,
         "vnp_CreateDate": create_date,
         "vnp_ExpireDate": expire_date,
         "vnp_CurrCode": "VND",
@@ -100,6 +159,8 @@ def create_vnpay_payment(order_id: str, request: Request, user=Depends(verify_to
     # and answers "Sai chữ ký" (code 70). The IPN URL is registered on the merchant portal.
 
     payment_url = _build_vnpay_url(params)
+    # QA checks this on DEV: the buyer's public IP, never nginx's 172.x / 127.x
+    logger.warning(f"VNPay pay URL: order {order_id}, txn_ref={txn_ref}, vnp_IpAddr={ip}")
     dao_orders.update_payment_create_date(order_id=order_id, payment_create_date=create_date)
 
     return {"success": True, "payment_url": payment_url}
@@ -134,10 +195,7 @@ def vnpay_ipn(request: Request):
     transaction_status = params.get("vnp_TransactionStatus", "")
     txn_ref = params.get("vnp_TxnRef", "")
 
-    # Extract full order UUID from txn_ref (format: uuid_no_dashes_HHMMSS)
-    order_id_nodash = txn_ref.split("_")[0] if txn_ref else ""
-    # Re-insert dashes: 8-4-4-4-12
-    order_id = f"{order_id_nodash[:8]}-{order_id_nodash[8:12]}-{order_id_nodash[12:16]}-{order_id_nodash[16:20]}-{order_id_nodash[20:]}" if len(order_id_nodash) == 32 else ""
+    order_id = _order_id_from_txn_ref(txn_ref)
 
     if not order_id:
         logger.warning(f"VNPay IPN: Could not extract order_id from txn_ref={txn_ref}")
@@ -157,10 +215,19 @@ def vnpay_ipn(request: Request):
         logger.warning(f"VNPay IPN: Amount mismatch for order {order_id}. vnp_Amount={vnp_amount}, expected={expected_amount}")
         return JSONResponse(content={"RspCode": "04", "Message": "Invalid amount"})
 
-    # Idempotency: skip if already paid
+    paid_now = response_code == "00" and transaction_status == "00"
+
+    # Already paid: the same TxnRef is VNPay retrying; another one is a second payment (the
+    # buyer opened two payment URLs) that must be refunded. Orders paid before transaction_ref
+    # was recorded can't tell the two apart: answered as before.
     if order.get("payment_status") == "paid":
-            logger.warning(f"VNPay IPN: Order {order_id} already paid, skipping")
-            return JSONResponse(content={"RspCode": "02", "Message": "Order already confirmed"})
+        if paid_now and order.get("transaction_ref") and txn_ref != order["transaction_ref"]:
+            return _refund_extra_payment(order, params, txn_ref, "duplicate_payment")
+        logger.warning(f"VNPay IPN: Order {order_id} already paid, skipping")
+        return JSONResponse(content={"RspCode": "02", "Message": "Order already confirmed"})
+
+    if paid_now and order.get("status") != "pending":
+        return _refund_extra_payment(order, params, txn_ref, "late_payment")
 
     if response_code == "00" and transaction_status == "00":
         # Payment successful — update status
@@ -226,9 +293,8 @@ def vnpay_return(request: Request):
     response_code = params.get("vnp_ResponseCode", "")
     txn_ref = params.get("vnp_TxnRef", "")
 
-    # Extract order_id from txn_ref for frontend polling
-    order_id_nodash = txn_ref.split("_")[0] if txn_ref else ""
-    order_id = f"{order_id_nodash[:8]}-{order_id_nodash[8:12]}-{order_id_nodash[12:16]}-{order_id_nodash[16:20]}-{order_id_nodash[20:]}" if len(order_id_nodash) == 32 else ""
+    # order_id for the frontend polling
+    order_id = _order_id_from_txn_ref(txn_ref)
 
     return {
         "success": is_valid and response_code == "00",
