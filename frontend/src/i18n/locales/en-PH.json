@@ -744,7 +744,7 @@
         "earnings_load_error": "Couldn't load your earnings",
         "earnings_retry": "Try again",
         "section_title_reviews": "Reviews",
-        "reviews_count": "{n} review | {n} reviews",
+        "reviews_count": "{n} store rating | {n} store ratings",
         "reviews_empty": "No reviews yet",
         "reviews_empty_sub": "See what customers say about your food",
         "reviews_whole_order": "Whole order",
