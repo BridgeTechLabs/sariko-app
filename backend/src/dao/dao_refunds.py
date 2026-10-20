@@ -66,3 +66,9 @@ class DAORefunds(DAOBase):
         except Exception as e:
             logger.error(f"Failed to create {reason} refund for order {order['id']}: {e}")
             return None
+
+    def read_txn_refs(self, order_id: str) -> set:
+        """original_txn_ref of every refund of the order (main + duplicate payments)."""
+        rows = self._supabase_client.table(self._table_name) \
+            .select("original_txn_ref").eq("order_id", order_id).execute().data or []
+        return {r["original_txn_ref"] for r in rows}

@@ -63,37 +63,48 @@ def _order_id_from_txn_ref(txn_ref: str) -> str:
     return f"{hex_id[:8]}-{hex_id[8:12]}-{hex_id[12:16]}-{hex_id[16:20]}-{hex_id[20:]}"
 
 
-def _late_payment(order: dict, params: dict, txn_ref: str) -> JSONResponse:
-    """VNPay took the money for an order that no longer waits for payment (the buyer
-    cancelled it while paying). Don't revive the order: queue a full refund for the admin
-    and ack so VNPay stops retrying. A retry finds the refund already there (one per order)."""
+def _refund_extra_payment(order: dict, params: dict, txn_ref: str, reason: str) -> JSONResponse:
+    """VNPay took money the order must not keep, so queue a full refund of it for the admin
+    and ack so VNPay stops retrying. Never changes the order.
+      late_payment: the order no longer waited for payment (cancelled while the buyer paid).
+      duplicate_payment: a second payment (another TxnRef) for an order already paid, or a
+        second late payment; it gets its own refund next to the order's main one.
+    A VNPay retry of the same IPN finds its TxnRef among the refunds and gets RspCode 02."""
     order_id = order["id"]
     suffix = txn_ref.rsplit("_", 1)[-1]
+    amount = int(Decimal(params["vnp_Amount"]) / 100)   # this payment, VND (checked = order total)
     try:
-        refund = DAORefunds().create_refund(
+        refunds = DAORefunds()
+        known = refunds.read_txn_refs(order_id)
+        if txn_ref in known:
+            logger.warning(f"VNPay IPN: {txn_ref} of order {order_id} already queued for refund")
+            return JSONResponse(content={"RspCode": "02", "Message": "Order already confirmed"})
+        if reason == "late_payment" and known:   # the order already has its main refund
+            reason = "duplicate_payment"
+        refund = refunds.create_refund(
             order_id=order_id,
-            amount=int(Decimal(str(order["total_amount"]))),
-            reason="late_payment",
+            amount=amount,
+            reason=reason,
             original_txn_ref=txn_ref,
             ipn_data=params,
             # the date the admin must send as vnp_TransactionDate (None for an old-style ref)
             payment_create_date=suffix if len(suffix) == 14 else None,
         )
     except Exception as e:
-        if "refunds_order_id_key" in str(e) or "23505" in str(e):
-            logger.warning(f"VNPay IPN: late payment for order {order_id} already queued for refund, txn_ref={txn_ref}")
+        if "23505" in str(e) or "duplicate key" in str(e):   # the same IPN racing itself
+            logger.warning(f"VNPay IPN: {txn_ref} of order {order_id} already queued for refund")
             return JSONResponse(content={"RspCode": "02", "Message": "Order already confirmed"})
-        logger.error(f"VNPay IPN: could not queue the late-payment refund for order {order_id}: {type(e).__name__}")
+        logger.error(f"VNPay IPN: could not queue the {reason} refund for order {order_id}: {type(e).__name__}")
         return JSONResponse(content={"RspCode": "99", "Message": "Unknown error"})
     try:
         DAOPayments().create_payment(
-            order_id=order_id, method="vnpay", amount=int(Decimal(str(order["total_amount"]))),
+            order_id=order_id, method="vnpay", amount=amount,
             status="succeeded", transaction_ref=txn_ref, type="charge",
             vnp_transaction_no=params.get("vnp_TransactionNo"),
         )
     except Exception as e:   # the refund (with the IPN data) is what matters; keep the ack
         logger.error(f"VNPay IPN: late payment row not saved for order {order_id}: {type(e).__name__}")
-    logger.warning(f"VNPay IPN: paid after the order was {order.get('status')}: order {order_id} stays unpaid, "
+    logger.warning(f"VNPay IPN: {reason}: order {order_id} ({order.get('status')}, {order.get('payment_status')}) unchanged, "
                    f"refund {(refund or {}).get('id')} queued, txn_ref={txn_ref}")
     return JSONResponse(content={"RspCode": "00", "Message": "Confirm Success"})
 
@@ -204,13 +215,19 @@ def vnpay_ipn(request: Request):
         logger.warning(f"VNPay IPN: Amount mismatch for order {order_id}. vnp_Amount={vnp_amount}, expected={expected_amount}")
         return JSONResponse(content={"RspCode": "04", "Message": "Invalid amount"})
 
-    # Idempotency: skip if already paid
-    if order.get("payment_status") == "paid":
-            logger.warning(f"VNPay IPN: Order {order_id} already paid, skipping")
-            return JSONResponse(content={"RspCode": "02", "Message": "Order already confirmed"})
+    paid_now = response_code == "00" and transaction_status == "00"
 
-    if response_code == "00" and transaction_status == "00" and order.get("status") != "pending":
-        return _late_payment(order, params, txn_ref)
+    # Already paid: the same TxnRef is VNPay retrying; another one is a second payment (the
+    # buyer opened two payment URLs) that must be refunded. Orders paid before transaction_ref
+    # was recorded can't tell the two apart: answered as before.
+    if order.get("payment_status") == "paid":
+        if paid_now and order.get("transaction_ref") and txn_ref != order["transaction_ref"]:
+            return _refund_extra_payment(order, params, txn_ref, "duplicate_payment")
+        logger.warning(f"VNPay IPN: Order {order_id} already paid, skipping")
+        return JSONResponse(content={"RspCode": "02", "Message": "Order already confirmed"})
+
+    if paid_now and order.get("status") != "pending":
+        return _refund_extra_payment(order, params, txn_ref, "late_payment")
 
     if response_code == "00" and transaction_status == "00":
         # Payment successful — update status

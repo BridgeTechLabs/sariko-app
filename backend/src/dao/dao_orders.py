@@ -100,6 +100,7 @@ class DAOOrders(DAOBase):
             result = self._supabase_client.table(self._table_name) \
                 .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), reviews(id), deliveries(status)") \
                 .eq("user_id", user_id) \
+                .neq("refunds.reason", "duplicate_payment") \
                 .order("created_at", desc=True) \
                 .limit(1, foreign_table="reviews") \
                 .execute()
@@ -120,6 +121,7 @@ class DAOOrders(DAOBase):
                 .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url)), refunds(status)") \
                 .eq("id", order_id) \
                 .eq("user_id", user_id) \
+                .neq("refunds.reason", "duplicate_payment") \
                 .maybe_single() \
                 .execute()
 
@@ -320,7 +322,7 @@ class DAOOrders(DAOBase):
         """Read order by ID without user scoping (for IPN server-to-server)."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_user_id, payment_status, status, total_amount") \
+                .select("id, seller_user_id, payment_status, status, total_amount, transaction_ref") \
                 .eq("id", order_id) \
                 .maybe_single() \
                 .execute()

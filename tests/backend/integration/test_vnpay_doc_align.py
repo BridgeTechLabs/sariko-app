@@ -51,7 +51,7 @@ class FakeOrders:
         FakeOrders.create_dates.append(payment_create_date)
 
     def update_payment_status(self, order_id, payment_status, transaction_ref):
-        self.order["payment_status"] = payment_status
+        self.order.update(payment_status=payment_status, transaction_ref=transaction_ref)
 
     def update_ipn_data(self, order_id, ipn_data):
         pass
@@ -65,11 +65,21 @@ class FakePayments:
 
 
 class FakeRefunds:
+    """Mirrors migration 20261020050000: one main refund per order (refunds_order_id_key)
+    and one duplicate_payment refund per (order, TxnRef) (refunds_order_txn_dup_key)."""
     rows = []
 
+    def read_txn_refs(self, order_id):
+        return {r["original_txn_ref"] for r in FakeRefunds.rows if r["order_id"] == order_id}
+
     def create_refund(self, **kw):
-        if any(r["order_id"] == kw["order_id"] for r in FakeRefunds.rows):
-            raise Exception('Supabase error - create_refund: duplicate key value violates unique constraint "refunds_order_id_key" (23505)')
+        for r in FakeRefunds.rows:
+            if r["order_id"] != kw["order_id"]:
+                continue
+            main = r["reason"] != "duplicate_payment" and kw["reason"] != "duplicate_payment"
+            dup = r["reason"] == kw["reason"] == "duplicate_payment" and r["original_txn_ref"] == kw["original_txn_ref"]
+            if main or dup:
+                raise Exception('Supabase error - create_refund: duplicate key value violates unique constraint (23505)')
         FakeRefunds.rows.append(kw)
         return {"id": f"rf{len(FakeRefunds.rows)}", **kw}
 
@@ -147,7 +157,7 @@ def test_tc12_late_payment_on_a_cancelled_order_queues_a_refund(caplog):
     assert refund["original_txn_ref"] == txn_ref and refund["payment_create_date"] == "20261020153000"
     assert refund["ipn_data"]["vnp_TransactionNo"] == "14567890"
     assert FakePayments.rows[0]["status"] == "succeeded" and FakePayments.rows[0]["amount"] == 100000
-    assert "stays unpaid, refund rf1 queued" in caplog.text
+    assert "late_payment: order" in caplog.text and "refund rf1 queued" in caplog.text
     # VNPay retries the same IPN: no second refund, still ended
     assert _ipn(txn_ref)["RspCode"] == "02" and len(FakeRefunds.rows) == 1
 
@@ -162,3 +172,42 @@ def test_tc12_old_style_ref_leaves_the_date_to_the_admin():
     FakeOrders.order["status"] = "cancelled"
     _ipn(f"{HEX}_153000")
     assert FakeRefunds.rows[0]["payment_create_date"] is None
+
+
+# TC-18 the buyer paid twice through two payment URLs
+A, B = f"{HEX}_20261020153000", f"{HEX}_20261020153400"
+
+
+def test_tc18_second_payment_on_a_paid_order_is_refunded():
+    assert _ipn(A)["RspCode"] == "00" and FakeOrders.order["transaction_ref"] == A
+    assert _ipn(B)["RspCode"] == "00"
+    [refund] = FakeRefunds.rows
+    assert refund["reason"] == "duplicate_payment" and refund["original_txn_ref"] == B
+    assert refund["amount"] == 100000 and refund["payment_create_date"] == "20261020153400"
+    assert FakeOrders.order["payment_status"] == "paid" and FakeOrders.order["transaction_ref"] == A
+    assert [p["transaction_ref"] for p in FakePayments.rows] == [A, B]
+    assert _ipn(B)["RspCode"] == "02" and len(FakeRefunds.rows) == 1   # VNPay retries B
+    assert _ipn(A)["RspCode"] == "02" and len(FakeRefunds.rows) == 1   # VNPay retries A
+
+
+def test_tc18_paid_order_without_a_recorded_ref_answers_as_before():
+    FakeOrders.order.update(payment_status="paid", transaction_ref=None)
+    assert _ipn(B)["RspCode"] == "02" and FakeRefunds.rows == []
+
+
+def test_tc18_cancelled_order_paid_twice_gets_two_refunds():
+    FakeOrders.order["status"] = "cancelled"
+    assert _ipn(A)["RspCode"] == "00"
+    assert _ipn(B)["RspCode"] == "00"
+    assert [(r["reason"], r["original_txn_ref"]) for r in FakeRefunds.rows] == [("late_payment", A), ("duplicate_payment", B)]
+    assert _ipn(A)["RspCode"] == "02" and _ipn(B)["RspCode"] == "02" and len(FakeRefunds.rows) == 2
+    assert FakeOrders.order["payment_status"] == "pending"
+
+
+def test_tc18_buyer_order_reads_leave_duplicate_refunds_out():
+    """Order detail / history show refunds[0].status: a duplicate payment's refund must not
+    appear there (filter on the embedded rows, not on the orders)."""
+    import inspect
+    from dao.dao_orders import DAOOrders
+    for method in (DAOOrders.read_orders_by_user_id, DAOOrders.read_order_by_id):
+        assert '.neq("refunds.reason", "duplicate_payment")' in inspect.getsource(method)
