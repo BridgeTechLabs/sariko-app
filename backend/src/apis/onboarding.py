@@ -22,6 +22,7 @@ from urllib.parse import urlparse
 import requests
 from fastapi import APIRouter, Header, HTTPException, Request
 
+from core.client_ip import client_ip
 from core.phone import to_e164_vn
 from core.seller_kyc import age, bank_holder_matches, id_error, same_name, valid_bank_account
 from dao.dao_admin_config import DAOAdminConfig
@@ -80,8 +81,7 @@ def _vnd(amount) -> int:
 
 
 def _client_ip(request: Request) -> str:
-    # nginx sets X-Real-IP; the API is not behind Cloudflare.
-    return request.headers.get("x-real-ip") or (request.client.host if request.client else "")
+    return client_ip(request)
 
 
 def _rate_limited(ip: str, limit: int) -> bool:

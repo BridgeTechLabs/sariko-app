@@ -84,6 +84,7 @@ def test_ipn_valid_payment_success(fastapi_client, vnp_secret, monkeypatch):
         "id": order_id,
         "total_amount": 100000,
         "payment_status": "pending",
+        "status": "pending",
     })
     fake_payments = _FakePaymentsDAO()
 
@@ -109,6 +110,7 @@ def test_ipn_invalid_signature_rejected(fastapi_client, vnp_secret, monkeypatch)
         "id": order_id,
         "total_amount": 100000,
         "payment_status": "pending",
+        "status": "pending",
     })
     monkeypatch.setattr("apis.payments.DAOOrders", lambda: fake_orders)
 
@@ -130,6 +132,7 @@ def test_ipn_amount_mismatch_rejected(fastapi_client, vnp_secret, monkeypatch):
         "id": order_id,
         "total_amount": 100000,  # actual order amount
         "payment_status": "pending",
+        "status": "pending",
     })
     monkeypatch.setattr("apis.payments.DAOOrders", lambda: fake_orders)
 
@@ -186,6 +189,7 @@ def test_ipn_failed_payment_logs_attempt_keeps_order_pending(fastapi_client, vnp
         "id": order_id,
         "total_amount": 100000,
         "payment_status": "pending",
+        "status": "pending",
     })
     fake_payments = _FakePaymentsDAO()
     monkeypatch.setattr("apis.payments.DAOOrders", lambda: fake_orders)
