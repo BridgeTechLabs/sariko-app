@@ -75,7 +75,8 @@ export default {
             return this.has('pickup_address') && this.missing.includes('pickup_address')
         },
         canSave() {
-            return !this.saving && !this.waitingForAddress && (this.payloadGroups.length > 0 || this.idFile)
+            // Only the passport photo missing and none picked: Save still runs and says so under the photo field.
+            return !this.saving && !this.waitingForAddress
         },
         payloadGroups() {
             return this.shown.filter(g => !['pickup_address', 'id_document'].includes(g))
@@ -219,7 +220,9 @@ export default {
                 </template>
                 <template v-if="needsPassportPhoto">
                     <div class="field-label">{{ $t('seller_profile.label_passport_photo') }}</div>
-                    <q-file v-model="idFile" dark outlined dense color="amber" accept="image/jpeg,image/png,application/pdf" :label="$t('join_page.documents_add')" :hint="$t('join_page.documents_hint', { mb: limits.max_file_mb })" :error="!!err('id_document')" :error-message="err('id_document')" />
+                    <!-- Not a q-file hint: Quasar positions hints absolutely, a 3-line one spills out of the card -->
+                    <div class="card-hint">{{ $t('join_page.documents_hint', { mb: limits.max_file_mb }) }}</div>
+                    <q-file v-model="idFile" dark outlined dense color="amber" accept="image/jpeg,image/png,application/pdf" :label="$t('join_page.documents_add')" :error="!!err('id_document')" :error-message="err('id_document')" />
                 </template>
             </div>
 
