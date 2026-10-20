@@ -8,6 +8,7 @@ export const useMenuStore = defineStore('menuStore', {
         return {
             categories: [],   // [{ id, name, sort_order, is_active, food_items: [...] }]
             isLoading: false,
+            loadError: false,   // last fetch failed: an error, not an empty menu
             sellerId: null,
         }
     },
@@ -21,6 +22,7 @@ export const useMenuStore = defineStore('menuStore', {
     actions: {
         async fetchMenu() {
             this.isLoading = true
+            this.loadError = false
             try {
                 const dashStore = useDashboardStore()
                 if (!dashStore.sellerId) await dashStore.fetchSellerInfo()
@@ -30,6 +32,7 @@ export const useMenuStore = defineStore('menuStore', {
                 this.categories = res.menu || []
             } catch (e) {
                 console.error('menuStore - fetchMenu -', e)
+                this.loadError = true
             } finally {
                 this.isLoading = false
             }
@@ -48,6 +51,25 @@ export const useMenuStore = defineStore('menuStore', {
             const res = await apiSellerMenu.updateCategory(catId, fields)
             const idx = this.categories.findIndex(c => c.id === catId)
             if (idx !== -1) Object.assign(this.categories[idx], res.category)
+        },
+
+        // Swap a category with its neighbour (step -1 up, +1 down) and save the new order.
+        // sort_order may hold duplicates (all 0), so every category whose position
+        // number changes is written, not just the two that swapped.
+        async moveCategory(catId, step) {
+            const from = this.categories.findIndex(c => c.id === catId)
+            const to = from + step
+            if (from === -1 || to < 0 || to >= this.categories.length) return
+            const list = [...this.categories]
+            ;[list[from], list[to]] = [list[to], list[from]]
+            const changed = list.filter((c, i) => c.sort_order !== i + 1)
+            this.categories = list.map((c, i) => Object.assign(c, { sort_order: i + 1 }))
+            try {
+                await Promise.all(changed.map(c => apiSellerMenu.updateCategory(c.id, { sort_order: c.sort_order })))
+            } catch (e) {
+                await this.fetchMenu()   // back to what the server has
+                throw e
+            }
         },
 
         async deleteCategory(catId) {

@@ -1,5 +1,6 @@
 <script>
-import { Plus } from 'lucide-vue-next'
+import { Plus, ChevronUp, ChevronDown } from 'lucide-vue-next'
+import { useMenuStore } from '@/stores/seller/menuStore'
 import SellerMenuFoodItem from './SellerMenuFoodItem.vue'
 import ModalEditItem from './ModalEditItem.vue'
 import ModalEditCategory from './ModalEditCategory.vue'
@@ -7,7 +8,7 @@ import ModalEditCategory from './ModalEditCategory.vue'
 export default {
     name: 'SellerMenuCategorySection',
 
-    components: { Plus, SellerMenuFoodItem, ModalEditItem, ModalEditCategory },
+    components: { Plus, ChevronUp, ChevronDown, SellerMenuFoodItem, ModalEditItem, ModalEditCategory },
 
     props: {
         category: { type: Object, required: true },
@@ -18,7 +19,31 @@ export default {
             showAddItem: false,
             showEditCategory: false,
             expanded: true,
+            moving: false,
         }
+    },
+
+    computed: {
+        position() {
+            return useMenuStore().categories.findIndex(c => c.id === this.category.id)
+        },
+        isFirst() { return this.position === 0 },
+        isLast()  { return this.position === useMenuStore().categories.length - 1 },
+    },
+
+    methods: {
+        async move(step) {
+            if (this.moving) return
+            this.moving = true
+            try {
+                await useMenuStore().moveCategory(this.category.id, step)
+            } catch (e) {
+                console.error('SellerMenuCategorySection - move -', e)
+                this.$q.notify({ type: 'negative', message: this.$t('seller_menu.category_move_failed'), position: 'bottom' })
+            } finally {
+                this.moving = false
+            }
+        },
     },
 
 }
@@ -34,6 +59,14 @@ export default {
                 <span class="item-count">({{ (category.food_items || []).length }})</span>
             </div>
             <div class="category-actions" @click.stop>
+                <button v-if="!isFirst" class="btn-cat-move" :disabled="moving"
+                    :aria-label="$t('seller_menu.category_move_up')" @click="move(-1)">
+                    <ChevronUp :size="14" />
+                </button>
+                <button v-if="!isLast" class="btn-cat-move" :disabled="moving"
+                    :aria-label="$t('seller_menu.category_move_down')" @click="move(1)">
+                    <ChevronDown :size="14" />
+                </button>
                 <button class="btn-cat-action" @click="showEditCategory = true">
                     {{ $t('seller_menu.category_edit') }}
                 </button>
@@ -121,6 +154,19 @@ export default {
     gap: 6px;
     flex-shrink: 0;
     margin-left: 10px;
+}
+
+.btn-cat-move {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.07);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    &:disabled { opacity: 0.4; }
 }
 
 .btn-cat-action {
