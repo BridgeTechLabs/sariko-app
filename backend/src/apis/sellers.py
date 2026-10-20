@@ -1,12 +1,15 @@
 import logging
+import re
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import ROUND_HALF_UP, Decimal
 
 from apis.orders import cancel_after
-from core.store_hours import confirm_deadline, is_open_now
+from core.store_hours import VN_TZ, confirm_deadline, is_open_now
 from services.order_expiry import confirm_window
 
 from dao.dao_admin_config import DAOAdminConfig
+from dao.dao_admin_payouts import DAOAdminPayouts
 from dao.dao_seller_profiles import DAOSellerProfiles
 from dao.dao_food_items import DAOFoodItems, FoodItemNameTaken
 from dao.dao_menu_categories import DAOMenuCategories
@@ -40,6 +43,11 @@ VALID_STATUS_TRANSITIONS = {
 # A Lalamove trip is over once it reaches one of these; before that the COMPLETED
 # webhook closes the order, so the seller can't mark it done (P0-6).
 DELIVERY_ENDED_STATUSES = {"COMPLETED", "REJECTED", "CANCELLED", "CANCELED", "EXPIRED"}
+
+# Rows one order search returns (a page size, not a business rule).
+SEARCH_LIMIT = 20
+# Payout batches shown on the earnings page (a page size, not a business rule).
+EARNINGS_PAYOUTS_LIMIT = 12
 
 @router.get("/")
 def get_sellers(user=Depends(verify_token)):
@@ -120,6 +128,8 @@ def get_seller_info(user=Depends(verify_token)):
             "opening_time": profile.get("opening_time"),
             "closing_time": profile.get("closing_time"),
             "open_now": is_open_now(profile.get("is_open"), profile.get("opening_time"), profile.get("closing_time")),
+            "rating_avg": profile.get("rating_avg"),
+            "rating_count": profile.get("rating_count") or 0,
         }
     except HTTPException:
         raise
@@ -176,8 +186,11 @@ def set_store_hours(body: Schema.RequestSetStoreHours, user=Depends(verify_token
 def get_seller_orders(user=Depends(verify_token)):
     try:
         seller = _get_seller(user)
-        orders = DAOOrders().read_orders_by_seller_id(seller["id"])
-        return {"success": True, "orders": _with_deadlines(orders, seller), "seller_id": seller["id"]}
+        history_days = DAOAdminConfig().get_positive_int("seller_order_history_days", 30)
+        since = datetime.now(timezone.utc) - timedelta(days=history_days)
+        orders = DAOOrders().read_orders_by_seller_id(seller["id"], since)
+        return {"success": True, "orders": _with_deadlines(orders, seller), "seller_id": seller["id"],
+                "history_days": history_days}
     except HTTPException:
         raise
     except Exception as e:
@@ -214,13 +227,37 @@ def get_seller_orders_head(user=Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Must stay above /me/orders/{order_id}, like /head.
+@router.get("/me/orders/search")
+def search_seller_orders(user=Depends(verify_token), q: str = Query(min_length=2, max_length=60)):
+    """Find an order of any age by its code (#54CB066E, or the start of it) or the buyer's name."""
+    try:
+        seller = _get_seller(user)
+        term = q.strip().lstrip("#").strip()
+        code = term.lower() if re.fullmatch(r"[0-9a-fA-F-]{2,36}", term) else None
+        if code:
+            code = code.replace("-", "")
+        # Keep letters, digits, spaces and . ' - : anything else could act as a PostgREST
+        # filter or LIKE character.
+        name = re.sub(r"[^\w\s.'-]|_", "", term).strip() or None
+        orders = DAOOrders().search_orders_for_seller(seller["id"], code, name, limit=SEARCH_LIMIT)
+        return {"success": True, "orders": _with_deadlines(orders, seller)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Exception in GET /sellers/me/orders/search: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/me/orders/{order_id}")
 def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
     try:
         seller = _get_seller(user)
-        order = DAOOrders().read_order_by_id_for_seller(order_id, seller["id"])
+        dao = DAOOrders()
+        order = dao.read_order_by_id_for_seller(order_id, seller["id"])
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        order["status_history"] = dao.read_status_history(order_id)
         return {"success": True, "order": _with_deadlines([order], seller)[0]}
     except HTTPException:
         raise
@@ -270,6 +307,18 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
 
             seller  = full_order.get("seller_profiles") or {}
             buyer   = full_order.get("users") or {}
+
+            # Same check as the Ready buttons (P1-4): no pickup point or phone, no quote.
+            missing = [field for field, ok in (
+                ("address", seller.get("address") and seller.get("lat") and seller.get("lon")),  # as has_address
+                ("phone", seller.get("phone")),
+            ) if not ok]
+            if missing:
+                raise HTTPException(status_code=409, detail={
+                    "code": "seller_profile_incomplete",
+                    "missing": missing,
+                    "message": "Set your store address and phone before marking the order ready.",
+                })
 
             pickup_address  = seller.get("address") or ""
             dropoff_address = full_order.get("delivery_address") or ""
@@ -592,6 +641,79 @@ def get_seller_reviews(
         raise
     except Exception as e:
         logger.exception(f"Exception in GET /sellers/me/reviews: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _money(value) -> Decimal:
+    return Decimal(str(value or 0))
+
+
+def _vnd(amount: Decimal) -> int:
+    """Whole đồng for the JSON, rounded half up like the admin screens (DB keeps 2 decimals)."""
+    return int(amount.quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
+@router.get("/me/earnings")
+def get_seller_earnings(user=Depends(verify_token)):
+    """Done orders of the last seller_order_history_days with their split (food, commission,
+    VAT, payout) and payout state, plus the seller's payout batches. Sums in Decimal,
+    int only in the JSON."""
+    try:
+        seller_id = _get_seller_id(user)
+        config = DAOAdminConfig()
+        history_days = config.get_positive_int("seller_order_history_days", 30)
+        delay_days = config.get_int_in_range("payout_delay_days", 3, 0, 30)
+        since = datetime.now(timezone.utc) - timedelta(days=history_days)
+
+        orders, awaiting = [], Decimal(0)
+        for row in DAOOrders().read_done_orders_for_earnings(seller_id, since):
+            payout = _money(row.get("payout_amount"))
+            state = row.get("payout_status") or "pending"
+            if state == "pending" and row.get("payout_hold"):
+                state = "held"
+            expected = None
+            if state == "pending":
+                awaiting += payout
+                done_day = datetime.fromisoformat(row["status_changed_at"]).astimezone(VN_TZ).date()
+                expected = (done_day + timedelta(days=delay_days)).isoformat()
+            elif state == "processing":
+                awaiting += payout
+            orders.append({
+                "id": row["id"],
+                "done_at": row.get("status_changed_at"),
+                "subtotal": _vnd(_money(row.get("subtotal"))),
+                "commission_amount": _vnd(_money(row.get("commission_amount"))),
+                "vat_amount": _vnd(_money(row.get("vat_amount"))),
+                "payout_amount": _vnd(payout),
+                "payout_state": state,
+                "expected_payout_date": expected,
+            })
+
+        payouts, received = [], Decimal(0)
+        for row in DAOAdminPayouts().read_payouts_by_seller_id(seller_id, EARNINGS_PAYOUTS_LIMIT):
+            net = _money(row.get("net_payout"))
+            if row.get("status") == "completed":
+                received += net
+            payouts.append({
+                **row,
+                "net_payout": _vnd(net),
+                "total_deductions": _vnd(_money(row.get("total_deductions"))),
+            })
+
+        return {
+            "success": True,
+            "history_days": history_days,
+            "payout_delay_days": delay_days,
+            "awaiting_total": _vnd(awaiting),
+            "received_total": _vnd(received),
+            "payouts_limit": EARNINGS_PAYOUTS_LIMIT,   # received_total covers only these batches
+            "orders": orders,
+            "payouts": payouts,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Exception in GET /sellers/me/earnings: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -23,6 +23,7 @@ export default {
         store()       { return useMenuStore() },
         categories()  { return this.store.categories },
         isLoading()   { return this.store.isLoading },
+        loadError()   { return this.store.loadError },
         totalItems()  { return this.store.allItems.length },
     },
 
@@ -65,6 +66,16 @@ export default {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Load failed: not the same as an empty menu -->
+            <div v-else-if="loadError" class="empty-state">
+                <div class="empty-icon">⚠️</div>
+                <div class="empty-title">{{ $t('seller_menu.load_error') }}</div>
+                <div class="empty-sub">{{ $t('seller_menu.load_error_sub') }}</div>
+                <button class="btn-empty-add" @click="store.fetchMenu()">
+                    {{ $t('seller_menu.retry') }}
+                </button>
             </div>
 
             <!-- Empty state -->

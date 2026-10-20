@@ -108,6 +108,7 @@ def _body(**over):
     body = {
         "first_name": "Maria", "last_name": "Santos", "date_of_birth": adult.isoformat(),
         "nationality": "Philippines", "id_type": "passport", "id_number": "P1234567",
+        "id_expiry_date": "2035-01-01", "tax_resident": True,
         "email": "maria@example.com", "phone": "0901234567",
         "residential_address": "12 Nguyen Hue, District 1",
         "store_name": "Maria's Kitchen", "pickup_address": "12 Nguyen Hue, District 1",
@@ -116,7 +117,8 @@ def _body(**over):
         "menu": [_dish("a"), _dish("b")],
         "tier": "tindahan",
         "bank_name": "Vietcombank", "bank_account_number": "0123456789", "bank_account_holder": "MARIA SANTOS",
-        "agreed": True, "agreement_version": onboarding.SETTINGS_DEFAULTS["seller_agreement_version"],
+        "agreed": True, "personal_data_consent": True,
+        "agreement_version": onboarding.SETTINGS_DEFAULTS["seller_agreement_version"],
         "signature_name": "maria  santos", "turnstile_token": "tok",
     }
     body.update(over)
@@ -346,3 +348,53 @@ def test_submit_ok_then_second_submit_is_404(env):
     assert res.status_code == 200 and res.json()["reference"] == app_id[:8].upper()
     assert FakeDAO.apps[app_id]["status"] == "submitted" and FakeDAO.apps[app_id]["upload_token"] is None
     assert _submit(env, app_id, token).status_code == 404
+
+
+# ── Q6 / Q9-Q12 (spec docs/dev/seller-profile-completion, TC-33..35) ──────────
+
+CCCD = {"nationality": "Vietnam", "id_type": "cccd", "id_number": "079090001234",
+        "first_name": "An", "last_name": "Nguyễn Văn", "signature_name": "Nguyễn Văn An",
+        "bank_account_holder": "NGUYEN VAN AN"}
+
+
+def test_tc33_cccd_seller_needs_no_photo(env):
+    app_id, token = _create(env, **CCCD)
+    assert _code(_upload(env, app_id, token, "id_document", _jpeg())) == "id_document_not_needed"
+    for key in ("a", "b"):
+        _upload(env, app_id, token, "dish_photo", _jpeg(), item_key=key)
+    assert _submit(env, app_id, token).status_code == 200
+
+
+def test_tc34_passport_seller_still_needs_the_photo(env):
+    app_id, token = _create(env)
+    for key in ("a", "b"):
+        _upload(env, app_id, token, "dish_photo", _jpeg(), item_key=key)
+    assert _code(_submit(env, app_id, token)) == "id_document_required"
+
+
+@pytest.mark.parametrize("over,code", [
+    ({"id_expiry_date": None}, "id_expiry_required"),
+    ({"id_expiry_date": (date.today() - timedelta(days=1)).isoformat()}, "id_expired"),
+    ({"id_expiry_date": (date.today() + timedelta(days=60)).isoformat()}, "id_expiring"),
+    ({**CCCD, "id_number": "12345"}, "invalid_id_number"),
+    ({"tax_resident": None}, "missing_field"),
+    ({"personal_data_consent": False}, "consent_required"),
+    ({"bank_account_number": "12345"}, "invalid_bank_account"),
+    ({"bank_account_holder": "JUAN CRUZ"}, "bank_holder_mismatch"),
+])
+def test_tc35_identity_rules(env, over, code):
+    res = env["client"].post("/onboarding/applications", json=_body(**over))
+    assert res.status_code == 400 and _code(res) == code
+    assert FakeDAO.apps == {}
+
+
+def test_tc35_stores_expiry_and_consent(env):
+    app_id, _ = _create(env, **CCCD)
+    row = FakeDAO.apps[app_id]
+    assert row["id_expiry_date"] == "2035-01-01" and row["personal_data_consent_at"]
+
+
+def test_tc35_months_setting_is_served_and_applied(env):
+    FakeConfig.raw = {"onboarding_min_id_validity_months": 1}
+    assert env["client"].get("/onboarding/settings").json()["min_id_validity_months"] == 1
+    _create(env, id_expiry_date=(date.today() + timedelta(days=60)).isoformat())

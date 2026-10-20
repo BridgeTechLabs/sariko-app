@@ -30,6 +30,7 @@ tests/
 | **Refactor backend logic** | Add unit test ở `tests/backend/unit/` |
 | **Add/change API endpoint** | Add integration test ở `tests/backend/integration/` |
 | **Frontend logic phức tạp (composables)** | (TODO) Setup Vitest ở `tests/frontend/` |
+| Lỗi lặp (docs/tracking/loi-lap-lai.txt) | test chặn ở tests/backend/unit/test_no_float_money.py, frontend scripts/check-i18n.mjs |
 
 ## Setup
 
