@@ -1,10 +1,14 @@
 <script>
 import { useOrderStore } from '@/stores/order/orderStore.js';
+import { orderCode } from '@/utils/orderCode';
 
 export default {
     computed: {
         order() {
             return useOrderStore().currentOrder
+        },
+        code() {
+            return orderCode(this.order?.id)
         },
         subtotal() {
             if (!this.order) return 0
@@ -53,6 +57,10 @@ export default {
 
 <template>
     <div v-if="order" class="order-card">
+        <div class="order-row">
+            <span class="label">{{ $t('order_detail.label_order_code') }}</span>
+            <span>{{ code }}</span>
+        </div>
         <div class="order-row">
             <span class="label">{{ $t('order_detail.label_status') }}</span>
             <q-badge :color="statusColor" text-color="black">

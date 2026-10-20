@@ -73,6 +73,8 @@ export const useDashboardStore = defineStore("dashboardStore", {
                     slug: res.slug,
                     store_name: res.store_name,
                     address: res.address,
+                    lat: res.lat,
+                    lon: res.lon,
                     phone: res.phone,
                     has_address: res.has_address,
                     has_phone: res.has_phone,
@@ -118,7 +120,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
                 const res = await apiSellerDashboard.getOrderDetail(orderId)
                 this.orderDetails = res.order || null
                 if (this.orderDetails?.delivery_method === 'delivery'
-                    && ['ready', 'done'].includes(this.orderDetails?.status)) {
+                    && ['ready', 'delivery_failed', 'done'].includes(this.orderDetails?.status)) {
                     await this._fetchDelivery(orderId)
                 }
             } catch (e) {

@@ -1,6 +1,7 @@
 <script>
 import BottomNavigation from '@/components/nav/BottomNavigation.vue'
 import SellerBottomNav from '@/components/nav/SellerBottomNav.vue'
+import SellerOrderAlert from '@/components/seller-home/SellerOrderAlert.vue'
 import { defineAsyncComponent } from 'vue'
 import { setUpAxiosPolicy } from "@/lib/axiosPolicy.js";
 import { useAuthStore } from '@/stores/auth/authStore'
@@ -17,6 +18,7 @@ export default {
     components: {
         BottomNavigation,
         SellerBottomNav,
+        SellerOrderAlert,
     },
 
     setup() {
@@ -70,6 +72,8 @@ export default {
                 </transition> -->
             <!-- </router-view> -->
         </div>
+        <!-- keyed by user: a different seller signing in gets a fresh poller -->
+        <SellerOrderAlert v-if="isSeller && userId" :key="userId" />
         <SellerBottomNav v-if="showNavigation && isSeller" />
         <BottomNavigation v-else-if="showNavigation" />
         <component :is="DevPanel" v-if="DevPanel" />

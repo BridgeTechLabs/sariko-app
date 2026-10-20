@@ -2,6 +2,7 @@
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import { AlertTriangle } from 'lucide-vue-next';
 import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '@/utils/readyWindow';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
 
 const STATUS_NEXT = {
     pending:   'confirmed',
@@ -10,6 +11,9 @@ const STATUS_NEXT = {
 }
 
 const REJECT_REASONS = ['out_of_ingredients', 'too_busy', 'store_closing', 'other']
+
+// Trip over: before that the Lalamove COMPLETED webhook closes the order, not the seller.
+const DELIVERY_ENDED = ['COMPLETED', 'REJECTED', 'CANCELLED', 'CANCELED', 'EXPIRED']
 
 export default {
     components: { AlertTriangle },
@@ -31,12 +35,19 @@ export default {
             rebooking: false,
             rebookError: false,
             tick: 0,
+            supportEmail: SUPPORT_EMAIL,
+            supportMailto: SUPPORT_MAILTO,
             _tickInterval: null,
         }
     },
 
     computed: {
-        canAccept() { return !!STATUS_NEXT[this.order.status] },
+        canAccept() { return !!STATUS_NEXT[this.order.status] && !this.tripRunning },
+        // Unknown delivery (not loaded yet) counts as running, so Done never flashes up.
+        tripRunning() {
+            return this.order.status === 'ready' && this.order.delivery_method === 'delivery'
+                && !DELIVERY_ENDED.includes(this.delivery?.status)
+        },
         readyWaitMinutes() {
             void this.tick
             return minutesUntilReady(this.order)
@@ -184,9 +195,9 @@ export default {
 <template>
     <div>
         <!-- Contact admin notice — infra errors requiring admin intervention -->
-        <div v-if="showContactAdmin" class="contact-admin-notice">
-            {{ $t('seller_order_detail.contact_admin_notice') }}
-        </div>
+        <a v-if="showContactAdmin" :href="supportMailto" class="contact-admin-notice">
+            {{ $t('seller_order_detail.contact_admin_notice', { email: supportEmail }) }}
+        </a>
 
         <!-- Action buttons -->
         <div class="action-row">
@@ -266,6 +277,8 @@ export default {
 
 <style lang="scss" scoped>
 .contact-admin-notice {
+    display: block;
+    text-decoration: underline;
     font-size: 12px;
     color: var(--text-secondary);
     text-align: center;

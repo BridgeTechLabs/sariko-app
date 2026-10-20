@@ -1,5 +1,7 @@
 <script>
 import { Phone } from 'lucide-vue-next';
+import { formatVnTime } from '@/utils/vnTime';
+import { orderCode } from '@/utils/orderCode';
 
 const STATUS_DISPLAY_KEY = {
     pending:   'seller_order_detail.status_new',
@@ -7,6 +9,7 @@ const STATUS_DISPLAY_KEY = {
     ready:     'seller_order_detail.status_ready',
     done:      'seller_order_detail.status_done',
     cancelled: 'seller_order_detail.status_cancelled',
+    delivery_failed: 'seller_orders.status_delivery_failed',
 }
 
 const STATUS_CLASS = {
@@ -15,14 +18,18 @@ const STATUS_CLASS = {
     ready:     'badge-ready',
     done:      'badge-done',
     cancelled: 'badge-cancelled',
+    delivery_failed: 'badge-delivery-failed',
 }
 
+const PAYMENT_METHOD_LABEL = { vnpay: 'VNPay' }
+
 const DELIVERY_STATUS_ORDER = ['ASSIGNING_DRIVER', 'ON_GOING', 'PICKED_UP', 'COMPLETED']
-const DELIVERY_CANCELLED_STATUSES = ['CANCELED', 'REJECTED', 'EXPIRED']
+const DELIVERY_CANCELLED_STATUSES = ['CANCELLED', 'CANCELED', 'REJECTED', 'EXPIRED']
 const DELIVERY_CANCEL_ERROR_KEY = {
     REJECTED: 'seller_order_detail.delivery_rejected_error',
     EXPIRED:  'seller_order_detail.delivery_expired_error',
     CANCELED: 'seller_order_detail.delivery_canceled_error',
+    CANCELLED: 'seller_order_detail.delivery_canceled_error',
 }
 
 export default {
@@ -51,11 +58,32 @@ export default {
         },
 
         customerName() {
-            return this.order.users?.name || this.order.users?.email || 'Customer'
+            return this.order.users?.name || this.order.users?.email || this.$t('seller_orders.customer_fallback')
         },
 
         customerPhone() {
             return this.order.users?.phone || null
+        },
+
+        // From the charge row in payments; force-paid DEV orders have none, so the row hides.
+        paymentMethod() {
+            const method = (this.order.payments || []).find(p => p.type === 'charge')?.method
+            return method ? (PAYMENT_METHOD_LABEL[method] || method) : null
+        },
+
+        // Driver card while Lalamove is running; hidden once the trip failed (driver fields are cleared then too).
+        showDriver() {
+            const d = this.delivery
+            return this.order.status === 'ready' && !!d && !DELIVERY_CANCELLED_STATUSES.includes(d.status)
+                && !!(d.driver_name || d.share_link)
+        },
+
+        code() {
+            return orderCode(this.order.id)
+        },
+
+        placedAt() {
+            return formatVnTime(this.order.created_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
         },
 
         subtotal() {
@@ -66,7 +94,8 @@ export default {
 
         timelineSteps() {
             const isCancelled = this.order.status === 'cancelled'
-            const orderStatusIdx = { pending: 0, confirmed: 1, ready: 2, done: 3 }
+            // delivery_failed comes after ready: placed / accepted / ready are all behind it
+            const orderStatusIdx = { pending: 0, confirmed: 1, ready: 2, delivery_failed: 3, done: 3 }
             const currentOrderIdx = orderStatusIdx[this.order.status] ?? -1
             const hasDelivery = this.order.delivery_method === 'delivery' && !!this.delivery
             const deliveryCancelled = hasDelivery && DELIVERY_CANCELLED_STATUSES.includes(this.delivery.status)
@@ -160,7 +189,7 @@ export default {
                 {{ $t('seller_order_detail.label_reason') }}: {{ order.cancellation_reason }}
             </div>
             <div class="order-time-text">
-                {{ $t('seller_order_detail.label_placed') }} {{ new Date(order.created_at).toLocaleString('vi-VN') }}
+                {{ code }} · {{ $t('seller_order_detail.label_placed') }} {{ placedAt }}
             </div>
         </div>
 
@@ -185,6 +214,28 @@ export default {
                 <span class="info-key">{{ $t('seller_order_detail.label_note') }}</span>
                 <span class="info-val note-text">{{ order.note }}</span>
             </div>
+        </div>
+
+        <!-- Driver -->
+        <div v-if="showDriver" class="card">
+            <div class="section-label" style="margin-bottom:12px;">{{ $t('seller_order_detail.section_driver') }}</div>
+            <div v-if="delivery.driver_name" class="info-row">
+                <span class="info-key">{{ $t('seller_order_detail.label_name') }}</span>
+                <span class="info-val">{{ delivery.driver_name }}</span>
+            </div>
+            <div v-if="delivery.driver_phone" class="info-row">
+                <span class="info-key">{{ $t('seller_order_detail.label_phone') }}</span>
+                <a :href="`tel:${delivery.driver_phone}`" class="phone-link">
+                    <Phone :size="13" style="margin-right:4px;" />{{ delivery.driver_phone }}
+                </a>
+            </div>
+            <div v-if="delivery.driver_plate" class="info-row">
+                <span class="info-key">{{ $t('seller_order_detail.label_plate') }}</span>
+                <span class="info-val">{{ delivery.driver_plate }}</span>
+            </div>
+            <a v-if="delivery.share_link" :href="delivery.share_link" target="_blank" rel="noopener" class="track-link">
+                {{ $t('delivery_tracker.track_rider') }}
+            </a>
         </div>
 
         <!-- Items -->
@@ -212,9 +263,9 @@ export default {
         <!-- Payment -->
         <div class="card">
             <div class="section-label" style="margin-bottom:12px;">{{ $t('seller_order_detail.section_payment') }}</div>
-            <div class="info-row">
+            <div v-if="paymentMethod" class="info-row">
                 <span class="info-key">{{ $t('seller_order_detail.label_method') }}</span>
-                <span class="info-val">{{ order.payment_method || 'VNPay' }}</span>
+                <span class="info-val">{{ paymentMethod }}</span>
             </div>
             <div class="info-row">
                 <span class="info-key">{{ $t('seller_order_detail.label_status') }}</span>
@@ -296,6 +347,7 @@ export default {
 .badge-ready     { background: rgba(139,92,246,0.15);  color: #a78bfa; }
 .badge-done      { background: rgba(34,197,94,0.15);   color: var(--color-success); }
 .badge-cancelled { background: rgba(239,68,68,0.1);    color: #ef4444; }
+.badge-delivery-failed { background: rgba(245,158,11,0.15); color: #f59e0b; }
 
 .order-time-text, .cancellation-reason {
     font-size: 12px;
@@ -322,6 +374,19 @@ export default {
     align-items: center;
     color: var(--color-accent);
     font-size: 13px;
+    text-decoration: none;
+}
+
+.track-link {
+    display: block;
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-accent);
+    border: 1px solid var(--color-accent);
     text-decoration: none;
 }
 

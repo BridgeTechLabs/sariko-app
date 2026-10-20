@@ -54,7 +54,7 @@ export default {
             return this.$t('seller_home.greeting_evening_prefix')
         },
 
-        storeName() {
+        greetingName() {
             return (this.user?.fullName || '...') + ' 👋'
         },
 
@@ -140,7 +140,8 @@ export default {
     <div class="greeting-header">
         <div class="greeting-wrap">
             <div class="greeting-prefix">{{ greetingPrefix }}</div>
-            <div class="greeting">{{ storeName }}</div>
+            <div class="greeting">{{ greetingName }}</div>
+            <div v-if="sellerInfo?.store_name" class="store-line">{{ sellerInfo.store_name }}</div>
             <div class="datetime">
                 <span class="date-text">{{ dateText }}</span>
                 <span class="time-text">{{ timeText }}</span>
@@ -196,6 +197,13 @@ export default {
 </template>
 
 <style lang="scss" scoped>
+.store-line {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-accent);
+    margin-top: 2px;
+}
+
 .greeting-header {
     display: flex;
     justify-content: space-between;
