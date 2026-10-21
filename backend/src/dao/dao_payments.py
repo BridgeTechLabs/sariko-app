@@ -50,3 +50,12 @@ class DAOPayments(DAOBase):
             raise Exception(f"Supabase error - create_payment: {e}")
         except Exception as e:
             raise Exception(f"error create_payment: {e}")
+
+    def has_transaction(self, transaction_ref: str) -> bool:
+        """A payment row already exists for this VNPay TxnRef (a result recorded once)."""
+        try:
+            result = self._supabase_client.table(self._table_name).select("id") \
+                .eq("transaction_ref", transaction_ref).limit(1).execute()
+            return bool(result.data)
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - has_transaction: {e}")

@@ -77,6 +77,12 @@ export default {
                 this.$q.notify({ type: 'negative', message: this.$t('order_detail.error_payment_create'), position: 'top' })
             } catch (e) {
                 console.error('Pay now failed:', e)
+                if (e.status === 409) {
+                    // the previous VNPay payment went through, or is still being processed (T125):
+                    // the message is already shown; reload the order so a paid one shows as paid
+                    await this.orderStore.getOrderDetail(this.order.id, { silent: true })
+                    return
+                }
                 this.$q.notify({ type: 'negative', message: this.$t('order_detail.error_payment_failed'), position: 'top' })
             } finally {
                 this.payingNow = false

@@ -10,7 +10,12 @@ export const apiPayments = {
             const response = await apiClient.post(`/v1/payments/vnpay/create/${orderId}`)
             return response
         } catch (error) {
-            throw new Error(error.response?.data?.detail || 'Failed to create VNPay payment')
+            // 409 order_already_paid / payment_in_progress (T125): the caller reacts to the status;
+            // axiosPolicy has already shown the translated message
+            const err = new Error('Failed to create VNPay payment')
+            err.status = error.response?.status
+            err.code = error.response?.data?.detail?.code
+            throw err
         }
     },
 

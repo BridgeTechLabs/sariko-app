@@ -62,6 +62,14 @@ MESSAGES = {
         "en": ("Order about to auto-cancel", "A paid order hasn't been accepted yet. Accept it in the next few minutes or it will be cancelled and refunded."),
         "vi": ("Đơn sắp tự hủy", "Một đơn đã thanh toán chưa được nhận. Hãy nhận đơn trong vài phút tới, nếu không đơn sẽ tự hủy và hoàn tiền cho khách."),
     },
+    "payment_confirmed": {
+        "en": ("Payment confirmed", "VNPay confirmed your payment. Your order is with the seller."),
+        "vi": ("Đã xác nhận thanh toán", "VNPay đã xác nhận thanh toán. Đơn hàng đã được gửi tới người bán."),
+    },
+    "payment_failed": {
+        "en": ("Payment not completed", "VNPay did not take the payment for your order. You can pay again."),
+        "vi": ("Thanh toán không thành công", "VNPay không ghi nhận thanh toán cho đơn hàng. Bạn có thể thanh toán lại."),
+    },
     "seller_complaint": {
         "en": ("New complaint on an order", "A customer filed a complaint about an order. Tap to see it."),
         "vi": ("Có khiếu nại về đơn hàng", "Khách vừa gửi khiếu nại về một đơn hàng. Nhấn để xem."),
@@ -145,6 +153,16 @@ def notify_seller_delivered(order: dict):
     """Seller side: Lalamove reported the delivery COMPLETED.
     Called from the webhook — a seller marking 'done' themselves needs no push."""
     _send_async(order.get("seller_user_id"), "seller_delivered", f"/seller/orders/{order['id']}")
+
+
+def notify_payment_confirmed(order: dict):
+    """Buyer side: the reconcile job found the payment at VNPay after the IPN did not come (T125)."""
+    _send_async(order.get("user_id"), "payment_confirmed", f"/orders/{order['id']}")
+
+
+def notify_payment_failed(order: dict):
+    """Buyer side: VNPay says the pay link was not paid; once per link (T125)."""
+    _send_async(order.get("user_id"), "payment_failed", f"/orders/{order['id']}")
 
 
 def notify_seller_complaint(seller_user_id, order_id: str):
