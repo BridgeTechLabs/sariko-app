@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Optional
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
@@ -37,13 +38,13 @@ class DAOOrders(DAOBase):
         self._table_name = "orders"
 
     def create_order(self, user_id: str, seller_id: str, seller_user_id: str,
-        subtotal: float, total_amount: float,
-        commission_rate: float, commission_amount: float,
-        vat_rate: float, vat_amount: float,
-        payout_amount: float,
+        subtotal: Decimal, total_amount: Decimal,
+        commission_rate: Decimal, commission_amount: Decimal,
+        vat_rate: Decimal, vat_amount: Decimal,
+        payout_amount: Decimal,
         delivery_method: str, delivery_address: Optional[str] = None, note: Optional[str] = None,
         delivery_lat: Optional[float] = None, delivery_lon: Optional[float] = None,
-        delivery_fee: Optional[float] = None, quotation_id: Optional[str] = None,
+        delivery_fee: Optional[int] = None, quotation_id: Optional[str] = None,
         delivery_appointment=None
     ):
         try:
@@ -51,13 +52,14 @@ class DAOOrders(DAOBase):
                 "user_id": user_id,
                 "seller_id": seller_id,
                 "seller_user_id": seller_user_id,
-                "subtotal": subtotal,
-                "total_amount": total_amount,
-                "commission_rate": commission_rate,
-                "commission_amount": commission_amount,
-                "vat_rate": vat_rate,
-                "vat_amount": vat_amount,
-                "payout_amount": payout_amount,
+                # numeric columns; PostgREST's JSON body can't carry a Decimal
+                "subtotal": str(subtotal),
+                "total_amount": str(total_amount),
+                "commission_rate": str(commission_rate),
+                "commission_amount": str(commission_amount),
+                "vat_rate": str(vat_rate),
+                "vat_amount": str(vat_amount),
+                "payout_amount": str(payout_amount),
                 "delivery_method": delivery_method,
                 "delivery_address": delivery_address,
                 "note": note,

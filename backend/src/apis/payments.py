@@ -237,7 +237,7 @@ def vnpay_ipn(request: Request):
             DAOPayments().create_payment(
                 order_id=order_id,
                 method="vnpay",
-                amount=float(order["total_amount"]),
+                amount=Decimal(str(order["total_amount"])),
                 status="succeeded",
                 transaction_ref=txn_ref,
                 type="charge",
@@ -258,7 +258,7 @@ def vnpay_ipn(request: Request):
             DAOPayments().create_payment(
                 order_id=order_id,
                 method="vnpay",
-                amount=float(order["total_amount"]),
+                amount=Decimal(str(order["total_amount"])),
                 status="failed",
                 transaction_ref=txn_ref,
                 type="charge",

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Optional
 import logging
 
@@ -195,7 +196,7 @@ class DAOSellerProfiles(DAOBase):
             return {
                 "user_id": row["user_id"],
                 "is_open": is_open_now(row["is_open"], row["opening_time"], row["closing_time"]),
-                "commission_rate": float(effective_rate),
+                "commission_rate": Decimal(str(effective_rate)),
                 "address": row["address"],
                 "lat": row["lat"],
                 "lon": row["lon"],

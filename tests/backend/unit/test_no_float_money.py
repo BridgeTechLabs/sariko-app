@@ -13,22 +13,10 @@ import utils.pricing
 SRC = Path(utils.pricing.__file__).resolve().parent.parent   # backend/src locally, /www in CI
 
 FLOAT = re.compile(r"float\(|:\s*float\b|->\s*float\b")
-MONEY = re.compile(r"price|amount|fee|commission|payout|refund|total|subtotal|vat|vnd|money|cost", re.I)
+MONEY = re.compile(r"price|amount|fee|commission|payout|refund|total|subtotal|vat|vnd|money|cost|rate", re.I)
 
-# Lines per file on 2026-10-20 (TODO T89). Lower the count when T89 fixes one.
-BASELINE = {
-    "apis/payments.py": 2,
-    "apis/sellers.py": 1,
-    "dao/dao_admin_config.py": 1,
-    "dao/dao_orders.py": 4,
-    "dao/dao_payments.py": 1,
-    "dao/dao_refunds.py": 1,
-    "dao/dao_seller_profiles.py": 1,
-    "schemas/request_create_food_item.py": 1,
-    "schemas/request_create_variant.py": 1,
-    "services/lalamove_service.py": 1,
-    "utils/pricing.py": 1,
-}
+# Frozen violations per file; T89 brought every file to 0. Keep it empty.
+BASELINE = {}
 
 
 def money_floats():

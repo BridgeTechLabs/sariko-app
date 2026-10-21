@@ -19,7 +19,7 @@ from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
 from services import push_service
 from services.lalamove_service import get_lalamove_service
-from utils.pricing import cart_item_unit_price
+from utils.pricing import order_amounts
 
 router = APIRouter(prefix="/orders")
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
                 if (now - created).total_seconds() < 60:
                     raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Duplicate order detected. Please wait.")
 
-    # 2. Calculate subtotal + commission (snapshot seller's rate at order time)
+    # 2. Check the cart is still sellable
     cart_items = cart["cart_items"]
 
     sold_out = unavailable_names(cart_items)
@@ -91,10 +91,6 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
             detail={"code": "no_longer_available", "message": f"No longer available: {', '.join(sold_out)}",
                     "names": ", ".join(sold_out)},
         )
-    subtotal = sum(
-        cart_item_unit_price(item) * item["quantity"]
-        for item in cart_items
-    )
 
     # 3. Get seller user_id + effective commission rate in one query
     dao_seller_profile = DAOSellerProfiles()
@@ -133,28 +129,20 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
                 "delivery_fee": delivery_fee,
                 "quotation_id": quotation_id,
             })
-    total_amount = subtotal + (delivery_fee or 0)
 
+    # Money columns, Decimal (snapshot seller's rate at order time)
     commission_rate = seller_info["commission_rate"]
-    commission_amount = round(subtotal * commission_rate, 2)
-
     vat_rate = DAOAdminConfig().get_tax_rate("vat_rate")
-    vat_amount = round(commission_amount * vat_rate, 2)
-
-    payout_amount = round(subtotal - commission_amount - vat_amount, 2)
+    amounts = order_amounts(cart_items, commission_rate, vat_rate, delivery_fee)
 
     # 4. Create order (include delivery fields if present)
     order = dao_orders.create_order(
         user_id=user_id,
         seller_id=cart["seller_id"],
         seller_user_id=seller_info["user_id"],
-        subtotal=subtotal,
-        total_amount=total_amount,
         commission_rate=commission_rate,
-        commission_amount=commission_amount,
         vat_rate=vat_rate,
-        vat_amount=vat_amount,
-        payout_amount=payout_amount,
+        **amounts,
         delivery_method=request.delivery_method,
         delivery_address=request.delivery_address,
         note=request.note,
