@@ -27,6 +27,7 @@ from core.phone import to_e164_vn
 from core.seller_kyc import age, bank_holder_matches, id_error, same_name, valid_bank_account
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_onboarding import DAOOnboarding
+from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
 from utils.storage import compress_to_jpeg, remove_private, upload_private
 
@@ -54,6 +55,7 @@ SETTINGS_DEFAULTS = {
     "onboarding_min_id_validity_months": 6, # passport valid at least this long (NĐ 248/2026 Đ18.1.b)
     "founding_slots": 50,                   # also GET /sellers/founding/slots
     "founding_free_months": 4,
+    "enterprise_slots": 5,                  # Enterprise is invitation only, capped at this many sellers
 }
 
 
@@ -245,6 +247,10 @@ def get_settings():
             "commission_percent": _percent(founding["commission_rate"]) if founding else None,
             "monthly_fee_vnd": _vnd(founding["monthly_fee_vnd"]) if founding else None,
         },
+        "enterprise": {
+            "slots": s["enterprise_slots"],
+            "taken": DAOSellerProfiles().count_sellers_by_tier("enterprise"),
+        },
     }
 
 
@@ -282,6 +288,8 @@ def create_application(body: Schema.RequestCreateOnboardingApplication, request:
         raise _error(400, "bank_holder_mismatch", "The bank account must be in your own name")
     if body.tier not in TIERS:
         raise _error(400, "invalid_tier", "Invalid plan")
+    if body.tier == "enterprise" and DAOSellerProfiles().count_sellers_by_tier("enterprise") >= settings["enterprise_slots"]:
+        raise _error(409, "enterprise_full", "No Enterprise places left", slots=settings["enterprise_slots"])
     if not EMAIL_RE.match(body.email.strip()):
         raise _error(400, "invalid_email", "Invalid email")
     try:

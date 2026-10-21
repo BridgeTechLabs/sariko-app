@@ -737,6 +737,7 @@ def get_seller_by_slug_name(slug_name):
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
 
+    seller["is_founding"] = seller.get("tier") == "founding"
     return {"success": True, "seller": seller}
 
 

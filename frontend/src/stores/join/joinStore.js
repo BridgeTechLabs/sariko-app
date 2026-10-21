@@ -133,6 +133,7 @@ export const useJoinStore = defineStore('joinStore', {
 
     getters: {
         tiers(state) {
+            const ent = state.settings?.enterprise
             return (state.settings?.tiers || []).map(t => ({
                 id: t.tier,
                 monthlyFee: t.monthly_fee_vnd,
@@ -140,6 +141,9 @@ export const useJoinStore = defineStore('joinStore', {
                 maxItems: t.max_items,
                 maxCategories: t.max_categories,
                 invite: INVITE_ONLY.includes(t.tier),
+                // Enterprise places: { left, slots }; full = can't be picked (backend answers 409 enterprise_full)
+                places: t.tier === 'enterprise' && ent ? { left: Math.max(0, ent.slots - ent.taken), slots: ent.slots } : null,
+                full: t.tier === 'enterprise' && !!ent && ent.taken >= ent.slots,
             }))
         },
 
@@ -476,7 +480,7 @@ export const useJoinStore = defineStore('joinStore', {
                     this.submitError = e?.response ? apiErrorMessage(data) : i18n.global.t('join_page.error_network')
                 }
                 // Agreement changed since the page loaded: pick up the new version (the iframe shows the new text).
-                if (code === 'agreement_outdated') await this.loadSettings()
+                if (code === 'agreement_outdated' || code === 'enterprise_full') await this.loadSettings()
                 console.error('joinStore - submit -', e)
             } finally {
                 this.submitting = false

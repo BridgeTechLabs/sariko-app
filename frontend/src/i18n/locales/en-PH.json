@@ -13,6 +13,7 @@
     },
     "api_errors": {
         "generic": "Something went wrong. Please try again.",
+        "enterprise_full": "The Enterprise plan has no places left. Please choose another plan.",
         "server": "Encountered an error. Please contact admin if the problem persists.",
         "network": "Network error. Please check your connection.",
         "timeout": "Request timed out. Please try again.",
@@ -197,7 +198,7 @@
         },
         "section_banner": {
             "banner_text_line_1": "BECOME A FOUNDING SELLER",
-            "banner_text_line_2": "4 months FREE, then $29/mo",
+            "banner_text_line_2": "4 months FREE, then 750,000₫/mo",
             "banner_text_line_3": "50 founding slots · 17% commission"
         },
         "section_zen_promo": {
@@ -231,7 +232,7 @@
             "banner_card_status_text_close": "Closed"
         },
         "section_banner_featured": {
-            "banner_text_line_1": "4 months FREE · then $29/mo",
+            "banner_text_line_1": "4 months FREE · then 750,000₫/mo",
             "banner_text_line_2": "· 17% commission · Founding Seller"
         },
         "section_food_cards": {
@@ -1051,6 +1052,8 @@
         "plan_limits": "Dishes: {items} · Categories: {categories}",
         "plan_unlimited": "Unlimited dishes and categories",
         "plan_by_invitation": "By invitation",
+        "plan_places_left": "{left} / {slots} places left",
+        "plan_full": "No places left",
         "plan_vat_note": "Fees exclude VAT at the current rate. The service fee is charged on the food amount of completed orders, not on delivery fees.",
         "plan_founding": "SariKo personally invited me as a Founding Seller",
         "plan_founding_short": "Founding Seller (invited)",
