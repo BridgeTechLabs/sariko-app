@@ -52,7 +52,6 @@ const ERROR_KEYS = {
     "Unable to book a delivery driver. Your order has been cancelled.": "booking_failed_cancelled",
     "Missing pickup or dropoff address. Please update your store address in settings.": "store_address_missing",
     "You already have a dish with this name in this category": "dish_name_taken",
-    "This price option is in a customer's cart. Hide it instead of deleting.": "option_in_cart",
     "Cannot unset the default address; set another address as default instead": "cannot_unset_default_address",
     "Invalid phone number": "invalid_phone",
     "Cannot start a conversation with your own store": "own_store_chat",

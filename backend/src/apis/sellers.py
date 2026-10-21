@@ -581,9 +581,6 @@ def delete_variant(variant_id: str, user=Depends(verify_token)):
         _assert_owns_variant(variant_id, seller_id)
         DAOFoodItemVariants().delete(variant_id)
         return {"success": True}
-    except ValueError:
-        # Raised by the DAO on FK 23503 — the level is in a buyer's cart right now.
-        raise HTTPException(status_code=409, detail="This price option is in a customer's cart. Hide it instead of deleting.")
     except HTTPException:
         raise
     except Exception as e:
@@ -632,9 +629,6 @@ def get_seller_reviews(
         )
         for review in reviews:
             mask_reviewer(review)
-            food_item = review.pop("food_items", None) or {}
-            # None on overall rows — the frontend labels those as a whole-order rating.
-            review["food_item_name"] = food_item.get("name")
 
         return {"success": True, "reviews": reviews}
     except HTTPException:
