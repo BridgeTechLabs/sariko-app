@@ -244,7 +244,7 @@ def test_rate_limit_sixth_is_429(env):
 
 def test_settings_endpoint_serves_defaults_and_plan_limits(env):
     res = env["client"].get("/onboarding/settings").json()
-    assert res["max_dish_price"] == 10_000_000 and res["min_age"] == 18 and res["agreement_version"] == 20261018
+    assert res["max_dish_price"] == 10_000_000 and res["min_age"] == 18 and res["agreement_version"] == 20261021
     assert [t["tier"] for t in res["tiers"]] == ["community", "tindahan", "negosyo", "enterprise"]
     assert res["tiers"][0]["max_items"] == 3 and res["tiers"][3]["max_items"] is None
     assert res["tiers"][1]["monthly_fee_vnd"] == 750000
@@ -281,6 +281,16 @@ def test_changed_setting_applies_at_once(env):
     res = env["client"].post("/onboarding/applications", json=_body())
     assert _code(res) == "invalid_price" and res.json()["detail"]["max"] == 50000
     assert env["client"].get("/onboarding/settings").json()["max_dish_price"] == 50000
+
+
+def test_tc11_agreement_20261021(env):
+    FakeConfig.raw = {"seller_agreement_version": 20261021}            # after migration 20261021040000
+    assert env["client"].get("/onboarding/settings").json()["agreement_version"] == 20261021
+    res = env["client"].post("/onboarding/applications", json=_body(agreement_version=20261018))   # page opened before
+    assert res.status_code == 409 and _code(res) == "agreement_outdated"
+    _create(env, agreement_version=20261021)
+    FakeConfig.raw = {}                                                 # row missing: the default is the new text too
+    _create(env, agreement_version=20261021)
 
 
 def test_new_agreement_version_rejects_old_signature(env):
