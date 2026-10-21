@@ -23,7 +23,7 @@ export default {
     },
 
     computed: {
-        ...mapGetters(useCartStore, ['subtotalText', 'subtotal', 'maxPreorderDay']),
+        ...mapGetters(useCartStore, ['subtotalText', 'subtotal', 'maxPreorderDay', 'unavailableNames']),
         ...mapState(useCartStore, ['cartItems', 'note', 'cart']),
 
         deliveryStore() {
@@ -63,6 +63,7 @@ export default {
             const auth = useAuthStore()
             // same list as the home banner (authStore.buyerMissing)
             const issues = auth.buyerMissing.map((k) => ({ msg: this.$t(`cart_page.validation.missing_${k}`), route: BUYER_MISSING_ROUTES[k] }))
+            if (this.unavailableNames.length) issues.push({ msg: this.$t('cart_page.validation.remove_unavailable', { names: this.unavailableNames.join(', ') }), route: null })
             if (this.isPreorder && !this.deliveryAppointment) issues.push({ msg: this.$t('cart_page.validation.missing_appointment'), route: null })
             return issues
         },

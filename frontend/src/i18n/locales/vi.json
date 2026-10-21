@@ -280,6 +280,7 @@
     },
     "cart_page": {
         "dish_sold_out": "Món này đã bán hết.",
+        "sold_out_label": "Hết món",
         "store_closed_same_day": "Cửa hàng đang đóng: món giao ngay tạm ngưng, món đặt trước vẫn đặt được.",
         "section_delivery_address": {
             "title": "GIAO ĐẾN {name}",
@@ -299,6 +300,7 @@
             "missing_phone": "Cần có số điện thoại để đặt hàng.",
             "missing_address": "Cần có địa chỉ giao hàng.",
             "missing_appointment": "Vui lòng chọn ngày và giờ nhận hàng.",
+            "remove_unavailable": "Bỏ món đã hết khỏi giỏ: {names}",
             "fix": "Cập nhật →"
         },
         "preorder": {

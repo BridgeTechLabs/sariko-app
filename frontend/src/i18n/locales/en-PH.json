@@ -280,6 +280,7 @@
     },
     "cart_page": {
         "dish_sold_out": "This dish is sold out.",
+        "sold_out_label": "Sold out",
         "store_closed_same_day": "This store is closed: same-day dishes are paused, pre-order dishes are still available.",
         "section_delivery_address": {
             "title": "DELIVERY TO {name}",
@@ -299,6 +300,7 @@
             "missing_phone": "Phone number is required to place an order.",
             "missing_address": "Delivery address is required.",
             "missing_appointment": "Please select a delivery date and time.",
+            "remove_unavailable": "Remove sold-out items from your cart: {names}",
             "fix": "Fix →"
         },
         "preorder": {
