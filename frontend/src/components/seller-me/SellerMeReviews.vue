@@ -122,11 +122,16 @@ export default {
                             <span class="review-name">{{ displayName(review) }}</span>
                             <span class="review-date">{{ dateText(review.created_at) }}</span>
                         </div>
-                        <div class="review-meta">
-                            <StarRating :model-value="review.rating" :size="13" :gap="2" readonly />
-                            <span class="review-dish">{{ review.food_item_name || $t('seller_me.reviews_whole_order') }}</span>
-                        </div>
+                        <StarRating :model-value="review.rating" :size="13" :gap="2" readonly />
                         <p v-if="review.comment" class="review-comment">{{ review.comment }}</p>
+                        <div v-for="item in review.items" :key="item.id" class="review-item">
+                            <div class="review-meta">
+                                <StarRating :model-value="item.rating" :size="11" :gap="2" readonly />
+                                <span class="review-dish">{{ item.name_snapshot }}</span>
+                                <span v-if="!item.food_item_id" class="review-dish-deleted">{{ $t('seller_me.reviews_dish_deleted') }}</span>
+                            </div>
+                            <p v-if="item.comment" class="review-comment">{{ item.comment }}</p>
+                        </div>
                     </div>
                 </div>
 
@@ -267,6 +272,20 @@ export default {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.review-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-left: 10px;
+    border-left: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.review-dish-deleted {
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--text-muted);
 }
 
 .review-comment {

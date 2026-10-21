@@ -44,9 +44,10 @@ def test_reviews_masked_and_scoped(client, monkeypatch):  # TC-3
         def read_reviews_by_seller_id(self, seller_id, limit, offset):
             asked.update(seller_id=seller_id, limit=limit, offset=offset)
             return [
-                {"id": "r1", "rating": 5, "food_items": None,
+                {"id": "r1", "rating": 5, "comment": "Fast", "items": [],
                  "users": {"name": "Maria Santos", "avatar_url": None}},
-                {"id": "r2", "rating": 4, "food_items": {"name": "Adobo"},
+                {"id": "r2", "rating": 4, "comment": None,
+                 "items": [{"food_item_id": None, "name_snapshot": "Adobo", "rating": 3}],
                  "users": {"name": "Juan Cruz", "avatar_url": "a.png"}},
             ]
 
@@ -55,11 +56,11 @@ def test_reviews_masked_and_scoped(client, monkeypatch):  # TC-3
     assert res.status_code == 200
     assert asked == {"seller_id": "seller-1", "limit": 10, "offset": 10}
 
-    overall, dish = res.json()["reviews"]
-    assert overall["food_item_name"] is None
-    assert dish["food_item_name"] == "Adobo"
-    for row in (overall, dish):
-        assert "users" not in row and "food_items" not in row
-    assert overall["reviewer_name"] != "Maria Santos"
-    assert dish["reviewer_name"] != "Juan Cruz"
-    assert dish["reviewer_avatar_url"] == "a.png"
+    first, second = res.json()["reviews"]
+    assert first["comment"] == "Fast"
+    assert second["items"] == [{"food_item_id": None, "name_snapshot": "Adobo", "rating": 3}]
+    for row in (first, second):
+        assert "users" not in row
+    assert first["reviewer_name"] != "Maria Santos"
+    assert second["reviewer_name"] != "Juan Cruz"
+    assert second["reviewer_avatar_url"] == "a.png"

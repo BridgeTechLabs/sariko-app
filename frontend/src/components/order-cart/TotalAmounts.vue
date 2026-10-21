@@ -284,7 +284,7 @@ export default {
 
         <div class="button-checkout">
             <q-btn class="button" dense no-caps :loading="submitting" :disable="!canPlaceOrder" @click="onPlaceOrder">
-                <ScanBarcode class="icon" /> Place Order · {{ totalAmountText }}
+                <ScanBarcode class="icon" /> {{ $t('cart_page.section_total_amount.button_label_checkout') }} · {{ totalAmountText }}
             </q-btn>
         </div>
         <p class="partners-note">{{ $t('cart_page.section_total_amount.partners_note') }}</p>

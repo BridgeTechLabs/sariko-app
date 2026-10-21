@@ -27,11 +27,13 @@ export default {
                 type="button"
                 class="tier"
                 :class="{ 'tier--active': store.form.tier === t.id }"
+                :disabled="t.full"
                 @click="store.form.tier = t.id"
             >
                 <div class="tier-name">
                     {{ $t(`join_page.tier_${t.id}`) }}
                     <span v-if="t.invite" class="badge">{{ $t('join_page.plan_by_invitation') }}</span>
+                    <span v-if="t.places" class="badge">{{ t.full ? $t('join_page.plan_full') : $t('join_page.plan_places_left', t.places) }}</span>
                 </div>
                 <div class="tier-fee">
                     {{ t.monthlyFee ? vnd(t.monthlyFee) : $t('join_page.plan_free') }}
@@ -72,6 +74,11 @@ export default {
     display: flex;
     flex-direction: column;
     gap: 4px;
+}
+
+.tier:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .tier--active {

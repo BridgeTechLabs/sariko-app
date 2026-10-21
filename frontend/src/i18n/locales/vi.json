@@ -13,6 +13,7 @@
     },
     "api_errors": {
         "generic": "Không thực hiện được. Vui lòng thử lại.",
+        "enterprise_full": "Gói Enterprise đã hết suất. Vui lòng chọn gói khác.",
         "server": "Có lỗi xảy ra. Nếu lỗi tiếp tục, vui lòng liên hệ admin.",
         "network": "Lỗi mạng. Vui lòng kiểm tra kết nối.",
         "timeout": "Hết thời gian chờ. Vui lòng thử lại.",
@@ -42,7 +43,6 @@
         "seller_phone_invalid": "Số điện thoại quán không hợp lệ. Vui lòng cập nhật trong cài đặt.",
         "buyer_phone_invalid": "Số điện thoại người mua không hợp lệ nên chưa đặt được tài xế.",
         "dish_name_taken": "Bạn đã có món trùng tên trong danh mục này.",
-        "option_in_cart": "Mức giá này đang nằm trong giỏ của khách. Hãy ẩn thay vì xoá.",
         "cannot_unset_default_address": "Không thể bỏ địa chỉ mặc định; hãy chọn địa chỉ khác làm mặc định.",
         "invalid_phone": "Số điện thoại không hợp lệ.",
         "own_store_chat": "Không thể nhắn tin với quán của chính bạn.",
@@ -197,7 +197,7 @@
         },
         "section_banner": {
             "banner_text_line_1": "TRỞ THÀNH NGƯỜI BÁN SÁNG LẬP",
-            "banner_text_line_2": "MIỄN PHÍ 4 tháng, sau đó 720.000₫/tháng",
+            "banner_text_line_2": "MIỄN PHÍ 4 tháng, sau đó 750.000₫/tháng",
             "banner_text_line_3": "50 suất · Hoa hồng 17%"
         },
         "section_zen_promo": {
@@ -231,7 +231,7 @@
             "banner_card_status_text_close": "Đóng"
         },
         "section_banner_featured": {
-            "banner_text_line_1": "MIỄN PHÍ 4 tháng · sau đó 720.000₫/tháng",
+            "banner_text_line_1": "MIỄN PHÍ 4 tháng · sau đó 750.000₫/tháng",
             "banner_text_line_2": "· Hoa hồng 17% · Người bán sáng lập"
         },
         "section_food_cards": {
@@ -246,7 +246,7 @@
             "button_explore": "Khám phá người bán khác"
         },
         "item_count": "{count} món",
-        "founding_seller": "Người bán tiên phong",
+        "founding_seller": "Người bán sáng lập",
         "btn_chat": "Nhắn tin",
         "btn_view_cart": "Xem giỏ hàng",
         "menu_empty_category": "Chưa có món trong danh mục này",
@@ -485,6 +485,7 @@
         "title": "Đánh giá đơn hàng",
         "overall_title": "Đánh giá chung",
         "overall_hint": "Bạn thấy đơn hàng này thế nào?",
+        "overall_comment_placeholder": "Nhận xét về quán (không bắt buộc) ...",
         "rating_label_1": "Rất tệ",
         "rating_label_2": "Không hài lòng",
         "rating_label_3": "Bình thường",
@@ -756,7 +757,7 @@
         "reviews_count": "{n} lượt đánh giá quán",
         "reviews_empty": "Chưa có đánh giá",
         "reviews_empty_sub": "Xem khách hàng nói gì về món ăn của bạn",
-        "reviews_whole_order": "Cả đơn",
+        "reviews_dish_deleted": "Món đã xoá",
         "reviews_load_error": "Không tải được đánh giá",
         "reviews_retry": "Thử lại",
         "reviews_more": "Xem thêm",
@@ -1054,6 +1055,8 @@
         "plan_limits": "Số món: {items} · Số danh mục: {categories}",
         "plan_unlimited": "Không giới hạn món và danh mục",
         "plan_by_invitation": "Theo lời mời",
+        "plan_places_left": "còn {left} / {slots} suất",
+        "plan_full": "Đã hết suất",
         "plan_vat_note": "Phí chưa gồm thuế GTGT theo thuế suất hiện hành. Phí dịch vụ tính trên tiền món của đơn hoàn tất, không tính trên phí giao hàng.",
         "plan_founding": "Tôi được SariKo mời trực tiếp làm Founding Seller",
         "plan_founding_short": "Founding Seller (được mời)",

@@ -100,11 +100,10 @@ class DAOOrders(DAOBase):
     def read_orders_by_user_id(self, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), reviews(id), deliveries(status)") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), review_stores(id), deliveries(status)") \
                 .eq("user_id", user_id) \
                 .neq("refunds.reason", "duplicate_payment") \
                 .order("created_at", desc=True) \
-                .limit(1, foreign_table="reviews") \
                 .execute()
 
             if result and result.data:

@@ -22,7 +22,7 @@ TIER_LIMITS = {
     "enterprise": {"max_items": None, "max_categories": None},
     "founding": {"max_items": None, "max_categories": None},
 }
-FEES = {"community": 0, "tindahan": 720000, "negosyo": 1200000, "enterprise": 2200000, "founding": 720000}
+FEES = {"community": 0, "tindahan": 750000, "negosyo": 1250000, "enterprise": 2300000, "founding": 750000}
 
 
 class FakeConfig:
@@ -73,6 +73,14 @@ class FakeDAO:
         return True
 
 
+class FakeProfiles:
+    enterprise = 0   # sellers already on the enterprise plan
+
+    def count_sellers_by_tier(self, tier):
+        assert tier == "enterprise"
+        return self.enterprise
+
+
 class FakeResponse:
     def __init__(self, success):
         self._success = success
@@ -85,7 +93,9 @@ class FakeResponse:
 def env(monkeypatch):
     FakeDAO.apps, FakeDAO.files = {}, {}
     FakeConfig.raw = {}
+    FakeProfiles.enterprise = 0
     monkeypatch.setattr(onboarding, "DAOAdminConfig", FakeConfig)
+    monkeypatch.setattr(onboarding, "DAOSellerProfiles", FakeProfiles)
     onboarding._rate_hits.clear()
     storage = {"uploaded": [], "removed": []}
     captcha = {"success": True}
@@ -234,12 +244,27 @@ def test_rate_limit_sixth_is_429(env):
 
 def test_settings_endpoint_serves_defaults_and_plan_limits(env):
     res = env["client"].get("/onboarding/settings").json()
-    assert res["max_dish_price"] == 10_000_000 and res["min_age"] == 18 and res["agreement_version"] == 20261018
+    assert res["max_dish_price"] == 10_000_000 and res["min_age"] == 18 and res["agreement_version"] == 20261021
     assert [t["tier"] for t in res["tiers"]] == ["community", "tindahan", "negosyo", "enterprise"]
     assert res["tiers"][0]["max_items"] == 3 and res["tiers"][3]["max_items"] is None
-    assert res["tiers"][1]["monthly_fee_vnd"] == 720000
+    assert res["tiers"][1]["monthly_fee_vnd"] == 750000
     assert res["tiers"][1]["commission_percent"] == 17
-    assert res["founding"] == {"slots": 50, "free_months": 4, "commission_percent": 17, "monthly_fee_vnd": 720000}
+    assert res["founding"] == {"slots": 50, "free_months": 4, "commission_percent": 17, "monthly_fee_vnd": 750000}
+    assert res["enterprise"] == {"slots": 5, "taken": 0}
+
+
+def test_tc4_enterprise_places(env):
+    FakeProfiles.enterprise = 2
+    assert env["client"].get("/onboarding/settings").json()["enterprise"] == {"slots": 5, "taken": 2}
+    _create(env, tier="enterprise")                       # 3 places left
+
+    FakeProfiles.enterprise = 5
+    res = env["client"].post("/onboarding/applications", json=_body(tier="enterprise"))
+    assert res.status_code == 409 and _code(res) == "enterprise_full"
+    _create(env, tier="tindahan")                         # other plans are not capped
+
+    FakeConfig.raw = {"enterprise_slots": 6}              # admin adds a place
+    _create(env, tier="enterprise")
 
 
 def test_percent_uses_decimal_half_up():
@@ -256,6 +281,16 @@ def test_changed_setting_applies_at_once(env):
     res = env["client"].post("/onboarding/applications", json=_body())
     assert _code(res) == "invalid_price" and res.json()["detail"]["max"] == 50000
     assert env["client"].get("/onboarding/settings").json()["max_dish_price"] == 50000
+
+
+def test_tc11_agreement_20261021(env):
+    FakeConfig.raw = {"seller_agreement_version": 20261021}            # after migration 20261021040000
+    assert env["client"].get("/onboarding/settings").json()["agreement_version"] == 20261021
+    res = env["client"].post("/onboarding/applications", json=_body(agreement_version=20261018))   # page opened before
+    assert res.status_code == 409 and _code(res) == "agreement_outdated"
+    _create(env, agreement_version=20261021)
+    FakeConfig.raw = {}                                                 # row missing: the default is the new text too
+    _create(env, agreement_version=20261021)
 
 
 def test_new_agreement_version_rejects_old_signature(env):

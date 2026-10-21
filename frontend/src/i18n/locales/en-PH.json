@@ -13,6 +13,7 @@
     },
     "api_errors": {
         "generic": "Something went wrong. Please try again.",
+        "enterprise_full": "The Enterprise plan has no places left. Please choose another plan.",
         "server": "Encountered an error. Please contact admin if the problem persists.",
         "network": "Network error. Please check your connection.",
         "timeout": "Request timed out. Please try again.",
@@ -42,7 +43,6 @@
         "seller_phone_invalid": "Store phone number is invalid. Please update it in settings.",
         "buyer_phone_invalid": "The buyer's phone number is invalid, so a driver can't be booked.",
         "dish_name_taken": "You already have a dish with this name in this category.",
-        "option_in_cart": "This price option is in a customer's cart. Hide it instead of deleting.",
         "cannot_unset_default_address": "You can't unset the default address; set another address as default instead.",
         "invalid_phone": "Invalid phone number.",
         "own_store_chat": "You can't start a conversation with your own store.",
@@ -197,7 +197,7 @@
         },
         "section_banner": {
             "banner_text_line_1": "BECOME A FOUNDING SELLER",
-            "banner_text_line_2": "4 months FREE, then $29/mo",
+            "banner_text_line_2": "4 months FREE, then 750,000₫/mo",
             "banner_text_line_3": "50 founding slots · 17% commission"
         },
         "section_zen_promo": {
@@ -231,7 +231,7 @@
             "banner_card_status_text_close": "Closed"
         },
         "section_banner_featured": {
-            "banner_text_line_1": "4 months FREE · then $29/mo",
+            "banner_text_line_1": "4 months FREE · then 750,000₫/mo",
             "banner_text_line_2": "· 17% commission · Founding Seller"
         },
         "section_food_cards": {
@@ -290,7 +290,7 @@
             "title_subtotal": "Subtotal",
             "title_estimated_delivery_fee": "Estimated Delivery Fee",
             "title_total_amount": "Total Amount",
-            "button_label_checkout": "Checkout",
+            "button_label_checkout": "Place Order",
             "partners_note": "Payments by VNPAY · Delivery by Lalamove",
             "agree_order": "I have reviewed my order and agree to the {policy}",
             "agree_order_policy": "Delivery & Refund Policy"
@@ -485,6 +485,7 @@
         "title": "Rate Your Order",
         "overall_title": "Overall",
         "overall_hint": "How was this order?",
+        "overall_comment_placeholder": "Tell us about the store (optional) ...",
         "rating_label_1": "Terrible",
         "rating_label_2": "Not happy",
         "rating_label_3": "Okay",
@@ -753,7 +754,7 @@
         "reviews_count": "{n} store rating | {n} store ratings",
         "reviews_empty": "No reviews yet",
         "reviews_empty_sub": "See what customers say about your food",
-        "reviews_whole_order": "Whole order",
+        "reviews_dish_deleted": "Dish removed",
         "reviews_load_error": "Couldn't load reviews",
         "reviews_retry": "Try again",
         "reviews_more": "See more",
@@ -1051,6 +1052,8 @@
         "plan_limits": "Dishes: {items} · Categories: {categories}",
         "plan_unlimited": "Unlimited dishes and categories",
         "plan_by_invitation": "By invitation",
+        "plan_places_left": "{left} / {slots} places left",
+        "plan_full": "No places left",
         "plan_vat_note": "Fees exclude VAT at the current rate. The service fee is charged on the food amount of completed orders, not on delivery fees.",
         "plan_founding": "SariKo personally invited me as a Founding Seller",
         "plan_founding_short": "Founding Seller (invited)",

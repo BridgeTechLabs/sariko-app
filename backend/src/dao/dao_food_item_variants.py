@@ -1,7 +1,5 @@
 import logging
 
-from postgrest.exceptions import APIError as PostgrestExceptionAPIError
-
 from dao.dao_base import DAOBase
 
 logger = logging.getLogger(__name__)
@@ -53,18 +51,11 @@ class DAOFoodItemVariants(DAOBase):
         return result.data[0] if result.data else None
 
     def delete(self, variant_id: str):
-        try:
-            result = (
-                self._supabase_client.table(self._table_name)
-                .delete()
-                .eq("id", variant_id)
-                .execute()
-            )
-            return result.data
-        except PostgrestExceptionAPIError as e:
-            # 23503 = cart_items_variant_id_fkey: the level is sitting in someone's
-            # cart. The FK has no ON DELETE on purpose (see the table migration), so
-            # this is expected, not a bug — the seller should hide it instead.
-            if e.code == "23503":
-                raise ValueError("variant_in_use")
-            raise
+        # cart_items rows of this level go with it (ON DELETE CASCADE, T87).
+        result = (
+            self._supabase_client.table(self._table_name)
+            .delete()
+            .eq("id", variant_id)
+            .execute()
+        )
+        return result.data
