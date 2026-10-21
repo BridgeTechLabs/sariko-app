@@ -21,6 +21,10 @@
             <slot name="Review" />
         </div>
 
+        <div class="complaint-section">
+            <slot name="Complaint" />
+        </div>
+
         <div class="actions-section">
             <slot name="Actions" />
         </div>
@@ -58,6 +62,15 @@
    height otherwise; the bottom gap comes from actions-section's padding either way. */
 .review-section {
     padding: 0 16px;
+}
+
+/* Same collapse rule: empty unless the order has complaints or can get one */
+.complaint-section {
+    padding: 16px 16px 0;
+}
+
+.complaint-section:empty {
+    padding: 0;
 }
 
 .actions-section {

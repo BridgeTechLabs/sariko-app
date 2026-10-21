@@ -9,6 +9,7 @@ from fastapi import (
     status,
 )
 
+from apis.complaints import complaints_for_order
 from core.auth import verify_token
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_carts import DAOCarts
@@ -214,6 +215,7 @@ def get_order_detail(order_id: str, user=Depends(verify_token)):
 
     deadline = cancel_after(order)
     order["cancel_after"] = deadline.isoformat() if deadline else None
+    order |= complaints_for_order(order, user["id"], "buyer")   # T35
     return {"success": True, "order": order}
 
 

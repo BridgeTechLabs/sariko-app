@@ -1197,5 +1197,60 @@
         "error_missing_group": "Vui lòng điền thêm: {items}",
         "error_location": "Chọn địa chỉ lấy hàng trên bản đồ",
         "error_save": "Không lưu được. Kiểm tra kết nối rồi thử lại."
+    },
+    "complaints": {
+        "menu_label": "Khiếu nại của tôi",
+        "title_mine": "Khiếu nại của tôi",
+        "title_new": "Gửi khiếu nại",
+        "title_detail": "Khiếu nại",
+        "section_title": "Khiếu nại",
+        "btn_new": "Gửi khiếu nại về đơn này",
+        "btn_view": "Xem khiếu nại",
+        "btn_back_order": "Về đơn hàng",
+        "empty": "Chưa có khiếu nại",
+        "empty_sub": "Muốn khiếu nại, mở đơn hàng rồi bấm Gửi khiếu nại.",
+        "order_label": "Đơn {code}",
+        "from_buyer": "Từ khách hàng",
+        "from_me": "Bạn gửi",
+        "field_category": "Vấn đề là gì?",
+        "field_description": "Mô tả",
+        "description_hint": "Mô tả chuyện đã xảy ra",
+        "field_photos": "Ảnh (tối đa {max})",
+        "add_photo": "Thêm",
+        "remove_photo": "Xoá ảnh",
+        "window_note": "Sau khi đơn kết thúc, bạn có {hours} giờ để gửi khiếu nại tại đây. Sau thời gian đó, gửi email cho bộ phận hỗ trợ.",
+        "submit": "Gửi khiếu nại",
+        "sent_title": "Đã tiếp nhận khiếu nại",
+        "sent_body": "Hãy giữ mã theo dõi này. Chúng tôi phản hồi trong {ack} giờ và giải quyết trong {days} ngày làm việc.",
+        "images_failed": "{n} ảnh chưa tải lên được. Gửi ảnh qua email hỗ trợ kèm mã theo dõi.",
+        "resolution": "Kết quả",
+        "not_found": "Không tìm thấy khiếu nại",
+        "status": {
+            "received": "Đã tiếp nhận",
+            "verifying": "Đang xác minh",
+            "resolved": "Đã giải quyết"
+        },
+        "category": {
+            "wrong_item": "Không đúng mô tả",
+            "damaged": "Hư hỏng hoặc không an toàn",
+            "missing_item": "Thiếu món",
+            "late": "Giao trễ hoặc không giao",
+            "buyer_issue": "Vấn đề với khách hàng",
+            "delivery_issue": "Vấn đề giao hàng",
+            "payment_issue": "Thanh toán hoặc chi trả",
+            "other": "Khác"
+        },
+        "errors": {
+            "window_closed": "Đã quá {hours} giờ để khiếu nại đơn này. Vui lòng gửi email cho bộ phận hỗ trợ.",
+            "order_not_paid": "Chỉ đơn đã thanh toán mới gửi khiếu nại được.",
+            "not_your_order": "Đây không phải đơn của bạn.",
+            "order_not_found": "Không tìm thấy đơn hàng.",
+            "complaint_open": "Bạn đã có một khiếu nại chưa giải quyết cho đơn này.",
+            "invalid_category": "Chọn vấn đề gặp phải.",
+            "missing_field": "Mô tả vấn đề.",
+            "description_too_long": "Mô tả quá dài (tối đa {max} ký tự).",
+            "file_too_large": "Có ảnh lớn hơn {mb} MB.",
+            "generic": "Không gửi được. Kiểm tra kết nối rồi thử lại."
+        }
     }
 }

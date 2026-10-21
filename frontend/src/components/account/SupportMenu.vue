@@ -1,8 +1,8 @@
 <script>
-import { FileText, Shield, Info, Truck, CreditCard, Receipt, MessageCircle, ChevronRight, ExternalLink } from 'lucide-vue-next';
+import { FileText, Shield, Info, Truck, CreditCard, Receipt, MessageCircle, ChevronRight, ExternalLink, MessageSquareWarning } from 'lucide-vue-next';
 
 export default {
-    components: { FileText, Shield, Info, Truck, CreditCard, Receipt, MessageCircle, ChevronRight, ExternalLink },
+    components: { FileText, Shield, Info, Truck, CreditCard, Receipt, MessageCircle, ChevronRight, ExternalLink, MessageSquareWarning },
 
     computed: {
         supportMailto() {
@@ -16,6 +16,12 @@ export default {
     <div>
         <div class="section-title">{{ $t('account_page.section_title_support') }}</div>
         <div class="menu-group">
+            <router-link to="/complaints" class="menu-item">
+                <div class="menu-icon"><MessageSquareWarning size="18" /></div>
+                <span class="menu-label">{{ $t('complaints.menu_label') }}</span>
+                <ChevronRight size="16" class="menu-arrow" />
+            </router-link>
+
             <a :href="supportMailto" class="menu-item">
                 <div class="menu-icon"><MessageCircle size="18" /></div>
                 <span class="menu-label">{{ $t('account_page.menu_label_contact_support') }}</span>

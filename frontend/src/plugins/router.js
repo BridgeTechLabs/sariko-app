@@ -111,6 +111,25 @@ const routes = [
         props: true,
         meta: { requiresAuth: true }
     },
+    // T35 complaints (buyer and seller): new before :complaintId
+    {
+        path: '/complaints',
+        name: 'complaints',
+        component: () => import('@/pages/ComplaintsPage.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/complaints/new',
+        name: 'complaint-new',
+        component: () => import('@/pages/ComplaintNewPage.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/complaints/:complaintId',
+        name: 'complaint-detail',
+        component: () => import('@/pages/ComplaintDetailPage.vue'),
+        meta: { requiresAuth: true }
+    },
     {
         path: '/dashboard',
         redirect: '/seller/home'

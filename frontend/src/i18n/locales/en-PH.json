@@ -1194,5 +1194,60 @@
         "error_missing_group": "Please also fill in: {items}",
         "error_location": "Pick the pickup address on the map",
         "error_save": "Could not save. Check your connection and try again."
+    },
+    "complaints": {
+        "menu_label": "My complaints",
+        "title_mine": "My complaints",
+        "title_new": "File a complaint",
+        "title_detail": "Complaint",
+        "section_title": "Complaints",
+        "btn_new": "File a complaint about this order",
+        "btn_view": "View complaint",
+        "btn_back_order": "Back to the order",
+        "empty": "No complaints",
+        "empty_sub": "To file one, open the order and tap File a complaint.",
+        "order_label": "Order {code}",
+        "from_buyer": "From the customer",
+        "from_me": "Sent by you",
+        "field_category": "What went wrong?",
+        "field_description": "Description",
+        "description_hint": "Describe what happened",
+        "field_photos": "Photos (up to {max})",
+        "add_photo": "Add",
+        "remove_photo": "Remove photo",
+        "window_note": "After an order ends you have {hours} hours to file a complaint here. Later, email support.",
+        "submit": "Send complaint",
+        "sent_title": "Complaint received",
+        "sent_body": "Keep this tracking code. We reply within {ack} hours and resolve complaints within {days} working days.",
+        "images_failed": "{n} photo(s) could not be uploaded. Email them to support with the tracking code.",
+        "resolution": "Outcome",
+        "not_found": "Complaint not found",
+        "status": {
+            "received": "Received",
+            "verifying": "Being verified",
+            "resolved": "Resolved"
+        },
+        "category": {
+            "wrong_item": "Not as described",
+            "damaged": "Damaged or unsafe",
+            "missing_item": "Missing item",
+            "late": "Late or not delivered",
+            "buyer_issue": "Problem with the customer",
+            "delivery_issue": "Delivery problem",
+            "payment_issue": "Payment or payout",
+            "other": "Other"
+        },
+        "errors": {
+            "window_closed": "The {hours} hours to complain about this order have passed. Please email support.",
+            "order_not_paid": "Only paid orders can get a complaint.",
+            "not_your_order": "This is not your order.",
+            "order_not_found": "Order not found.",
+            "complaint_open": "You already have an open complaint on this order.",
+            "invalid_category": "Choose what went wrong.",
+            "missing_field": "Describe the problem.",
+            "description_too_long": "The description is too long (max {max} characters).",
+            "file_too_large": "A photo is larger than {mb} MB.",
+            "generic": "Could not send. Check your connection and try again."
+        }
     }
 }

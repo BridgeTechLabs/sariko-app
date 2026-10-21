@@ -4,6 +4,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 
+from apis.complaints import complaints_for_order
 from apis.orders import cancel_after
 from core.store_hours import VN_TZ, confirm_deadline, is_open_now
 from services.order_expiry import confirm_window
@@ -258,6 +259,7 @@ def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
         order["status_history"] = dao.read_status_history(order_id)
+        order |= complaints_for_order(order, user["id"], "seller")   # T35
         return {"success": True, "order": _with_deadlines([order], seller)[0]}
     except HTTPException:
         raise

@@ -62,6 +62,10 @@ MESSAGES = {
         "en": ("Order about to auto-cancel", "A paid order hasn't been accepted yet. Accept it in the next few minutes or it will be cancelled and refunded."),
         "vi": ("Đơn sắp tự hủy", "Một đơn đã thanh toán chưa được nhận. Hãy nhận đơn trong vài phút tới, nếu không đơn sẽ tự hủy và hoàn tiền cho khách."),
     },
+    "seller_complaint": {
+        "en": ("New complaint on an order", "A customer filed a complaint about an order. Tap to see it."),
+        "vi": ("Có khiếu nại về đơn hàng", "Khách vừa gửi khiếu nại về một đơn hàng. Nhấn để xem."),
+    },
     "seller_order_expired": {
         "en": ("Order cancelled: not confirmed in time", "A paid order wasn't confirmed in time, so it was cancelled and the customer will be refunded."),
         "vi": ("Đơn đã tự hủy", "Một đơn đã thanh toán không được xác nhận kịp thời nên đã bị hủy, khách sẽ được hoàn tiền."),
@@ -116,6 +120,11 @@ def notify_seller_delivered(order: dict):
     """Seller side: Lalamove reported the delivery COMPLETED.
     Called from the webhook — a seller marking 'done' themselves needs no push."""
     _send_async(order.get("seller_user_id"), "seller_delivered", f"/seller/orders/{order['id']}")
+
+
+def notify_seller_complaint(seller_user_id, order_id: str):
+    """Seller side: the buyer filed a complaint about this order (T35)."""
+    _send_async(seller_user_id, "seller_complaint", f"/seller/orders/{order_id}")
 
 
 def _send_async(user_id, event: str, url: str):

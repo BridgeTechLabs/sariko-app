@@ -57,6 +57,9 @@ from schemas.request_quotation import RequestQuotation
 from schemas.request_create_onboarding_application import RequestCreateOnboardingApplication
 from schemas.request_upload_onboarding_file import RequestUploadOnboardingFile
 
+# Complaints (T35)
+from schemas.request_create_complaint import RequestCreateComplaint
+
 
 class Schema:
     RequestUploadImage = RequestUploadImage
@@ -97,3 +100,5 @@ class Schema:
 
     RequestCreateOnboardingApplication = RequestCreateOnboardingApplication
     RequestUploadOnboardingFile = RequestUploadOnboardingFile
+
+    RequestCreateComplaint = RequestCreateComplaint

@@ -42,6 +42,11 @@ def remove_private(bucket: str, path: str) -> None:
     get_supabase_client().storage.from_(bucket).remove([path])
 
 
+def signed_url(bucket: str, path: str, expires_in: int) -> str:
+    """Temporary read link to a private object (the browser cannot read private buckets)."""
+    return get_supabase_client().storage.from_(bucket).create_signed_url(path, expires_in)["signedURL"]
+
+
 def upload_image_base64(path: str, image_base64: str) -> str:
     """Compress a base64-encoded image to JPEG, upload it to the public bucket and
     return its public URL.
