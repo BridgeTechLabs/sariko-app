@@ -144,7 +144,7 @@ export default {
 
             <div class="price-row">
                 <div class="price-row__text">
-                    <div class="food-price">₫{{ price }}</div>
+                    <div class="food-price">{{ price }}</div>
                     <div v-if="unitLabel" class="unit-label">/ {{ unitLabel }}</div>
                 </div>
                 <q-btn flat dense no-caps :loading="loading" :disable="storeClosed || !isAvailable" @click="handleAddToCart">
