@@ -93,10 +93,11 @@ export default {
     justify-content: center;
     text-decoration: none;
     color: var(--text-secondary);
-    padding: 8px 16px;
+    padding: 8px 2px;
+    flex: 1 1 0;
     border-radius: 12px;
     transition: all 0.2s ease;
-    min-width: 64px;
+    min-width: 0;
     min-height: 44px;
 }
 
@@ -109,6 +110,11 @@ export default {
     margin-top: 5px;
     font-size: 10px;
     font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .icon-wrapper {
