@@ -290,7 +290,7 @@
             "title_subtotal": "Subtotal",
             "title_estimated_delivery_fee": "Estimated Delivery Fee",
             "title_total_amount": "Total Amount",
-            "button_label_checkout": "Checkout",
+            "button_label_checkout": "Place Order",
             "partners_note": "Payments by VNPAY · Delivery by Lalamove",
             "agree_order": "I have reviewed my order and agree to the {policy}",
             "agree_order_policy": "Delivery & Refund Policy"
