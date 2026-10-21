@@ -228,7 +228,8 @@ async def delivery_webhook(request: Request):
         elif new_status in TERMINAL_STATUSES:
             order = dao_orders.read_order_by_id_raw(delivery["order_id"])
             if order and order["status"] == "ready":
-                dao_orders.update_order_status(delivery["order_id"], "delivery_failed")
+                if dao_orders.update_order_status(delivery["order_id"], "delivery_failed"):
+                    push_service.notify_admins("admin_delivery_failed", f"/orders?open={order['id']}", code=order["id"][:8])
                 logger.warning(f"[Webhook] order={delivery['order_id']} → delivery_failed (lalamove={new_status})")
 
         return {"success": True}

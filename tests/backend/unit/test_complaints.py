@@ -71,6 +71,8 @@ def env(monkeypatch):
     monkeypatch.setattr(DAOAdminConfig, "get_positive_ints", lambda self, d: {k: settings.get(k, v) for k, v in d.items()})
     monkeypatch.setattr(DAOAdminConfig, "get_positive_int", lambda self, k, d: settings.get(k, d))
     monkeypatch.setattr(complaints.push_service, "notify_seller_complaint", lambda uid, oid: pushed.append((uid, oid)))
+    monkeypatch.setattr(complaints.push_service, "notify_admins",
+                        lambda event, url, **f: pushed.append((event, url, f)))
     monkeypatch.setattr(complaints, "upload_private", lambda bucket, path, content, ct: uploaded.append((bucket, path, ct)))
     monkeypatch.setattr(complaints, "signed_url", lambda bucket, path, s: f"https://signed/{bucket}/{path}")
     user = {"id": BUYER}
@@ -95,7 +97,9 @@ def test_tc2_buyer_files_with_photo(env):
     assert res.status_code == 200, res.text
     c = res.json()["complaint"]
     assert c["code"] == "KN000001" and c["status"] == "received"
-    assert env.pushed == [(SELLER_USER, "o1")]                          # TC-12: seller told
+    assert env.pushed == [(SELLER_USER, "o1"),                          # TC-12: seller told
+                          ("admin_new_complaint", f"/complaints?open={c['id']}",   # admin-push TC-3
+                           {"code": "KN000001", "category": "damaged"})]
     res = env.client.post(f"/complaints/{c['id']}/images", json={"image_base64": "data:image/jpeg;base64," + _jpg()})
     assert res.status_code == 200 and res.json()["image_count"] == 1
     assert env.uploaded == [("complaints", f"{c['id']}/1.jpg", "image/jpeg")]   # private bucket
@@ -158,7 +162,8 @@ def test_tc9_seller_files_no_seller_push(env):
     env.as_user(SELLER_USER)
     res = post(env, category="buyer_issue")
     assert res.status_code == 200 and env.dao.rows["c1"]["sender_role"] == "seller"
-    assert env.pushed == []
+    # no seller push; admins hear about a seller's complaint too (admin-push Q4a)
+    assert env.pushed == [("admin_new_complaint", "/complaints?open=c1", {"code": "KN000001", "category": "buyer_issue"})]
 
 
 def test_q9_who_sees_what(env):

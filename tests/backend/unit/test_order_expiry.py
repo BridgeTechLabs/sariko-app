@@ -86,6 +86,8 @@ def reminders(monkeypatch):
     sent = []
     order_expiry._reminded.clear()
     monkeypatch.setattr(order_expiry.push_service, "notify_seller_order_expiring", lambda order: sent.append(order["id"]))
+    monkeypatch.setattr(order_expiry.push_service, "notify_admins",
+                        lambda event, url, **f: sent.append((event, url, f["code"], f["minutes"])))
     return sent
 
 
@@ -135,12 +137,13 @@ def test_reminds_seller_once_before_auto_cancel(monkeypatch, config, refunds, se
     ])
     monkeypatch.setattr(order_expiry, "DAOOrders", lambda: fake)
 
+    soon = ["soon", ("admin_order_expiring", "/orders?open=soon", "soon", 10)]   # admin-push TC-3: same moment
     assert order_expiry.expire_unconfirmed_orders(now=at("12:00")) == 0
-    assert reminders == ["soon"]
+    assert reminders == soon
     order_expiry.expire_unconfirmed_orders(now=at("12:01"))
-    assert reminders == ["soon"]                               # once only
+    assert reminders == soon                                   # once only
     assert order_expiry.expire_unconfirmed_orders(now=at("12:10")) == 1
     assert fake.cancelled == ["soon"]
-    assert reminders == ["soon"]                               # "early" reminds at 12:25 - 10 min
+    assert reminders == soon                                   # "early" reminds at 12:25 - 10 min
     order_expiry.expire_unconfirmed_orders(now=at("12:15"))
-    assert reminders == ["soon", "early"]
+    assert reminders == soon + ["early", ("admin_order_expiring", "/orders?open=early", "early", 10)]

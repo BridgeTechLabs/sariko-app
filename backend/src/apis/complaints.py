@@ -110,6 +110,7 @@ def create_complaint(body: Schema.RequestCreateComplaint, user=Depends(verify_to
         raise _error(409, "complaint_open", "You already have an open complaint on this order")
     if role == "buyer":
         push_service.notify_seller_complaint((order.get("seller_profiles") or {}).get("user_id"), order["id"])
+    push_service.notify_admins("admin_new_complaint", f"/complaints?open={row['id']}", code=row["code"], category=body.category)
     logger.warning(f"[Complaint] {row['code']} order={order['id']} role={role} held={row['held_payout']}")
     return {"success": True, "complaint": {"id": row["id"], "code": row["code"], "status": row["status"]}}
 
