@@ -224,6 +224,13 @@ export const useDashboardStore = defineStore("dashboardStore", {
             }
         },
 
+        // Sign-out: stop both pollers first ($reset would drop the handles while the intervals keep running)
+        reset() {
+            this._ordersPoller?.stop()
+            this.stopWatchingOrderDetail()
+            this.$reset()
+        },
+
         clearOrderDetail() {
             this.orderDetails = null
             this.orderDelivery = null
