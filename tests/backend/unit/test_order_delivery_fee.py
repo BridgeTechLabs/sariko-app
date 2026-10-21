@@ -4,6 +4,8 @@ only checked against it. No DB, no network.
 Run from tests/backend:  pytest unit/test_order_delivery_fee.py
 """
 
+from decimal import Decimal
+
 import pytest
 from fastapi import HTTPException
 
@@ -34,13 +36,13 @@ class FakeOrders:
 
 class FakeSellers:
     def read_seller_order_info(self, seller_id):
-        return {"user_id": "seller-user", "is_open": True, "commission_rate": 0.1,
+        return {"user_id": "seller-user", "is_open": True, "commission_rate": Decimal("0.1"),
                 "address": "Q1", "lat": 10.77, "lon": 106.70}
 
 
 class FakeVat:
     def get_tax_rate(self, _):
-        return 0.1
+        return Decimal("0.1")
 
 
 class FakeOrderItems:

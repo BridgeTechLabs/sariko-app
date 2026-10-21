@@ -6,7 +6,7 @@ class RequestCreateFoodItem(BaseModel):
     category_id: Optional[str] = None
     name: str = Field(min_length=1, max_length=200)
     description: Optional[str] = None
-    price: float = Field(gt=0)
+    price: int = Field(gt=0)
     unit_label: Optional[str] = None
     min_quantity: Optional[int] = Field(default=1, ge=1)
     quantity_step: Optional[int] = Field(default=1, ge=1)

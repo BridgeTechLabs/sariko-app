@@ -426,7 +426,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
 
 
 
-def _make_price_text(price: float) -> str:
+def _make_price_text(price: int) -> str:
     formatted = "{:,.0f}".format(price).replace(",", ".")
     return f"{formatted} ₫"
 

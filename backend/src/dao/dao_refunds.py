@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from typing import Optional
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
@@ -17,7 +18,7 @@ class DAORefunds(DAOBase):
     def create_refund(
         self,
         order_id: str,
-        amount: float,
+        amount: Decimal,
         reason: str,
         original_txn_ref: Optional[str] = None,
         ipn_data: Optional[dict] = None,
@@ -26,7 +27,7 @@ class DAORefunds(DAOBase):
         try:
             data = {
                 "order_id": order_id,
-                "amount": amount,
+                "amount": str(amount),
                 "reason": reason,
                 "status": "pending",
             }
@@ -57,7 +58,7 @@ class DAORefunds(DAOBase):
         try:
             return self.create_refund(
                 order_id=order["id"],
-                amount=order["total_amount"],
+                amount=Decimal(str(order["total_amount"])),
                 reason=reason,
                 original_txn_ref=order.get("transaction_ref"),
                 ipn_data=order.get("ipn_data"),

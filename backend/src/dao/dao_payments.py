@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from typing import Optional
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
@@ -18,7 +19,7 @@ class DAOPayments(DAOBase):
         self,
         order_id: str,
         method: str,
-        amount: float,
+        amount: Decimal,
         status: str,
         transaction_ref: str,
         type: str = "charge",
@@ -29,7 +30,7 @@ class DAOPayments(DAOBase):
             data = {
                 "order_id": order_id,
                 "method": method,
-                "amount": amount,
+                "amount": str(amount),
                 "status": status,
                 "transaction_ref": transaction_ref,
                 "type": type,
