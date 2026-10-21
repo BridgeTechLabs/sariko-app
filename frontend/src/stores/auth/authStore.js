@@ -424,10 +424,16 @@ export const useAuthStore = defineStore("authStore", {
                 // Shared phone: stop this device getting the old account's order pushes
                 await disablePush().catch((error) => console.warn(`authStore - disablePush - ${error}`));
                 await apiAuth.authSignout();
-                this.session = null;
-                this.user = null;
+                // Sign-out is a route change, not a reload: drop the old account's address, phone, flags
+                const sub = this._authSub;
+                this.$reset();
+                this._authSub = sub;
                 clearStoredRole();
                 useCartStore().$reset();
+                // Not $reset(): that would drop the poller handles while their intervals keep running
+                const orderStore = useOrderStore();
+                orderStore.orders = [];
+                orderStore.currentOrder = null;
                 Notify.create({
                     classes: 'quasar-notify-positive',
                     message: i18n.global.t("common.toast_signed_out"),
@@ -450,10 +456,14 @@ export const useAuthStore = defineStore("authStore", {
             } catch (error) {
                 console.error(`authStore - signOutRedirectSignIn - ${error}`);
             }
-            this.session = null;
-            this.user = null;
+            const sub = this._authSub;
+            this.$reset();
+            this._authSub = sub;
             clearStoredRole();
             useCartStore().$reset();
+            const orderStore = useOrderStore();
+            orderStore.orders = [];
+            orderStore.currentOrder = null;
             Notify.create({
                 classes: 'quasar-notify-negative',
                 message: i18n.global.t("common.toast_session_expired"),
