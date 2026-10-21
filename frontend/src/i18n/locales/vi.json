@@ -280,6 +280,7 @@
     },
     "cart_page": {
         "dish_sold_out": "Món này đã bán hết.",
+        "sold_out_label": "Hết món",
         "store_closed_same_day": "Cửa hàng đang đóng: món giao ngay tạm ngưng, món đặt trước vẫn đặt được.",
         "section_delivery_address": {
             "title": "GIAO ĐẾN {name}",
@@ -299,6 +300,7 @@
             "missing_phone": "Cần có số điện thoại để đặt hàng.",
             "missing_address": "Cần có địa chỉ giao hàng.",
             "missing_appointment": "Vui lòng chọn ngày và giờ nhận hàng.",
+            "remove_unavailable": "Bỏ món đã hết khỏi giỏ: {names}",
             "fix": "Cập nhật →"
         },
         "preorder": {
@@ -748,6 +750,8 @@
         "earnings_state_failed": "Chuyển khoản lỗi",
         "earnings_payouts_title": "Các kỳ chi trả",
         "earnings_deductions": "Đã trừ {amount}",
+        "earnings_withholding": "Thuế khấu trừ: GTGT −{vat} · TNCN −{pit}",
+        "earnings_payout_withholding": "Đã khấu trừ thuế {amount}",
         "earnings_note": "Sariko chi tiền mỗi đơn {days} ngày sau khi đơn hoàn tất, đã trừ hoa hồng và VAT trên hoa hồng.",
         "earnings_empty": "Chưa có thu nhập",
         "earnings_empty_sub": "Khi đơn hoàn tất, Sariko chi tiền sau {days} ngày, đã trừ hoa hồng và VAT trên hoa hồng.",
@@ -817,6 +821,7 @@
         "toast_item_saved": "Đã lưu món",
         "toast_item_deleted": "Đã xóa món",
         "toast_save_failed": "Lưu thất bại. Thử lại.",
+        "price_whole_error": "Giá phải là số nguyên (đồng)",
         "toast_image_too_large": "Ảnh quá lớn ({size} MB). Vui lòng chọn ảnh dưới {max} MB.",
         "toast_image_bad_format": "Định dạng ảnh không được hỗ trợ. Vui lòng dùng ảnh JPG, PNG hoặc WebP.",
         "toast_image_upload_failed": "Đã lưu món nhưng chưa tải được ảnh. Mở lại món để thêm ảnh.",

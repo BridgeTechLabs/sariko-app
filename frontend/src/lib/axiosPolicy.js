@@ -66,6 +66,8 @@ export function apiErrorMessage(data, fallbackKey = "generic") {
         if (ERROR_KEYS[detail.message]) return t(`api_errors.${ERROR_KEYS[detail.message]}`);
     }
     if (typeof detail === "string" && ERROR_KEYS[detail]) return t(`api_errors.${ERROR_KEYS[detail]}`);
+    // Pydantic 422 on a dish / price level: price must be whole VND
+    if (Array.isArray(detail) && detail.some((d) => d?.loc?.at(-1) === "price")) return t("seller_menu.price_whole_error");
     if (detail) console.warn("Untranslated API error:", detail);
     return t(`api_errors.${fallbackKey}`);
 }

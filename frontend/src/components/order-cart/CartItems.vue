@@ -28,10 +28,8 @@ export default {
     },
 
     mounted() {
-        if (!this.cartItems.length) {
-            const cartStore = useCartStore()
-            cartStore.getCurrentCart()
-        }
+        // Always refetch: the seller may have switched a dish off since it went into the cart
+        useCartStore().getCurrentCart()
     }
 }
 
@@ -65,6 +63,7 @@ export default {
                 :item-variant-name="item.variantName"
                 :seller-store="item.sellerStore"
                 :seller-slug-name="item.sellerSlugName"
+                :item-unavailable="item.unavailable"
                 />
             </div>
         </div>

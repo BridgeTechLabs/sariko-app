@@ -162,7 +162,7 @@ class DAOOrders(DAOBase):
         """Seller's paid orders that became done since `done_since`, with their money split."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, subtotal, commission_amount, vat_amount, payout_amount, payout_status, payout_hold, status_changed_at") \
+                .select("id, subtotal, commission_amount, vat_amount, payout_amount, payout_status, payout_hold, status_changed_at, wh_vat_amount, wh_pit_amount") \
                 .eq("seller_id", seller_id) \
                 .eq("payment_status", "paid") \
                 .eq("status", "done") \
@@ -371,6 +371,12 @@ class DAOOrders(DAOBase):
             # Same rule as the cache drop: the payment is already written, so a
             # failed push lookup must not turn the IPN into an error.
             if payment_status == "paid":
+                # Seller tax withholding snapshot (Decree 252, per order at payment). A failure
+                # must not fail the IPN: the payout computes the missing orders first.
+                try:
+                    self._supabase_client.rpc('compute_order_withholding', {'p_order_id': order_id}).execute()
+                except Exception as e:
+                    logger.error(f"withholding not computed for order {order_id}, payout will compute it: {e}")
                 try:
                     order = self.read_order_by_id_raw(order_id)
                     if order:

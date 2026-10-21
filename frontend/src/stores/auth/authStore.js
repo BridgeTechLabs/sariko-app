@@ -6,6 +6,12 @@ import apiAuth from "@/apis/auth/apiAuth";
 import apiUsers from "@/apis/users/apiUsers";
 import { useCartStore } from "@/stores/cart/cartStore";
 import { useOrderStore } from "@/stores/order/orderStore";
+import { useChatStore } from "@/stores/chat/chatStore";
+import { useDeliveryStore } from "@/stores/delivery/deliveryStore";
+import { useDashboardStore } from "@/stores/seller/dashboardStore";
+import { useMenuStore } from "@/stores/seller/menuStore";
+import { useProfileCompletionStore } from "@/stores/seller/profileCompletionStore";
+import { useReviewStore } from "@/stores/review/reviewStore";
 import { i18n } from "@/plugins/i18n";
 import { disablePush } from "@/composables/pushNotifications";
 
@@ -15,6 +21,22 @@ const ROLE_KEY = 'sariko.role';
 const ROLE_USER_KEY = 'sariko.roleUserId';
 
 let _redirectingToSignIn = false;
+
+// Sign-out is a route change, not a reload: drop every store that holds the old account's data.
+// Stores with a poller / channel have their own reset() that stops it first; orderStore keeps its
+// poller handles (a $reset() would drop them while the intervals keep running), so only its data goes.
+function resetAccountStores() {
+    useCartStore().$reset();
+    const orderStore = useOrderStore();
+    orderStore.orders = [];
+    orderStore.currentOrder = null;
+    useChatStore().reset();
+    useDeliveryStore().reset();
+    useDashboardStore().reset();
+    useMenuStore().$reset();
+    useProfileCompletionStore().$reset();
+    useReviewStore().$reset();
+}
 
 // The axios interceptor reads the token via supabase.auth.getSession() (storage),
 // so wait until the new session is persisted before anything calls the API.
@@ -429,11 +451,7 @@ export const useAuthStore = defineStore("authStore", {
                 this.$reset();
                 this._authSub = sub;
                 clearStoredRole();
-                useCartStore().$reset();
-                // Not $reset(): that would drop the poller handles while their intervals keep running
-                const orderStore = useOrderStore();
-                orderStore.orders = [];
-                orderStore.currentOrder = null;
+                resetAccountStores();
                 Notify.create({
                     classes: 'quasar-notify-positive',
                     message: i18n.global.t("common.toast_signed_out"),
@@ -460,10 +478,7 @@ export const useAuthStore = defineStore("authStore", {
             this.$reset();
             this._authSub = sub;
             clearStoredRole();
-            useCartStore().$reset();
-            const orderStore = useOrderStore();
-            orderStore.orders = [];
-            orderStore.currentOrder = null;
+            resetAccountStores();
             Notify.create({
                 classes: 'quasar-notify-negative',
                 message: i18n.global.t("common.toast_session_expired"),

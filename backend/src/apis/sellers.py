@@ -661,17 +661,19 @@ def get_seller_earnings(user=Depends(verify_token)):
 
         orders, awaiting = [], Decimal(0)
         for row in DAOOrders().read_done_orders_for_earnings(seller_id, since):
+            # What reaches the seller: the order's payout minus the tax withheld from it
             payout = _money(row.get("payout_amount"))
+            withheld = _money(row.get("wh_vat_amount")) + _money(row.get("wh_pit_amount"))
             state = row.get("payout_status") or "pending"
             if state == "pending" and row.get("payout_hold"):
                 state = "held"
             expected = None
             if state == "pending":
-                awaiting += payout
+                awaiting += payout - withheld
                 done_day = datetime.fromisoformat(row["status_changed_at"]).astimezone(VN_TZ).date()
                 expected = (done_day + timedelta(days=delay_days)).isoformat()
             elif state == "processing":
-                awaiting += payout
+                awaiting += payout - withheld
             orders.append({
                 "id": row["id"],
                 "done_at": row.get("status_changed_at"),
@@ -679,6 +681,8 @@ def get_seller_earnings(user=Depends(verify_token)):
                 "commission_amount": _vnd(_money(row.get("commission_amount"))),
                 "vat_amount": _vnd(_money(row.get("vat_amount"))),
                 "payout_amount": _vnd(payout),
+                "wh_vat_amount": _vnd(_money(row.get("wh_vat_amount"))),   # 0 until computed
+                "wh_pit_amount": _vnd(_money(row.get("wh_pit_amount"))),
                 "payout_state": state,
                 "expected_payout_date": expected,
             })
@@ -691,6 +695,7 @@ def get_seller_earnings(user=Depends(verify_token)):
             payouts.append({
                 **row,
                 "net_payout": _vnd(net),
+                "withholding_amount": _vnd(_money(row.get("withholding_amount"))),
                 "total_deductions": _vnd(_money(row.get("total_deductions"))),
             })
 
