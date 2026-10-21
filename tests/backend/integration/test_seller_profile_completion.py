@@ -501,3 +501,11 @@ def test_tc30_cart_refuses_coming_soon(monkeypatch):
                           "seller_profiles": {"status": "active", "lat": None, "lon": None, "is_open": True}}
     r = TestClient(app).post("/cart/add", json={"seller_id": SELLER_A, "food_item_id": "f1", "quantity": 1})
     assert r.status_code == 400 and "not taking orders" in r.text
+
+
+def test_tax_resident_also_on_seller_profile():   # tax-withholding TC-14: the withholding rate reads it there
+    make_complete(tax_resident=None)
+    r = client().post(P, json={"tax": {"tax_resident": False}})
+    assert r.status_code == 200, r.text
+    assert DB.sellers[SELLER_A]["tax_resident"] is False
+    assert DB.apps[f"app-{SELLER_A}"]["tax_resident"] is False

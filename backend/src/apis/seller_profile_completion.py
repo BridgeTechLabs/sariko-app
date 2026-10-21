@@ -176,6 +176,7 @@ def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request
         if body.tax.tax_resident is None:
             raise _error(400, "missing_field", "Required field is empty", field="tax_resident")
         app_data.update(tax_resident=body.tax.tax_resident, tax_code=squash(body.tax.tax_code or "") or None)
+        seller_data["tax_resident"] = body.tax.tax_resident  # the withholding rate reads it here
     if body.bank:
         number = _new_value(body.bank.bank_account_number).replace(" ", "") or seller.get("bank_account_number") or ""
         if not valid_bank_account(number):

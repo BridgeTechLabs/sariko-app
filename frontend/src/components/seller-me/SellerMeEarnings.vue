@@ -150,6 +150,9 @@ export default {
                                 food: vnd(o.subtotal), commission: vnd(o.commission_amount), vat: vnd(o.vat_amount),
                             }) }}
                         </div>
+                        <div v-if="o.wh_vat_amount || o.wh_pit_amount" class="row-split">
+                            {{ $t('seller_me.earnings_withholding', { vat: vnd(o.wh_vat_amount), pit: vnd(o.wh_pit_amount) }) }}
+                        </div>
                         <span class="chip" :class="o.stateClass">{{ o.stateText }}</span>
                     </div>
                 </div>
@@ -160,6 +163,9 @@ export default {
                         <div class="row-head">
                             <span class="row-code">{{ p.periodText }}</span>
                             <span class="row-amount">{{ vnd(p.net_payout) }}</span>
+                        </div>
+                        <div v-if="p.withholding_amount" class="row-split">
+                            {{ $t('seller_me.earnings_payout_withholding', { amount: vnd(p.withholding_amount) }) }}
                         </div>
                         <div v-if="p.total_deductions" class="row-split">
                             {{ $t('seller_me.earnings_deductions', { amount: vnd(p.total_deductions) }) }}

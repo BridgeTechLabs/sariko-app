@@ -18,7 +18,7 @@ class DAOAdminPayouts(DAOBase):
         """The seller's payout batches, newest first."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, period_start, period_end, order_count, net_payout, total_deductions, status, paid_at") \
+                .select("id, period_start, period_end, order_count, net_payout, withholding_amount, total_deductions, status, paid_at") \
                 .eq("seller_id", seller_id) \
                 .order("period_end", desc=True) \
                 .limit(limit) \
