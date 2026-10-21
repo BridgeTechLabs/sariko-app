@@ -2,6 +2,7 @@
 import { CreditCard } from 'lucide-vue-next';
 import { useOrderStore } from '@/stores/order/orderStore.js';
 import apiPayments from '@/apis/payments/apiPayments.js';
+import { formatVnTime, vnDay } from '@/utils/vnTime';
 
 export default {
     components: {
@@ -44,15 +45,15 @@ export default {
         canLateCancel() {
             return !!this.lateCancelAt && this.now >= this.lateCancelAt.getTime()
         },
-        lateCancelAtText() {
-            const d = this.lateCancelAt
-            const locale = this.$i18n.locale
-            const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
-            if (d.toDateString() === new Date(this.now).toDateString()) return time
-            return `${time} ${d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit' })}`
+        // Pending order with a delivery time: cancel only until this time (backend cancel_before, T129)
+        cancelBefore() {
+            return this.order?.cancel_before ? new Date(this.order.cancel_before) : null
+        },
+        canCancelPending() {
+            return this.isPending && (!this.cancelBefore || this.now <= this.cancelBefore.getTime())
         },
         hasActions() {
-            return this.isPaymentPending || this.isPending || !!this.lateCancelAt
+            return this.isPaymentPending || this.canCancelPending || !!this.lateCancelAt
         }
     },
 
@@ -65,6 +66,13 @@ export default {
     },
 
     methods: {
+        // Vietnam time; $i18n.locale 'en_ph' is not a valid locale tag for toLocale*String (RangeError)
+        timeText(d) {
+            const time = formatVnTime(d, { hour: '2-digit', minute: '2-digit' })
+            const [, month, day] = vnDay(d).split('-')
+            return vnDay(d) === vnDay(new Date(this.now)) ? time : `${time} ${day}/${month}`
+        },
+
         async onPayNow() {
             this.payingNow = true
             try {
@@ -112,10 +120,14 @@ export default {
         </q-btn>
 
         <div v-if="lateCancelAt && !canLateCancel" class="late-hint">
-            {{ $t('order_detail.late_cancel_hint', { time: lateCancelAtText }) }}
+            {{ $t('order_detail.late_cancel_hint', { time: timeText(lateCancelAt) }) }}
         </div>
 
-        <q-btn v-if="isPending || canLateCancel" class="btn-cancel" flat dense no-caps @click="showCancelDialog = true">
+        <div v-if="canCancelPending && cancelBefore" class="late-hint">
+            {{ $t('order_detail.cancel_until_hint', { time: timeText(cancelBefore) }) }}
+        </div>
+
+        <q-btn v-if="canCancelPending || canLateCancel" class="btn-cancel" flat dense no-caps @click="showCancelDialog = true">
             {{ canLateCancel ? $t('order_detail.btn_late_cancel') : $t('order_detail.btn_cancel') }}
         </q-btn>
 

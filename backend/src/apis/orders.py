@@ -233,6 +233,15 @@ def cancel_after(order: dict):
     return None
 
 
+def cancel_before(order: dict):
+    """A pending order with a delivery time: the last moment the buyer may cancel it
+    (buyer_cancel_before_appointment_minutes before that time, R3.3), or None if no such limit."""
+    appointment = _ts(order.get("delivery_appointment"))
+    if order["status"] != "pending" or not appointment:
+        return None
+    return appointment - DAOAdminConfig().get_minutes("buyer_cancel_before_appointment_minutes", 1440)
+
+
 @router.get("/{order_id}")
 def get_order_detail(order_id: str, user=Depends(verify_token)):
 
@@ -244,6 +253,8 @@ def get_order_detail(order_id: str, user=Depends(verify_token)):
 
     deadline = cancel_after(order)
     order["cancel_after"] = deadline.isoformat() if deadline else None
+    last = cancel_before(order)
+    order["cancel_before"] = last.isoformat() if last else None
     order |= complaints_for_order(order, user["id"], "buyer")   # T35
     return {"success": True, "order": order}
 
@@ -260,14 +271,12 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
     now = datetime.now(timezone.utc)
     reason = None
     if order["status"] == "pending":
-        appointment = _ts(order.get("delivery_appointment"))
-        if appointment:
-            cutoff = DAOAdminConfig().get_minutes("buyer_cancel_before_appointment_minutes", 1440)
-            if appointment - now < cutoff:
-                hours = f"{cutoff.total_seconds() / 3600:g}"
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
-                    "code": "cancel_cutoff", "hours": hours,
-                    "message": f"Can't cancel within {hours} hours of the delivery time"})
+        last = cancel_before(order)
+        if last and now > last:
+            hours = f"{(_ts(order['delivery_appointment']) - last).total_seconds() / 3600:g}"
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
+                "code": "cancel_cutoff", "hours": hours,
+                "message": f"Can't cancel within {hours} hours of the delivery time"})
     else:
         deadline = cancel_after(order)
         if not deadline or now < deadline:

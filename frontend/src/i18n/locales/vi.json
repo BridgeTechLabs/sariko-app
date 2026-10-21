@@ -441,6 +441,7 @@
         "reason_seller_timeout": "Người bán không xác nhận đơn kịp thời",
         "reason_seller_late": "Người bán trễ hạn",
         "late_cancel_hint": "Dự kiến trước {time}. Quá giờ này bạn có thể hủy và được hoàn tiền.",
+        "cancel_until_hint": "Bạn có thể hủy đơn này trước {time}.",
         "btn_late_cancel": "Đơn đang chậm: Hủy và hoàn tiền",
         "title": "Chi tiết đơn hàng",
         "status_title_awaiting_payment": "Chờ thanh toán",

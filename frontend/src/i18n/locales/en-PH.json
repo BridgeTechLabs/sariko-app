@@ -441,6 +441,7 @@
         "reason_seller_timeout": "The seller didn't confirm your order in time",
         "reason_seller_late": "Seller was late",
         "late_cancel_hint": "Expected by {time}. After that you can cancel for a full refund.",
+        "cancel_until_hint": "You can cancel this order until {time}.",
         "btn_late_cancel": "Order is late: Cancel and refund",
         "title": "Order Detail",
         "status_title_awaiting_payment": "Awaiting Payment",
