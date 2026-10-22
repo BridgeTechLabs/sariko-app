@@ -10,6 +10,7 @@ echo "Cleaning old images..."
 docker images "$IMAGE_REPO" --format '{{.Repository}}:{{.Tag}}' |
 while read -r IMAGE; do
     TAG="${IMAGE#"$IMAGE_REPO:"}"
+    [[ $TAG == admin-* ]] && continue  # the admin panel's images share this repo; its pipeline manages them
 
     if [ "$TAG" = "$CURRENT_TAG" ] || [ "$TAG" = "$PREVIOUS_TAG" ]; then
         echo "Keeping $IMAGE"
