@@ -20,6 +20,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, status
 
 from apis.reviews import mask_reviewer
 from core.auth import verify_token
+from core.payout_cycle import OFF, cycle_start, expected_payout_date
 from core.phone import to_e164_vn
 from core.sariko_cache import cache
 from dao.dao_orders import DAOOrders, seller_orders_key
@@ -659,6 +660,8 @@ def get_seller_earnings(user=Depends(verify_token)):
         config = DAOAdminConfig()
         history_days = config.get_positive_int("seller_order_history_days", 30)
         delay_days = config.get_int_in_range("payout_delay_days", 3, 0, 30)
+        cycle_days = config.get_int_in_range("payout_cycle_days", 1, 1, 14)
+        start = cycle_start(config.get_positive_int("payout_cycle_start_date", OFF))
         since = datetime.now(timezone.utc) - timedelta(days=history_days)
 
         orders, awaiting = [], Decimal(0)
@@ -673,7 +676,7 @@ def get_seller_earnings(user=Depends(verify_token)):
             if state == "pending":
                 awaiting += payout - withheld
                 done_day = datetime.fromisoformat(row["status_changed_at"]).astimezone(VN_TZ).date()
-                expected = (done_day + timedelta(days=delay_days)).isoformat()
+                expected = expected_payout_date(done_day, delay_days, cycle_days, start).isoformat()
             elif state == "processing":
                 awaiting += payout - withheld
             orders.append({

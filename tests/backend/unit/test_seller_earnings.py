@@ -1,6 +1,6 @@
 """P1-1: seller earnings — per-order split and payout state, exact money (Decimal, int in
 JSON), expected payout day = Vietnam day the order became done + payout_delay_days."""
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi import FastAPI
@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from apis import sellers
 from core.auth import verify_token
+from core.payout_cycle import cycle_start, expected_payout_date
 from dao.dao_admin_config import DAOAdminConfig
 
 
@@ -151,3 +152,33 @@ def test_money_rounds_half_up(earnings):  # TC-25: DB keeps 2 decimals; JSON rou
     assert body["payouts"][0]["net_payout"] == 98121 and body["payouts"][0]["total_deductions"] == 1
     assert body["received_total"] == 98121
     assert body["payouts_limit"] == 12
+
+
+# payout-cycle §6 (TC-33, TC-34): start 28/10 (Wed), cycle 3, delay 2 → payout days 28/10, 31/10, …
+@pytest.mark.parametrize("done, want", [
+    ("2026-10-26", "2026-10-28"),   # last day of the 28/10 period
+    ("2026-10-27", "2026-10-31"),   # first day of the next one
+    ("2026-10-23", "2026-10-25"),   # done + delay before the start date: day by day
+    ("2026-10-29", "2026-10-31"),   # last day of the 31/10 period
+    ("2026-10-30", "2026-11-03"),
+])
+def test_expected_payout_date_cycle(done, want):  # TC-34
+    assert expected_payout_date(date.fromisoformat(done), 2, 3, date(2026, 10, 28)) == date.fromisoformat(want)
+
+
+@pytest.mark.parametrize("value, want", [(99991231, None), (20261028, date(2026, 10, 28)), (20261399, None)])
+def test_cycle_start(value, want):
+    assert cycle_start(value) == want
+
+
+def test_expected_date_cycle_from_settings(earnings):  # TC-34 through the endpoint (17:30 UTC 26/10 = 00:30 VN 27/10)
+    res, _ = earnings(orders=[_order(1, status_changed_at="2026-10-26T17:30:00+00:00")],
+                      settings={"payout_delay_days": 2, "payout_cycle_days": 3, "payout_cycle_start_date": 20261028})
+    assert res.json()["orders"][0]["expected_payout_date"] == "2026-10-31"
+
+
+@pytest.mark.parametrize("settings", [{}, {"payout_cycle_days": 3, "payout_cycle_start_date": 99991231}])
+def test_expected_date_cycle_off(earnings, settings):  # TC-33: off (or keys missing) = done + delay as before
+    res, _ = earnings(orders=[_order(1, status_changed_at="2026-10-26T17:30:00+00:00")],
+                      settings={"payout_delay_days": 2, **settings})
+    assert res.json()["orders"][0]["expected_payout_date"] == "2026-10-29"
