@@ -1,6 +1,4 @@
-"""Pre-launch switch (docs/dev/prelaunch TC-2): Vietnam date vs admin_settings public_launch_date."""
-from datetime import datetime, timezone
-
+"""Go-live switch (docs/dev/prelaunch TC-2): app_live decides, launch_date is only shown."""
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -9,24 +7,28 @@ from apis import launch
 from core.launch import NO_DATE, launch_status
 from dao.dao_admin_config import DAOAdminConfig
 
-NOON_VN_22 = datetime(2026, 10, 22, 5, 0, tzinfo=timezone.utc)      # 12:00 on 22/10 in Vietnam
-LATE_UTC_22 = datetime(2026, 10, 22, 23, 30, tzinfo=timezone.utc)   # 06:30 on 23/10 in Vietnam
 
-
-@pytest.mark.parametrize("launch_date, now, prelaunch, shown", [
-    (20261021, NOON_VN_22, False, "2026-10-21"),   # before today: open
-    (20261022, NOON_VN_22, False, "2026-10-22"),   # opening day: open
-    (20261023, NOON_VN_22, True, "2026-10-23"),    # tomorrow: coming soon
-    (NO_DATE, NOON_VN_22, True, None),             # no date announced
-    (20261023, LATE_UTC_22, False, "2026-10-23"),  # still 22/10 in UTC, already 23/10 in Vietnam
+@pytest.mark.parametrize("app_live, launch_date, expected", [
+    (0, NO_DATE, {"prelaunch": True, "launch_date": None}),             # coming soon, date hidden
+    (0, 20261101, {"prelaunch": True, "launch_date": "2026-11-01"}),    # coming soon, date shown
+    (1, 20261101, {"prelaunch": False, "launch_date": "2026-11-01"}),   # live
+    (0, 20200101, {"prelaunch": True, "launch_date": "2020-01-01"}),    # a past date does not go live
 ])
-def test_launch_status(launch_date, now, prelaunch, shown):
-    assert launch_status(launch_date, now) == {"prelaunch": prelaunch, "launch_date": shown}
+def test_launch_status(app_live, launch_date, expected):
+    assert launch_status(app_live, launch_date) == expected
 
 
-def test_endpoint_reads_setting(monkeypatch):
+@pytest.mark.parametrize("settings, prelaunch", [
+    ({"app_live": 1, "launch_date": 20261101}, False),
+    ({"app_live": 0, "launch_date": 20261101}, True),   # 0 is a valid value, not "missing"
+    ({}, True),                                         # rows missing: not live
+    ({"app_live": 7, "launch_date": 20261101}, True),   # out of range: default 0
+])
+def test_endpoint_reads_settings(monkeypatch, settings, prelaunch):
     monkeypatch.setattr(DAOAdminConfig, "__init__", lambda self: None)
-    monkeypatch.setattr(DAOAdminConfig, "get_positive_int", lambda self, k, d: {"public_launch_date": 99991231}.get(k, d))
+    monkeypatch.setattr(DAOAdminConfig, "get_setting", lambda self, k: settings.get(k))
     app = FastAPI()
     app.include_router(launch.router, prefix="/rest/v1")
-    assert TestClient(app).get("/rest/v1/launch").json() == {"success": True, "prelaunch": True, "launch_date": None}
+    body = TestClient(app).get("/rest/v1/launch").json()
+    assert body["prelaunch"] is prelaunch
+    assert body["launch_date"] == ("2026-11-01" if settings else None)

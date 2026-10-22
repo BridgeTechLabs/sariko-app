@@ -334,7 +334,7 @@ router.beforeEach(async (to) => {
         return { name: 'home' }
     }
 
-    // Before admin_settings public_launch_date, buyer pages show /coming-soon. ?preview=1 (remembered
+    // Until admin_settings app_live = 1 (go live), buyer pages show /coming-soon. ?preview=1 (remembered
     // in this browser, ?preview=0 to stop) lets testers through. This is a notice, not a lock: the
     // backend still takes orders, so test orders before launch rely on only the test store being listed.
     if (to.query.preview === '1' || to.query.preview === '0') {

@@ -8,5 +8,7 @@ router = APIRouter()
 
 @router.get("/launch")
 def get_launch():
-    """Public. Before admin_settings public_launch_date (Vietnam date) the app shows "coming soon" on buyer pages."""
-    return {"success": True, **launch_status(DAOAdminConfig().get_positive_int("public_launch_date", NO_DATE))}
+    """Public. Until admin_settings app_live = 1 the app shows "coming soon" on buyer pages."""
+    config = DAOAdminConfig()
+    return {"success": True, **launch_status(config.get_int_in_range("app_live", 0, 0, 1),
+                                             config.get_positive_int("launch_date", NO_DATE))}
