@@ -50,6 +50,9 @@ class FakeOrders:
     def update_payment_create_date(self, order_id, payment_create_date):
         FakeOrders.create_dates.append(payment_create_date)
 
+    def read_vnpay_state(self, order_id):   # no earlier pay link: create asks VNPay nothing (T125)
+        return {**self.order, "payment_create_date": None, "payments": [], "refunds": []}
+
     def update_payment_status(self, order_id, payment_status, transaction_ref):
         self.order.update(payment_status=payment_status, transaction_ref=transaction_ref)
 
@@ -62,6 +65,9 @@ class FakePayments:
 
     def create_payment(self, **kw):
         FakePayments.rows.append(kw)
+
+    def has_transaction(self, transaction_ref):
+        return any(r["transaction_ref"] == transaction_ref for r in FakePayments.rows)
 
 
 class FakeRefunds:

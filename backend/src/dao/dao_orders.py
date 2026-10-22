@@ -423,8 +423,10 @@ class DAOOrders(DAOBase):
 
     def update_payment_create_date(self, order_id: str, payment_create_date: str):
         try:
+            # A new pay link: the querydr state of the previous one no longer applies (T125)
             result = self._supabase_client.table(self._table_name) \
-                .update({"payment_create_date": payment_create_date}) \
+                .update({"payment_create_date": payment_create_date, "vnpay_checked_at": None,
+                         "vnpay_check": None, "vnpay_fail_notified_at": None}) \
                 .eq("id", order_id) \
                 .execute()
 
@@ -434,6 +436,56 @@ class DAOOrders(DAOBase):
             raise Exception(f"Supabase error - update_payment_create_date: {e}")
         except Exception as e:
             raise Exception(f"error update_payment_create_date: {e}")
+
+    # T125: what the VNPay check (querydr) needs about an unpaid order, with refunds (never asked
+    # about: querydr after a refund still answers "paid") and payment rows (an IPN result is final).
+    _VNPAY_STATE = ("id, user_id, status, payment_status, total_amount, payment_create_date, vnpay_checked_at, "
+                    "vnpay_check, vnpay_fail_notified_at, refunds(id), payments(transaction_ref, status)")
+
+    def read_vnpay_state(self, order_id: str):
+        try:
+            result = self._supabase_client.table(self._table_name).select(self._VNPAY_STATE) \
+                .eq("id", order_id).maybe_single().execute()
+            return result.data if result and result.data else None
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_vnpay_state: {e}")
+
+    def read_unpaid_vnpay_orders(self, created_since: datetime):
+        """Unpaid orders that got a VNPay pay link, created since `created_since` (UTC)."""
+        try:
+            return self._supabase_client.table(self._table_name).select(self._VNPAY_STATE) \
+                .eq("payment_status", "pending") \
+                .not_.is_("payment_create_date", "null") \
+                .gte("created_at", created_since.astimezone(timezone.utc).replace(tzinfo=None).isoformat()) \
+                .execute().data or []
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_unpaid_vnpay_orders: {e}")
+
+    def claim_vnpay_check(self, order_id: str, now: datetime, last_before: datetime) -> bool:
+        """Take this order's turn to ask VNPay: true only for the caller whose conditional update set
+        vnpay_checked_at (never asked, or last asked before `last_before`). The job and a buyer's new-link
+        request can't both ask (a second ask within ~15 minutes gets 94)."""
+        try:
+            result = self._supabase_client.table(self._table_name) \
+                .update({"vnpay_checked_at": now.isoformat()}).eq("id", order_id) \
+                .or_(f"vnpay_checked_at.is.null,vnpay_checked_at.lt.{last_before.astimezone(timezone.utc):%Y-%m-%dT%H:%M:%SZ}").execute()
+            return bool(result.data)
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - claim_vnpay_check: {e}")
+
+    def save_vnpay_check(self, order_id: str, check: dict, checked_at: datetime):
+        try:
+            self._supabase_client.table(self._table_name) \
+                .update({"vnpay_check": check, "vnpay_checked_at": checked_at.isoformat()}).eq("id", order_id).execute()
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - save_vnpay_check: {e}")
+
+    def set_vnpay_fail_notified(self, order_id: str, at: datetime):
+        try:
+            self._supabase_client.table(self._table_name) \
+                .update({"vnpay_fail_notified_at": at.isoformat()}).eq("id", order_id).execute()
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - set_vnpay_fail_notified: {e}")
 
     def update_ipn_data(self, order_id: str, ipn_data: dict):
         try:

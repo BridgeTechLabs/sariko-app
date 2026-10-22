@@ -3,8 +3,9 @@ import hmac
 import hashlib
 import urllib.parse
 import logging
+import math
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, Request, status
 from fastapi.responses import JSONResponse
@@ -13,7 +14,9 @@ from core.auth import verify_token
 from core.client_ip import client_ip
 from dao.dao_orders import DAOOrders
 from dao.dao_payments import DAOPayments
+from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_refunds import DAORefunds
+from services import vnpay_query
 
 router = APIRouter(prefix="/payments")
 logger = logging.getLogger(__name__)
@@ -23,6 +26,13 @@ VNPAY_TMN_CODE = os.getenv("VNPAY_TMN_CODE", "YOUR_TMN_CODE")
 VNPAY_HASH_SECRET = os.getenv("VNPAY_HASH_SECRET", "YOUR_HASH_SECRET")
 VNPAY_URL = os.getenv("VNPAY_URL", "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html")
 VNPAY_RETURN_URL = os.getenv("VNPAY_RETURN_URL", "http://localhost:8081/payment/return")
+
+
+# vnp_ResponseCode values that mean the buyer was NOT charged (VNPay online docs, pay page, table "vnp_ResponseCode
+# VNPAY phản hồi qua IPN và Return URL"; .claude/skills/vnpay-integration). Only these record a failed payment
+# (and let the buyer get a new link). 07 = charged but flagged as suspicious, 99 = other error, any other code:
+# money may have moved, so nothing is recorded and the VNPay check (querydr) or an admin decides. Protocol constant.
+NOT_CHARGED_CODES = {"09", "10", "11", "12", "13", "24", "51", "65", "75", "79"}
 
 
 def _hmac_sha512(key: str, data: str) -> str:
@@ -123,6 +133,24 @@ def create_vnpay_payment(order_id: str, request: Request, user=Depends(verify_to
     if order["payment_status"] == "paid":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order already paid")
 
+    # T125: the previous pay link may have been paid with the IPN late or lost: ask VNPay before a new
+    # link, or the buyer pays twice.
+    now_utc = datetime.now(timezone.utc)
+    state = dao_orders.read_vnpay_state(order_id)
+    try:
+        outcome, check = vnpay_query.check_order(state, dao_orders, now_utc)
+    except Exception as e:   # network / VNPay error: not known, so no second link yet
+        logger.warning(f"VNPay check before a new link failed for order {order_id}: {repr(e)}")
+        outcome, check = "unknown", None
+    if outcome == "paid":
+        apply_vnpay_result(querydr_params(check))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail={"code": "order_already_paid", "message": "This order is already paid"})
+    if outcome in ("pending", "unknown"):
+        minutes = max(1, math.ceil((vnpay_query.retry_at(state) - now_utc).total_seconds() / 60))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
+            "code": "payment_in_progress", "message": "VNPay is still processing the previous payment", "minutes": minutes})
+
     # The buyer's IP (VNPay: "Địa chỉ IP của khách hàng"), not nginx's
     ip = client_ip(request)
 
@@ -190,6 +218,18 @@ def vnpay_ipn(request: Request):
         logger.warning(f"VNPay IPN hash mismatch")
         return JSONResponse(content={"RspCode": "97", "Message": "Invalid Checksum"})
 
+    return apply_vnpay_result(params)
+
+
+def querydr_params(check: dict) -> dict:
+    """A querydr answer that says paid, as the IPN params apply_vnpay_result reads (and keeps as ipn_data)."""
+    return {k: v for k, v in check.items() if v is not None} | {"vnp_ResponseCode": "00", "source": "querydr"}
+
+
+def apply_vnpay_result(params: dict) -> JSONResponse:
+    """What a signed VNPay result does to the order: the IPN, and the querydr check when the IPN is late
+    (T125, services/payment_reconcile.py) go through here, so marking paid, the amount check, a second /
+    late payment refund, withholding and the seller push are the same for both."""
     # Check response code
     response_code = params.get("vnp_ResponseCode", "")
     transaction_status = params.get("vnp_TransactionStatus", "")
@@ -248,23 +288,32 @@ def vnpay_ipn(request: Request):
         except Exception as e:
             logger.warning(f"VNPay IPN: Failed to update order: {e}")
             return JSONResponse(content={"RspCode": "99", "Message": "Unknown error"})
+    elif response_code not in NOT_CHARGED_CODES:
+        # 07 (charged, suspicious), 99, an unknown code, or 00 with a non-00 status: not a clear "not paid".
+        # Ack so VNPay stops retrying, record nothing: no new pay link until VNPay / an admin settles it.
+        logger.error(f"VNPay result {response_code}/{transaction_status} for {txn_ref} (order {order_id}, "
+                     f"source {params.get('source', 'ipn')}): money may have moved, nothing recorded, check it")
+        return JSONResponse(content={"RspCode": "00", "Message": "Confirm Success"})
     else:
         # VNPay reports failure (insufficient funds, wrong OTP, customer cancelled, ...).
         # Per VNPay SIT test "Giao dịch không thành công" we ack with RspCode "00"
         # so VNPay stops retrying. We log the failed transaction in the payments table
         # (audit trail) but DO NOT change order.payment_status — it stays "pending"
         # so the user can retry payment from the order detail page.
+        # Once per TxnRef: the signed Return (T125), a VNPay retry and a reload all land here.
         try:
-            DAOPayments().create_payment(
-                order_id=order_id,
-                method="vnpay",
-                amount=Decimal(str(order["total_amount"])),
-                status="failed",
-                transaction_ref=txn_ref,
-                type="charge",
-                vnp_transaction_no=params.get("vnp_TransactionNo"),
-            )
-            dao_orders.update_ipn_data(order_id=order_id, ipn_data=params)
+            dao_payments = DAOPayments()
+            if not dao_payments.has_transaction(txn_ref):
+                dao_payments.create_payment(
+                    order_id=order_id,
+                    method="vnpay",
+                    amount=Decimal(str(order["total_amount"])),
+                    status="failed",
+                    transaction_ref=txn_ref,
+                    type="charge",
+                    vnp_transaction_no=params.get("vnp_TransactionNo"),
+                )
+                dao_orders.update_ipn_data(order_id=order_id, ipn_data=params)
         except Exception as e:
             logger.warning(f"VNPay IPN: Failed to record failed transaction: {e}")
             return JSONResponse(content={"RspCode": "99", "Message": "Unknown error"})
@@ -274,7 +323,9 @@ def vnpay_ipn(request: Request):
 
 @router.get("/vnpay/return")
 def vnpay_return(request: Request):
-    """Return URL — browser redirect after payment. Only for display, NOT for updating DB."""
+    """Return URL — browser redirect after payment. For display, except one thing (T125): a SIGNED "not paid"
+    (e.g. 24, the buyer cancelled at VNPay) is recorded as the link's failed result, as a failed IPN would be,
+    so a new link can be made at once instead of waiting for VNPay. Never used to mark an order paid."""
 
     params = dict(request.query_params)
 
@@ -296,12 +347,20 @@ def vnpay_return(request: Request):
     # order_id for the frontend polling
     order_id = _order_id_from_txn_ref(txn_ref)
 
+    if is_valid and response_code != "00":
+        try:
+            apply_vnpay_result(params | {"source": "return"})
+        except Exception as e:   # display still works; the IPN or the VNPay check records it later
+            logger.warning(f"VNPay return: failed result of {txn_ref} not recorded: {repr(e)}")
+
     return {
         "success": is_valid and response_code == "00",
         "response_code": response_code,
         "txn_ref": txn_ref,
         "order_id": order_id,
-        "is_valid": is_valid
+        "is_valid": is_valid,
+        # the page says "not completed, pay again" only then; 07 / 99 / unknown -> "waiting for VNPay"
+        "not_charged": is_valid and response_code in NOT_CHARGED_CODES,
     }
 
 
@@ -316,4 +375,6 @@ def get_payment_status(order_id: str, user=Depends(verify_token)):
 
     return {
         "payment_status": order["payment_status"],
+        # T125: how long the result page waits before "waiting for VNPay" (never "failed")
+        "wait_seconds": DAOAdminConfig().get_positive_int("payment_result_wait_seconds", 90),
     }

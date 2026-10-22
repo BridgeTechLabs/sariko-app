@@ -4,6 +4,7 @@ only checked against it. No DB, no network.
 Run from tests/backend:  pytest unit/test_order_delivery_fee.py
 """
 
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -79,7 +80,9 @@ def place(monkeypatch, server_fee, client_fee):
     monkeypatch.setattr(orders, "get_lalamove_service", lambda: FakeLalamove(server_fee))
     req = Schema.RequestCreateOrder(delivery_method="delivery", delivery_address="D7",
                                     delivery_lat=10.73, delivery_lon=106.72,
-                                    delivery_fee=client_fee, quotation_id="client-q")
+                                    delivery_fee=client_fee, quotation_id="client-q",
+                                    # the cart's dish is a 1-day pre-order (T127)
+                                    delivery_appointment=datetime.now(timezone.utc) + timedelta(days=2))
     return orders.create_order(req, user={"id": "buyer"})
 
 

@@ -12,6 +12,7 @@ import { useDashboardStore } from "@/stores/seller/dashboardStore";
 import { useMenuStore } from "@/stores/seller/menuStore";
 import { useProfileCompletionStore } from "@/stores/seller/profileCompletionStore";
 import { useReviewStore } from "@/stores/review/reviewStore";
+import { useComplaintStore } from "@/stores/complaint/complaintStore";
 import { i18n } from "@/plugins/i18n";
 import { disablePush } from "@/composables/pushNotifications";
 
@@ -36,6 +37,7 @@ function resetAccountStores() {
     useMenuStore().$reset();
     useProfileCompletionStore().$reset();
     useReviewStore().$reset();
+    useComplaintStore().$reset();
 }
 
 // The axios interceptor reads the token via supabase.auth.getSession() (storage),

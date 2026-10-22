@@ -74,6 +74,9 @@ class _FakePaymentsDAO:
     def create_payment(self, **kwargs):
         self.create_called = True
 
+    def has_transaction(self, transaction_ref):
+        return False
+
 
 # ─── Tests ───────────────────────────────────────────────────────────────────
 def test_ipn_valid_payment_success(fastapi_client, vnp_secret, monkeypatch):

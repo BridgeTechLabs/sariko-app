@@ -69,6 +69,7 @@ def test_ready_passes_guard_when_complete(mark_ready):  # TC-16
 def test_detail_has_status_history(client, monkeypatch):  # TC-17
     monkeypatch.setattr("apis.sellers._get_seller", lambda user: {"id": "seller-1"})
     monkeypatch.setattr("apis.sellers._with_deadlines", lambda orders, seller: orders)
+    monkeypatch.setattr("apis.sellers.complaints_for_order", lambda order, user_id, role: {})   # complaints: own tests
     history = {"order-1": [{"status": "pending", "changed_at": "2026-10-20T03:00:00+00:00"},
                            {"status": "confirmed", "changed_at": "2026-10-20T03:05:00+00:00"}],
                "order-2": []}

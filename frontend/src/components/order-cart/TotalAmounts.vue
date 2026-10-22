@@ -56,8 +56,11 @@ export default {
             d.setDate(d.getDate() + this.maxPreorderDay)
             return d
         },
+        // local (Vietnam) date like the hour / minute limits below; toISOString gave the UTC date, so from
+        // 00:00 to 07:00 any time on the next day passed and the server refused it (T127)
         minAppointmentDate() {
-            return this.minAppointmentDatetime.toISOString().slice(0, 10).replace(/-/g, '/')
+            const d = this.minAppointmentDatetime
+            return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
         },
         validationIssues() {
             const auth = useAuthStore()

@@ -45,7 +45,7 @@ class DAOSellerProfiles(DAOBase):
     def read_seller_by_slug_name(self, slug: str):
         try:
             query = self._supabase_client.table(self._table_name)
-            query = query.select("id, store_name, slug, address, avatar_url, status, is_verified, phone, lat, lon, tier, description, is_open, opening_time, closing_time, rating_avg, rating_count").eq("slug", slug)
+            query = query.select("id, store_name, slug, address, avatar_url, status, is_verified, lat, lon, tier, description, is_open, opening_time, closing_time, rating_avg, rating_count").eq("slug", slug)
             
             query = query.maybe_single()
             result = query.execute()
