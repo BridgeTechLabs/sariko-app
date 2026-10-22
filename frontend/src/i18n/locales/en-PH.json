@@ -991,6 +991,14 @@
         "no_food": "No food matches",
         "no_category": "No category matches"
     },
+    "coming_soon_page": {
+        "title": "Sariko is opening soon",
+        "opening_date": "Open from {date}",
+        "intro": "Home-cooked Filipino food in Ho Chi Minh City, made by home cooks and delivered to your door.",
+        "seller_title": "Are you a seller? Sign in to get your menu ready before we open.",
+        "seller_signin": "Sign in",
+        "seller_join": "Become a seller"
+    },
     "not_found_page": {
         "title": "Page not found",
         "subtitle": "The page you're looking for doesn't exist.",

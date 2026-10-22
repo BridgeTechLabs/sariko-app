@@ -994,6 +994,14 @@
         "no_food": "Không có món phù hợp",
         "no_category": "Không có danh mục phù hợp"
     },
+    "coming_soon_page": {
+        "title": "Sariko sắp mở cửa",
+        "opening_date": "Mở bán từ {date}",
+        "intro": "Món Philippines nhà làm ở TP.HCM, do người bán nấu tại nhà và giao tận nơi.",
+        "seller_title": "Bạn là người bán? Đăng nhập để chuẩn bị thực đơn trước ngày mở bán.",
+        "seller_signin": "Đăng nhập",
+        "seller_join": "Đăng ký bán hàng"
+    },
     "not_found_page": {
         "title": "Không tìm thấy trang",
         "subtitle": "Trang bạn tìm không tồn tại.",
