@@ -994,6 +994,17 @@
         "no_food": "Không có món phù hợp",
         "no_category": "Không có danh mục phù hợp"
     },
+    "coming_soon_page": {
+        "badge": "Sắp mở cửa",
+        "title": "Món nhà làm của người {country}, sắp có mặt ở TP.HCM",
+        "country": "Philippines",
+        "sub": "Sariko kết nối bạn với những bếp nhà người Philippines quanh thành phố. Chúng tôi đang chuẩn bị những đơn hàng đầu tiên.",
+        "date_label": "Mở bán từ",
+        "seller_title": "Bạn là người bán?",
+        "seller_text": "Đăng nhập ngay để chuẩn bị thực đơn, giờ mở cửa và tài khoản nhận tiền trước ngày mở bán.",
+        "signin": "Đăng nhập để chuẩn bị thực đơn",
+        "join": "Đăng ký bán hàng"
+    },
     "not_found_page": {
         "title": "Không tìm thấy trang",
         "subtitle": "Trang bạn tìm không tồn tại.",

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth/authStore'
+import { apiLaunch } from '@/apis/launch/apiLaunch'
 
 let _bootstrapped = false
 
@@ -16,7 +17,8 @@ const routes = [
     {
         path: '/home',
         name: 'home',
-        component: () => import('@/pages/HomePage.vue')
+        component: () => import('@/pages/HomePage.vue'),
+        meta: { buyer: true }
     },
     {
         path: '/signin',
@@ -57,29 +59,33 @@ const routes = [
         path: '/sellers',
         name: 'all-sellers',
         component: () => import('@/pages/AllSellersPage.vue'),
+        meta: { buyer: true }
     },
     {
         path: '/search',
         name: 'search',
-        component: () => import('@/pages/SearchPage.vue')
+        component: () => import('@/pages/SearchPage.vue'),
+        meta: { buyer: true }
     },
     {
         path: '/seller/:slugName',
         name: 'seller',
         component: () => import('@/pages/SellerPage.vue'),
-        props: true
+        props: true,
+        meta: { buyer: true }
     },
     {
         path: '/food/:sellerSlug/:foodId',
         name: 'food-detail',
         component: () => import('@/pages/FoodDetailPage.vue'),
-        props: true
+        props: true,
+        meta: { buyer: true }
     },
     {
         path: '/cart',
         name: 'cart',
         component: () => import('@/pages/CartPage.vue'),
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true, buyer: true }
     },
     // {
     //     path: '/checkout',
@@ -95,21 +101,21 @@ const routes = [
         path: '/orders',
         name: 'orders',
         component: () => import('@/pages/OrdersPage.vue'),
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true, buyer: true }
     },
     {
         path: '/orders/:orderId',
         name: 'order-confirmation',
         component: () => import('@/pages/OrderConfirmationPage.vue'),
         props: true,
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true, buyer: true }
     },
     {
         path: '/orders/:orderId/review',
         name: 'order-review',
         component: () => import('@/pages/OrderReviewPage.vue'),
         props: true,
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true, buyer: true }
     },
     // T35 complaints (buyer and seller): new before :complaintId
     {
@@ -275,6 +281,11 @@ const routes = [
         meta: { requiresAuth: true }
     },
     {
+        path: '/coming-soon',
+        name: 'coming-soon',
+        component: () => import('@/pages/ComingSoonPage.vue'),
+    },
+    {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/pages/NotFoundPage.vue'),
@@ -321,6 +332,20 @@ router.beforeEach(async (to) => {
 
     if (to.meta.requiresSeller && (!authStore.user?.isSeller)) {
         return { name: 'home' }
+    }
+
+    // Until admin_settings app_live = 1 (go live), buyer pages show /coming-soon. ?preview=1 (remembered
+    // in this browser, ?preview=0 to stop) lets testers through. This is a notice, not a lock: the
+    // backend still takes orders, so test orders before launch rely on only the test store being listed.
+    if (to.query.preview === '1' || to.query.preview === '0') {
+        try { to.query.preview === '1' ? localStorage.setItem('preview', '1') : localStorage.removeItem('preview') } catch { }
+    }
+    if (to.meta.buyer || to.name === 'coming-soon') {
+        let preview = false
+        try { preview = localStorage.getItem('preview') === '1' } catch { }
+        const { prelaunch } = await apiLaunch.get()
+        if (to.meta.buyer && prelaunch && !preview) return { name: 'coming-soon' }
+        if (to.name === 'coming-soon' && !prelaunch) return { name: 'home' }
     }
 })
 

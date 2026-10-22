@@ -65,7 +65,7 @@
 
 ### Infrastructure
 - Docker image built & pushed on merge to `main` (GitHub Actions, self-hosted EC2 runner)
-- nginx reverse proxy + certbot TLS (`infra/docker/`)
+- nginx reverse proxy + certbot TLS (`infra/<env>/deploy/`)
 - Readiness check with automatic rollback on failed deploy
 
 ---
@@ -110,7 +110,7 @@ sariko-app/
 │
 ├── frontend-quetoi/             # Quê Tôi tenant — mock-adapter clone
 ├── landing/                     # Static landing page
-├── infra/docker/                # compose.yaml, nginx, get_cert.sh
+├── infra/{dev,prod}/            # mirror of ~ on each EC2; push with infra/sync.sh <env>
 ├── tests/                       # backend (pytest), frontend, smoke, manual
 ├── .github/workflows/main.yml   # Test → build → deploy → rollback
 ├── CLAUDE.md                    # Development guidelines
@@ -238,7 +238,7 @@ runner: run `pytest tests/backend` → build & push the Docker image →
 previous image tag on failure.
 
 nginx terminates TLS and reverse-proxies the API; VNPay IPN source-IP filtering
-is enforced there (`infra/docker/nginx/nginx.conf`), not in the app.
+is enforced there (`infra/prod/deploy/nginx/nginx.conf`), not in the app.
 
 ### Build
 ```bash
