@@ -992,12 +992,15 @@
         "no_category": "No category matches"
     },
     "coming_soon_page": {
-        "title": "Sariko is opening soon",
-        "opening_date": "Open from {date}",
-        "intro": "Home-cooked Filipino food in Ho Chi Minh City, made by home cooks and delivered to your door.",
-        "seller_title": "Are you a seller? Sign in to get your menu ready before we open.",
-        "seller_signin": "Sign in",
-        "seller_join": "Become a seller"
+        "badge": "Opening soon",
+        "title": "Home-cooked {country} food, coming soon to Ho Chi Minh City",
+        "country": "Filipino",
+        "sub": "Sariko connects you with Filipino home kitchens around the city. We're getting ready for our very first orders.",
+        "date_label": "Orders open on",
+        "seller_title": "Are you a seller?",
+        "seller_text": "Sign in now to set up your menu, opening hours and payout account before we open.",
+        "signin": "Sign in to set up your menu",
+        "join": "Become a seller"
     },
     "not_found_page": {
         "title": "Page not found",

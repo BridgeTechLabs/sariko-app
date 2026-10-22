@@ -18,23 +18,29 @@ export default {
 
 <template>
     <div class="coming-soon">
-        <div class="lang">
-            <LanguageSwitcher />
-        </div>
+        <header class="top">
+            <img class="logo-small" src="/logo/sariko/sariko_logo_dark_bg-removebg.png" alt="SariKo" />
+            <LanguageSwitcher class="lang" />
+        </header>
 
-        <div class="main">
-            <img class="logo" src="/logo/sariko/sariko_logo_dark_bg-removebg.png" alt="SariKo" />
-            <div class="heading">
-                <h1 class="title">{{ $t('coming_soon_page.title') }}</h1>
-                <div v-if="launchDate" class="date">{{ $t('coming_soon_page.opening_date', { date: launchDate }) }}</div>
-            </div>
-            <p class="intro">{{ $t('coming_soon_page.intro') }}</p>
-            <div class="seller-card">
-                <div class="seller-title">{{ $t('coming_soon_page.seller_title') }}</div>
-                <router-link to="/signin" class="btn-primary">{{ $t('coming_soon_page.seller_signin') }}</router-link>
-                <router-link to="/join" class="btn-link">{{ $t('coming_soon_page.seller_join') }}</router-link>
-            </div>
-        </div>
+        <main class="main">
+            <section class="hero">
+                <img class="logo" src="/logo/sariko/sariko_logo_dark_bg-removebg.png" alt="" />
+                <span class="badge">{{ $t('coming_soon_page.badge') }}</span>
+                <i18n-t keypath="coming_soon_page.title" tag="h1" class="title">
+                    <template #country><em>{{ $t('coming_soon_page.country') }}</em></template>
+                </i18n-t>
+                <p class="sub">{{ $t('coming_soon_page.sub') }}</p>
+                <div v-if="launchDate" class="date">{{ $t('coming_soon_page.date_label') }} <b>{{ launchDate }}</b></div>
+            </section>
+
+            <section class="card">
+                <h2>{{ $t('coming_soon_page.seller_title') }}</h2>
+                <p>{{ $t('coming_soon_page.seller_text') }}</p>
+                <router-link to="/signin" class="btn primary">{{ $t('coming_soon_page.signin') }}</router-link>
+                <router-link to="/join" class="btn ghost">{{ $t('coming_soon_page.join') }}</router-link>
+            </section>
+        </main>
 
         <!-- This page stands in for the home page, so it keeps the operator details a marketplace must publish. -->
         <footer class="legal">
@@ -52,6 +58,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
+// Layout and sizes follow docs/dev/prelaunch/mockup (2026-10-22), on the /join navy instead of #040A14.
 .coming-soon {
     position: relative;
     z-index: 0;  // own stacking context: the ::before layer below paints over the app's background, under this content
@@ -59,11 +66,11 @@ export default {
     flex-direction: column;
     min-height: 100vh;
     min-height: 100dvh;
-    padding: 16px 16px 12px;
-    background-color: #121b2f;  // the /join navy
+    width: min(1040px, 100vw);  // wider than the app's 800px column, like the mockup; centred over it
+    align-self: center;
+    padding: 0 20px;
     color: #fff;
     font-family: $sariko-font-family-secondary;
-    text-align: center;
 }
 
 // Navy behind the whole viewport too: on desktop the app column is 800px wide on the app's darker background.
@@ -75,79 +82,146 @@ export default {
     background-color: #121b2f;
 }
 
+.top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+}
+
+.logo-small {
+    height: 36px;
+}
+
 .lang {
-    align-self: flex-end;
     --text-primary: #fff;  // the pill uses the theme text colour; this page is always dark
 }
 
 .main {
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-evenly;
-    align-items: center;
+    display: grid;
+    gap: 24px;
+    align-content: center;
+    padding: 8px 0 12px;
+}
+
+.hero {
+    display: grid;
+    justify-items: center;
     gap: 12px;
-    width: 100%;
-    max-width: 480px;
-    margin: 0 auto;
+    text-align: center;
 }
 
 .logo {
-    width: 120px;
+    width: 112px;
+    height: 112px;
+    object-fit: contain;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border: 1px solid rgba(250, 204, 21, 0.35);
+    border-radius: 999px;
+    background: rgba(250, 204, 21, 0.12);
+    color: #facc15;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.badge::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #facc15;
+    box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.18);
 }
 
 .title {
     margin: 0;
-    font-family: $sariko-font-family-primary;
-    font-size: 26px;
-    font-weight: 700;
-    line-height: 1.3;
-    color: #fff;
+    max-width: 22ch;
+    font-family: $sariko-font-family-secondary;
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: normal;
+}
+
+.title em {
+    font-style: normal;
+    color: #facc15;
+}
+
+.sub {
+    margin: 0;
+    max-width: 46ch;
+    font-size: 15px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .date {
-    margin-top: 6px;
-    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border: 1px solid #374151;
+    border-radius: 12px;
+    background: #1f2940;
     font-weight: 600;
-    color: #f5a623;
 }
 
-.intro {
+.date b {
+    font-size: 18px;
+    color: #facc15;
+}
+
+.card {
+    display: grid;
+    gap: 12px;
+    padding: 20px;
+    border: 1px solid #374151;
+    border-radius: 16px;
+    background: #111620;
+}
+
+.card h2 {
+    margin: 0;
+    font-family: $sariko-font-family-secondary;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.card p {
     margin: 0;
     font-size: 14px;
-    line-height: 1.6;
-    color: rgba(255, 255, 255, 0.75);
+    line-height: 1.55;
+    color: rgba(255, 255, 255, 0.6);
 }
 
-.seller-card {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    width: 100%;
-    padding: 16px;
-    border-radius: 16px;
-    background: #1f2940;
-}
-
-.seller-title {
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.btn-primary {
-    padding: 12px;
+.btn {
+    display: block;
+    padding: 13px 16px;
     border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+}
+
+.btn.primary {
     background: #facc15;
     color: #121b2f;
-    font-weight: 700;
-    text-decoration: none;
 }
 
-.btn-link {
-    color: #f5a623;
-    font-weight: 600;
-    text-decoration: none;
+.btn.ghost {
+    border: 1px solid #374151;
+    color: #fff;
 }
 
 .legal {
@@ -156,7 +230,8 @@ export default {
     justify-content: center;
     align-items: center;
     gap: 2px 10px;
-    margin-top: 16px;
+    padding: 12px 0;
+    border-top: 1px solid #374151;
     font-size: 11px;
     line-height: 1.5;
     color: rgba(255, 255, 255, 0.45);
@@ -169,5 +244,27 @@ export default {
 .moit-badge {
     height: 24px;
     vertical-align: middle;
+}
+
+@media (min-width: 900px) {
+    .main {
+        grid-template-columns: 1.3fr 1fr;
+        align-items: center;
+        gap: 48px;
+    }
+
+    .hero {
+        justify-items: start;
+        text-align: left;
+    }
+
+    .logo {
+        width: 132px;
+        height: 132px;
+    }
+
+    .title {
+        font-size: 40px;
+    }
 }
 </style>
