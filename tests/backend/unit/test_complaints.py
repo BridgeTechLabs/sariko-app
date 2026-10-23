@@ -210,3 +210,85 @@ def test_order_screen_survives_a_complaints_error(env, monkeypatch):
         raise RuntimeError("relation complaints does not exist")
     monkeypatch.setattr(env.dao, "list_for_order", boom)
     assert complaints.complaints_for_order(env.dao.orders["o1"], BUYER, "buyer") == {"complaints": [], "can_complain": False}
+
+
+# complaint-email TC-1..TC-3: new complaint → one email to support, in the background, never breaking the API
+class FakeSMTP:
+    sent, logins, fail = [], [], False
+
+    def __init__(self, host, port, timeout):
+        FakeSMTP.host = (host, port, timeout)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def login(self, user, password):
+        if FakeSMTP.fail:
+            raise complaints.email_service.smtplib.SMTPAuthenticationError(535, b"bad credentials")
+        FakeSMTP.logins.append(user)
+
+    def send_message(self, msg):
+        FakeSMTP.sent.append(msg)
+
+
+@pytest.fixture
+def mail(env, monkeypatch):
+    FakeSMTP.sent, FakeSMTP.logins, FakeSMTP.fail, FakeSMTP.host = [], [], False, None
+    monkeypatch.setattr(complaints.email_service.smtplib, "SMTP_SSL", FakeSMTP)
+    monkeypatch.setattr(complaints.threading, "Thread", lambda target, args, daemon: type("T", (), {"start": lambda self: target(*args)})())
+    monkeypatch.setattr(complaints, "DAOUsers", lambda: type("U", (), {"get_users": lambda self, uid: {
+        "name": "Mai Buyer", "email": "mai@example.com", "phone": "+84901234567"}})())
+    for k, v in {"SMTP_PASSWORD": "s3cret-pw", "COMPLAINT_EMAIL_TO": "support@sariko.store", "SMTP_USER": "support@sariko.store",
+                 "SMTP_HOST": "smtp.titan.email", "SMTP_PORT": "465", "ADMIN_APP_URL": "https://admin.sariko.store/", "ENV": "dev"}.items():
+        monkeypatch.setenv(k, v)
+    env.dao.orders["o1"]["id"] = "a805e862-1111-4222-8333-444444444444"
+    env.dao.orders["a805e862-1111-4222-8333-444444444444"] = env.dao.orders.pop("o1")
+    env.dao.orders["a805e862-1111-4222-8333-444444444444"]["seller_profiles"]["store_name"] = "Rosa Home Kitchen"
+    return env
+
+
+def file(env):
+    return env.client.post("/complaints", json={"order_id": "a805e862-1111-4222-8333-444444444444",
+                                                "category": "damaged", "description": "Đồ ăn bị đổ, hộp móp"})
+
+
+def test_email_tc1_sent_to_support(mail):
+    res = file(mail)
+    assert res.status_code == 200, res.text
+    c = res.json()["complaint"]
+    assert FakeSMTP.host == ("smtp.titan.email", 465, 30) and FakeSMTP.logins == ["support@sariko.store"]
+    (msg,) = FakeSMTP.sent
+    assert msg["From"] == "Sariko <support@sariko.store>" and msg["To"] == "support@sariko.store"
+    assert msg["Reply-To"] == "mai@example.com"
+    assert msg["Subject"] == "[DEV] [Sariko] Khiếu nại mới KN000001 - Hư hỏng / không an toàn"
+    body = msg.get_content()
+    for line in ("Khiếu nại mới KN000001", "Người gửi: Người mua · Mai Buyer · mai@example.com · +84901234567",
+                 "Kênh: Ứng dụng", "Loại: Hư hỏng / không an toàn", "Đơn: #A805E862 · Rosa Home Kitchen",
+                 "(giờ Việt Nam)", "Đồ ăn bị đổ, hộp móp", f"Mở trong admin: https://admin.sariko.store/complaints?open={c['id']}",
+                 "Ảnh (nếu có): xem trong admin."):
+        assert line in body, (line, body)
+
+
+def test_email_prd_has_no_prefix(mail, monkeypatch):
+    monkeypatch.setenv("ENV", "prd")
+    file(mail)
+    assert FakeSMTP.sent[0]["Subject"].startswith("[Sariko] Khiếu nại mới")
+
+
+@pytest.mark.parametrize("unset", ["SMTP_PASSWORD", "COMPLAINT_EMAIL_TO"])
+def test_email_tc2_not_configured(mail, monkeypatch, unset):
+    monkeypatch.delenv(unset)
+    res = file(mail)
+    assert res.status_code == 200 and FakeSMTP.host is None and FakeSMTP.sent == []   # no SMTP connection at all
+
+
+def test_email_tc3_smtp_error_keeps_the_complaint(mail, caplog):
+    FakeSMTP.fail = True
+    res = file(mail)
+    assert res.status_code == 200 and res.json()["complaint"]["code"] == "KN000001"
+    lines = [r.getMessage() for r in caplog.records if "email not sent" in r.getMessage()]
+    assert lines == ["[Complaint] KN000001 email not sent: SMTPAuthenticationError"], lines
+    assert "s3cret-pw" not in caplog.text and "Đồ ăn bị đổ" not in caplog.text

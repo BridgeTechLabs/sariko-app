@@ -20,7 +20,7 @@ class DAOComplaints(DAOBase):
         """The order fields the complaint rules need, with the seller's user id."""
         try:
             result = self._supabase_client.table("orders") \
-                .select("id, user_id, seller_id, status, payment_status, status_changed_at, seller_profiles(user_id)") \
+                .select("id, user_id, seller_id, status, payment_status, status_changed_at, seller_profiles(user_id, store_name)") \
                 .eq("id", order_id).maybe_single().execute()
             return result.data if result and result.data else None
         except PostgrestExceptionAPIError as e:
