@@ -769,6 +769,7 @@
         "reviews_load_error": "Couldn't load reviews",
         "reviews_retry": "Try again",
         "reviews_more": "See more",
+        "reviews_see_all": "See all reviews",
         "button_label_sign_out": "Sign Out",
         "signout_dialog_title": "Sign Out",
         "signout_dialog_message": "Are you sure you want to sign out?",
