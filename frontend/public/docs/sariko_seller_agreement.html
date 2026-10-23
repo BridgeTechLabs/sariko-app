@@ -53,6 +53,25 @@
     .fee-table { font-size: 12px; }
     .fee-table th, .fee-table td { padding: 8px 8px; }
   }
+  /* Phones (docs-mobile, BUGS #36): 16px margins, a short header and hero, tables scroll in their own box.
+     .table-scroll keeps the table's 20px margin outside the box, so desktop spacing is unchanged. */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 20px 0; }
+  .table-scroll > table { margin: 0; }
+  @media (max-width: 600px) {
+    .site-header { padding: 12px 16px; }
+    .site-header .wordmark { font-size: 22px; }
+    .hero { padding: 24px 16px 20px; }
+    .hero h1 { font-size: 30px; margin-bottom: 10px; }
+    .hero-meta { gap: 2px 16px; }
+    .layout { padding: 28px 16px 48px; }
+    .section { margin-bottom: 28px; padding-bottom: 28px; }
+    .section h2 { font-size: 24px; margin-bottom: 12px; }
+    .fee-table, .data-table { font-size: 14px; }
+    .fee-table th, .fee-table td, .data-table th, .data-table td { padding: 8px 10px; }
+    .fee-table th, .data-table th { font-size: 13px; }
+    .page-footer { padding: 20px 16px; }
+    .method-card p, .payout-card p, .provider-card p, .node-card p, .team-card p, .parent-note, .fee-table .mono { font-size: 14px; }
+  }
 </style>
 </head>
 <body>
@@ -82,7 +101,7 @@
   <div class="section">
     <h2>2. Fees and payouts</h2>
     <p>There is no sign-up fee. The monthly fee and the service fee per order depend on the plan:</p>
-    <table class="fee-table">
+    <div class="table-scroll"><table class="fee-table">
       <thead>
         <tr><th>Plan</th><th>Monthly fee (VND)</th><th>Service fee per order</th><th>Max dishes, categories</th></tr>
       </thead>
@@ -92,7 +111,7 @@
         <tr><td>Negosyo</td><td>1,250,000</td><td>15%</td><td>90 dishes, 10 categories</td></tr>
         <tr><td>Enterprise (by invitation, up to 5 sellers)</td><td>2,300,000</td><td>13%</td><td>Unlimited</td></tr>
       </tbody>
-    </table>
+    </table></div>
     <ul>
       <li>The service fee is charged on the food amount of completed orders. It is not charged on delivery fees, nor on cancelled or refunded orders.</li>
       <li>Fees exclude VAT, which is added at the rate in force when the fee is charged. SariKo pays the VNPAY payment gateway fees.</li>
@@ -122,14 +141,14 @@
   <div class="section">
     <h2>4. Taxes</h2>
     <p>Under Decree 252/2026/NĐ-CP (Articles 43 to 46) and Decree 68/2026/NĐ-CP, SariKo withholds VAT and personal income tax on the food amount of each completed order and pays them to the tax authority on the Seller's behalf. The rates are set by the VAT Law (48/2024/QH15) and the Personal Income Tax Law (109/2025/QH15) and depend on whether the Seller is resident in Vietnam for tax purposes. Every home-cooked food Seller is in one business group, services attached to goods:</p>
-    <table class="fee-table">
+    <div class="table-scroll"><table class="fee-table">
       <thead>
         <tr><th>Business group</th><th>Tax resident</th><th>Non-resident or residency unknown</th></tr>
       </thead>
       <tbody>
         <tr><td>Home-cooked food (services attached to goods)</td><td>4.5%</td><td>5%</td></tr>
       </tbody>
-    </table>
+    </table></div>
     <ul>
       <li>All home-cooked food sellers are in this group.</li>
       <li>If the Seller's revenue for the year is 500 million VND or less, the Seller owes no VAT or personal income tax and can claim the tax withheld back from the tax office.</li>

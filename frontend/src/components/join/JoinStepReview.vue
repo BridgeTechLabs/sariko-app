@@ -220,12 +220,23 @@ export default {
     color: rgba(255, 255, 255, 0.6);
 }
 
+/* tall enough to read on a phone (60% of the screen), scrolls inside; never shorter than before */
 .agreement {
+    display: block;
     width: 100%;
-    height: 360px;
-    border: 0;
+    height: 60vh;
+    min-height: 360px;
+    border: 1px solid rgba(245, 166, 35, 0.3);
     border-radius: 12px;
     background: #fff;
+}
+
+/* phones: the vertical stepper indents every step 60px; the agreement takes that space back to be readable */
+@media (max-width: 599px) {
+    .agreement {
+        width: calc(100% + 60px);
+        margin-left: -60px;
+    }
 }
 
 .checks {

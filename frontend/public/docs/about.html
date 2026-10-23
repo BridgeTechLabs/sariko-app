@@ -387,6 +387,25 @@
     .contact-block .cb-row { flex-direction: column; gap: 2px; }
     .hero::before { display: none; }
   }
+  /* Phones (docs-mobile, BUGS #36): 16px margins, a short header and hero, tables scroll in their own box.
+     .table-scroll keeps the table's 20px margin outside the box, so desktop spacing is unchanged. */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 20px 0; }
+  .table-scroll > table { margin: 0; }
+  @media (max-width: 600px) {
+    .site-header { padding: 12px 16px; }
+    .site-header .wordmark { font-size: 22px; }
+    .hero { padding: 24px 16px 20px; }
+    .hero h1 { font-size: 30px; margin-bottom: 10px; }
+    .hero-meta { gap: 2px 16px; }
+    .layout { padding: 28px 16px 48px; }
+    .section { margin-bottom: 28px; padding-bottom: 28px; }
+    .section h2 { font-size: 24px; margin-bottom: 12px; }
+    .fee-table, .data-table { font-size: 14px; }
+    .fee-table th, .fee-table td, .data-table th, .data-table td { padding: 8px 10px; }
+    .fee-table th, .data-table th { font-size: 13px; }
+    .page-footer { padding: 20px 16px; }
+    .method-card p, .payout-card p, .provider-card p, .node-card p, .team-card p, .parent-note, .fee-table .mono { font-size: 14px; }
+  }
 </style>
 </head>
 <body>
