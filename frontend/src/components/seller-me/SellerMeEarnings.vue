@@ -119,7 +119,7 @@ export default {
             <div v-else-if="isEmpty" class="earnings-state">
                 <Wallet :size="28" class="earnings-icon" />
                 <div class="earnings-state-text">{{ $t('seller_me.earnings_empty') }}</div>
-                <div class="earnings-state-sub">{{ $t('seller_me.earnings_empty_sub', { days: data.payout_delay_days }) }}</div>
+                <div class="earnings-state-sub">{{ $t('seller_me.earnings_empty_sub') }}</div>
                 <div class="earnings-links">
                     <a href="/docs/sariko_fees.html" target="_blank">{{ $t('seller_me.menu_label_fees') }}</a>
                     <a :href="supportMailto">{{ supportEmail }}</a>
@@ -177,7 +177,7 @@ export default {
                 </div>
 
                 <div class="earnings-note">
-                    {{ $t('seller_me.earnings_note', { days: data.payout_delay_days }) }}
+                    {{ $t('seller_me.earnings_note') }}
                     <a href="/docs/sariko_fees.html" target="_blank">{{ $t('seller_me.menu_label_fees') }}</a>
                 </div>
             </template>

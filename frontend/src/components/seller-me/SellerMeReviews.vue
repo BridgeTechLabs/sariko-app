@@ -13,6 +13,12 @@ export default {
 
     components: { Star, User, StarRating },
 
+    // preview > 0: the "Me" page shows only the newest `preview` reviews and a link to the full list
+    // (/seller/me/reviews), so it does not grow with every review. 0: full list with "See more".
+    props: {
+        preview: { type: Number, default: 0 },
+    },
+
     data() {
         return {
             reviews: [],
@@ -37,6 +43,7 @@ export default {
     },
 
     mounted() {
+        if (!this.sellerInfo) useDashboardStore().fetchSellerInfo()
         this.load()
     },
 
@@ -45,9 +52,12 @@ export default {
             this.loading = true
             this.error = false
             try {
-                const res = await apiSellerDashboard.getReviews(PAGE_SIZE, 0)
-                this.reviews = res.reviews || []
-                this.hasMore = this.reviews.length === PAGE_SIZE
+                // preview: ask one more than shown, to know whether there are others
+                const limit = this.preview ? this.preview + 1 : PAGE_SIZE
+                const res = await apiSellerDashboard.getReviews(limit, 0)
+                const page = res.reviews || []
+                this.reviews = this.preview ? page.slice(0, this.preview) : page
+                this.hasMore = page.length === limit
             } catch (e) {
                 console.error('SellerMeReviews - load -', e)
                 this.error = true
@@ -84,7 +94,7 @@ export default {
 
 <template>
     <div>
-        <div class="section-title">{{ $t('seller_me.section_title_reviews') }}</div>
+        <div v-if="preview" class="section-title">{{ $t('seller_me.section_title_reviews') }}</div>
         <div class="reviews-card">
 
             <template v-if="loading">
@@ -135,7 +145,9 @@ export default {
                     </div>
                 </div>
 
-                <q-btn v-if="hasMore" flat no-caps dense class="reviews-btn" :loading="loadingMore"
+                <q-btn v-if="hasMore && preview" flat no-caps dense class="reviews-btn" to="/seller/me/reviews"
+                    :label="$t('seller_me.reviews_see_all')" />
+                <q-btn v-else-if="hasMore" flat no-caps dense class="reviews-btn" :loading="loadingMore"
                     :label="$t('seller_me.reviews_more')" @click="loadMore" />
             </template>
 
