@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seller Agreement — SariKo</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Outfit:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:   #0B1E45;
+    --gold:   #C9A84C;
+    --gold-lt:#E2C47A;
+    --cream:  #F4EFE4;
+    --text:   #1A1A2E;
+    --border: #D9D0BC;
+    --surface:#FDFAF5;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Outfit', sans-serif; background: var(--surface); color: var(--text); font-size: 15px; line-height: 1.75; }
+
+  .site-header { background: var(--navy); padding: 18px 40px; display: flex; align-items: center; justify-content: space-between; }
+  .wordmark { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 600; color: #fff; text-decoration: none; }
+  .wordmark span { color: var(--gold); }
+  .back-link { font-size: 13px; color: var(--gold-lt); text-decoration: none; }
+
+  .hero { background: var(--navy); padding: 52px 40px 44px; border-bottom: 3px solid var(--gold); }
+  .hero-tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 12px; }
+  .hero h1 { font-family: 'Cormorant Garamond', serif; font-size: clamp(32px, 5vw, 52px); font-weight: 500; color: #fff; line-height: 1.1; margin-bottom: 16px; }
+  .hero-meta { display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; color: rgba(255,255,255,0.6); font-family: 'JetBrains Mono', monospace; }
+  .hero-meta strong { color: var(--gold-lt); font-weight: 500; }
+
+  .layout { max-width: 900px; margin: 0 auto; padding: 56px 40px 80px; }
+  .section { margin-bottom: 40px; padding-bottom: 40px; border-bottom: 1px solid var(--border); }
+  .section:last-of-type { border-bottom: none; }
+  .section h2 { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 600; color: var(--navy); margin-bottom: 18px; line-height: 1.15; }
+  .section p, .section li { color: #2C2C3E; margin-bottom: 10px; }
+  .section ul { padding-left: 20px; }
+
+  .fee-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+  .fee-table thead tr { background: var(--navy); color: #fff; }
+  .fee-table th { padding: 10px 14px; text-align: left; font-weight: 500; font-size: 13px; }
+  .fee-table tbody tr { border-bottom: 1px solid var(--border); }
+  .fee-table tbody tr:nth-child(even) { background: var(--cream); }
+  .fee-table td { padding: 10px 14px; vertical-align: top; }
+
+  .acceptance { background: var(--cream); border-left: 3px solid var(--gold); padding: 16px 20px; font-size: 14px; }
+
+  .page-footer { background: var(--navy); padding: 28px 40px; text-align: center; }
+  .page-footer p { font-size: 12px; color: rgba(255,255,255,0.4); line-height: 1.8; }
+
+  @media (max-width: 640px) {
+    .site-header, .hero, .layout { padding-left: 16px; padding-right: 16px; }
+    .fee-table { font-size: 12px; }
+    .fee-table th, .fee-table td { padding: 8px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="wordmark" href="https://www.sariko.store">Sari<span>Ko</span></a>
+  <a class="back-link" href="https://www.sariko.store">← sariko.store</a>
+</header>
+
+<div class="hero">
+  <div class="hero-tag">Seller Agreement</div>
+  <h1>SariKo Seller Agreement</h1>
+  <div class="hero-meta">
+    <span><strong>Version</strong> 2026-10-21</span>
+    <span><strong>Operator</strong> Zen Tech Asia Co., Ltd.</span>
+  </div>
+</div>
+
+<div class="layout">
+
+  <div class="section">
+    <h2>1. Parties</h2>
+    <p>This agreement is between <strong>Zen Tech Asia Co., Ltd.</strong> (tax code 0316852554), 6th Floor, Rosana Building, 60 Nguyễn Đình Chiểu, Tân Định Ward, Ho Chi Minh City, the operator of the SariKo marketplace ("SariKo"), and the person who submits the seller application ("the Seller").</p>
+    <p>Contact: <a href="mailto:support@sariko.store">support@sariko.store</a>.</p>
+  </div>
+
+  <div class="section">
+    <h2>2. Fees and payouts</h2>
+    <p>There is no sign-up fee. The monthly fee and the service fee per order depend on the plan:</p>
+    <table class="fee-table">
+      <thead>
+        <tr><th>Plan</th><th>Monthly fee (VND)</th><th>Service fee per order</th><th>Max dishes, categories</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Community</td><td>Free</td><td>19%</td><td>3 dishes, 1 category</td></tr>
+        <tr><td>Tindahan</td><td>750,000</td><td>17%</td><td>30 dishes, 5 categories</td></tr>
+        <tr><td>Negosyo</td><td>1,250,000</td><td>15%</td><td>90 dishes, 10 categories</td></tr>
+        <tr><td>Enterprise (by invitation, up to 5 sellers)</td><td>2,300,000</td><td>13%</td><td>Unlimited</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li>The service fee is charged on the food amount of completed orders. It is not charged on delivery fees, nor on cancelled or refunded orders.</li>
+      <li>Fees exclude VAT, which is added at the rate in force when the fee is charged. SariKo pays the VNPAY payment gateway fees.</li>
+      <li><strong>Founding Seller plan:</strong> a separate plan for the first 50 sellers. No monthly fee for the first 4 months, then 750,000 VND per month. Its 17% service fee stays fixed, unchanged, for as long as the Seller uses this plan.</li>
+      <li>A change of plan applies from the following month. SariKo gives at least 30 days' notice before changing its fees; this does not apply to the 17% service fee of the Founding Seller plan, which does not change.</li>
+      <li><strong>Payouts</strong> are made within 3 days after an order is completed, by bank transfer in VND to a Vietnamese bank account in the Seller's own name, with a statement listing every order, the fees and taxes deducted and the amount paid. Each payout is the food amount of completed orders, less the service fee, VAT on the service fee and the tax withheld under section 4. The monthly fee is deducted from the first payout of each month.</li>
+      <li><strong>Holds and deductions:</strong> the payout for an order under a buyer complaint is held until the complaint is resolved. If a buyer is refunded because of the Seller's fault after the order has been paid out, that amount is deducted from the Seller's later payouts. Each payout is reduced by no more than a percentage, set by SariKo, of the amount the Seller receives in that payout; any remainder is deducted from the following payouts.</li>
+    </ul>
+    <p>Full fee schedule: <a href="/docs/sariko_fees.html">sariko_fees.html</a>.</p>
+  </div>
+
+  <div class="section">
+    <h2>3. Seller obligations</h2>
+    <ul>
+      <li>Sell only food the Seller cooks, which is lawful to sell.</li>
+      <li>Keep descriptions, photos and prices (in VND) accurate.</li>
+      <li>Hold a valid food safety certificate before starting to sell.</li>
+      <li>Accept or decline each order within 30 minutes while the store is open, and have accepted orders ready within 1 hour.</li>
+      <li>Pack food so it travels safely by motorbike.</li>
+      <li>Keep the pickup address and opening hours up to date.</li>
+      <li>Not move buyers off the platform to take orders or payments outside SariKo.</li>
+      <li>Hold one account per person.</li>
+      <li>Tell SariKo within 7 days when any information in the application changes.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>4. Taxes</h2>
+    <p>Under Decree 252/2026/NĐ-CP (Articles 43 to 46) and Decree 68/2026/NĐ-CP, SariKo withholds VAT and personal income tax on the food amount of each completed order and pays them to the tax authority on the Seller's behalf. The rates are set by the VAT Law (48/2024/QH15) and the Personal Income Tax Law (109/2025/QH15) and depend on the business group and on whether the Seller is resident in Vietnam for tax purposes:</p>
+    <table class="fee-table">
+      <thead>
+        <tr><th>Business group</th><th>Resident</th><th>Non-resident</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Goods</td><td>1.5%</td><td>2%</td></tr>
+        <tr><td>Services attached to goods</td><td>4.5%</td><td>5%</td></tr>
+        <tr><td>Services</td><td>7%</td><td>10%</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li>SariKo confirms the Seller's group when it approves the application.</li>
+      <li>If the Seller's revenue for the year is 500 million VND or less, the Seller owes no VAT or personal income tax and can claim the tax withheld back from the tax office.</li>
+      <li>Tax withheld on an order that is later cancelled or refunded is returned to the Seller.</li>
+      <li>SariKo issues a certificate of tax withheld every year.</li>
+      <li>Foreign Sellers need only their passport for this; no Vietnamese tax code is required to start.</li>
+      <li>Any tax obligations in the Philippines (BIR) or another country remain the Seller's own responsibility.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>5. Personal data</h2>
+    <p>SariKo collects the Seller's identity documents, contact details, bank account and transaction data to run the seller account, make payouts, file taxes and meet its reporting duties under Vietnamese law. SariKo stores this data securely and only staff assigned to these tasks can see it. SariKo processes personal data in line with Vietnamese law on personal data protection; see the <a href="/docs/privacy-policy.html">privacy policy</a>.</p>
+  </div>
+
+  <div class="section">
+    <h2>6. Complaints and disputes</h2>
+    <ul>
+      <li>SariKo receives buyer complaints within 24 hours and resolves them within 7 working days.</li>
+      <li>When a refund is due to the Seller's fault, the payout for the order is held or the refunded amount is deducted from later payouts, as set out in section 2.</li>
+      <li>Disputes between SariKo and the Seller are settled first by negotiation, then by mediation through the platform's complaint process. If that fails, either party may refer the dispute to the competent state authority or the competent court in Ho Chi Minh City.</li>
+      <li>This agreement is governed by the laws of Vietnam.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>7. Suspension and termination</h2>
+    <ul>
+      <li>The Seller may close the account at any time.</li>
+      <li>SariKo gives the Seller at least 5 days' notice, with reasons, before suspending, terminating or restricting the account, unless a state authority requires otherwise.</li>
+      <li>Money for completed orders is always paid out.</li>
+      <li>Information about dishes the Seller has listed is kept for at least 1 year (Decree 248).</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <p class="acceptance">This agreement is accepted electronically by ticking the boxes and typing your full legal name on sariko.store/join; SariKo records the date, time and IP address.</p>
+  </div>
+
+</div>
+
+<footer class="page-footer">
+  <p>
+    Công ty TNHH Zen Tech Asia (MST 0316852554) · Tầng 6, Tòa nhà Rosana, 60 Nguyễn Đình Chiểu, P. Tân Định, TP. Hồ Chí Minh<br>
+    Thanh toán: VNPAY · Giao hàng: Lalamove
+  </p>
+</footer>
+
+</body>
+</html>

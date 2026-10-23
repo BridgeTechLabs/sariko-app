@@ -300,6 +300,25 @@
     .data-table { font-size: 12px; }
     .data-table thead th, .data-table tbody td { padding: 8px 10px; }
   }
+  /* Phones (docs-mobile, BUGS #36): 16px margins, a short header and hero, tables scroll in their own box.
+     .table-scroll keeps the table's 20px margin outside the box, so desktop spacing is unchanged. */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 20px 0; }
+  .table-scroll > table { margin: 0; }
+  @media (max-width: 600px) {
+    .site-header { padding: 12px 16px; }
+    .site-header .wordmark { font-size: 22px; }
+    .hero { padding: 24px 16px 20px; }
+    .hero h1 { font-size: 30px; margin-bottom: 10px; }
+    .hero-meta { gap: 2px 16px; }
+    .layout { padding: 28px 16px 48px; }
+    .section { margin-bottom: 28px; padding-bottom: 28px; }
+    .section h2 { font-size: 24px; margin-bottom: 12px; }
+    .fee-table, .data-table { font-size: 14px; }
+    .fee-table th, .fee-table td, .data-table th, .data-table td { padding: 8px 10px; }
+    .fee-table th, .data-table th { font-size: 13px; }
+    .page-footer { padding: 20px 16px; }
+    .method-card p, .payout-card p, .provider-card p, .node-card p, .team-card p, .parent-note, .fee-table .mono { font-size: 14px; }
+  }
 </style>
 </head>
 <body>
@@ -371,7 +390,7 @@
     <h2>What Data We Collect</h2>
     <p>We collect only the data necessary to operate the platform, process orders, comply with Vietnamese law, and improve your experience.</p>
 
-    <table class="data-table">
+    <div class="table-scroll"><table class="data-table">
       <thead>
         <tr>
           <th>Data Category</th>
@@ -421,7 +440,7 @@
           <td>All users</td>
         </tr>
       </tbody>
-    </table>
+    </table></div>
 
     <div class="warn-box">
       <strong>What we do NOT collect:</strong> We do not collect Social Security numbers, biometric data, health data, religious or political beliefs, or any sensitive personal data categories beyond identity verification required by Vietnamese law for marketplace compliance.
@@ -434,7 +453,7 @@
     <h2>How We Use Your Data</h2>
     <p>We use your personal data for the following specific purposes, each grounded in a lawful basis under Decree 13/2023:</p>
 
-    <table class="data-table">
+    <div class="table-scroll"><table class="data-table">
       <thead>
         <tr>
           <th>Purpose</th>
@@ -454,7 +473,7 @@
           <td>Contract performance</td>
         </tr>
         <tr>
-          <td>Paying sellers every 2 weeks</td>
+          <td>Paying sellers every week</td>
           <td>Seller payout data, order data</td>
           <td>Contract performance</td>
         </tr>
@@ -484,7 +503,7 @@
           <td>Legitimate interest</td>
         </tr>
       </tbody>
-    </table>
+    </table></div>
 
     <div class="info-box">
       <strong>We do not use your data for advertising profiling, sale to third parties, or automated decision-making that produces legal effects on you.</strong>
@@ -497,7 +516,7 @@
     <h2>How We Share Your Data</h2>
     <p>We share your personal data only where necessary to operate the platform or comply with legal obligations. We do not sell your data.</p>
 
-    <table class="data-table">
+    <div class="table-scroll"><table class="data-table">
       <thead>
         <tr>
           <th>Recipient</th>
@@ -532,7 +551,7 @@
           <td>Corporate reporting. No individual personal data is transferred to BridgeTech Labs without separate consent.</td>
         </tr>
       </tbody>
-    </table>
+    </table></div>
   </div>
 
   <!-- S5 -->
