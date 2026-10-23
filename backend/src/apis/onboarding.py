@@ -51,7 +51,7 @@ SETTINGS_DEFAULTS = {
     "onboarding_max_preorder_days": 14,
     "onboarding_min_age": 18,               # đề án III.1
     "onboarding_review_days": 2,
-    "seller_agreement_version": 20261021,   # change together with public/docs/sariko_seller_agreement.html
+    "seller_agreement_version": 20261023,   # change together with public/docs/sariko_seller_agreement.html
     "onboarding_min_id_validity_months": 6, # passport valid at least this long (NĐ 248/2026 Đ18.1.b)
     "founding_slots": 50,                   # also GET /sellers/founding/slots
     "founding_free_months": 4,
