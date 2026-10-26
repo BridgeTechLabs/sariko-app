@@ -263,7 +263,7 @@ def test_email_tc1_sent_to_support(mail):
     (msg,) = FakeSMTP.sent
     assert msg["From"] == "Sariko <support@sariko.store>" and msg["To"] == "support@sariko.store"
     assert msg["Reply-To"] == "mai@example.com"
-    assert msg["Subject"] == "[DEV] [Sariko] Khiếu nại mới KN000001 - Hư hỏng / không an toàn"
+    assert msg["Subject"] == "[TEST DEV] [Sariko] Khiếu nại mới KN000001 - Hư hỏng / không an toàn"
     body = msg.get_content()
     for line in ("Khiếu nại mới KN000001", "Người gửi: Người mua · Mai Buyer · mai@example.com · +84901234567",
                  "Kênh: Ứng dụng", "Loại: Hư hỏng / không an toàn", "Đơn: #A805E862 · Rosa Home Kitchen",

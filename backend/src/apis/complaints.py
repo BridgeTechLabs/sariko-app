@@ -98,7 +98,7 @@ def complaint_email(row: dict, order: dict, sender: dict) -> dict:
     created, so the email only points to the admin for them."""
     category = EMAIL_CATEGORY.get(row["category"], row["category"])
     env = os.getenv("ENV", "local")
-    prefix = "" if env == "prd" else f"[{env.upper()}] "
+    prefix = "" if env == "prd" else f"[TEST {env.upper()}] "
     who = " · ".join(x for x in (EMAIL_ROLE.get(row["sender_role"], row["sender_role"]), sender.get("name"),
                                   sender.get("email"), sender.get("phone")) if x)
     created = datetime.fromisoformat(row["created_at"]).astimezone(VN_TZ).strftime("%H:%M %d/%m/%Y")
