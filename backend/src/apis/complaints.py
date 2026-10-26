@@ -5,6 +5,8 @@ one request per photo (nginx caps a request at 10 MB)."""
 import base64
 import binascii
 import logging
+import os
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -12,10 +14,12 @@ from fastapi import APIRouter, Depends
 
 from apis.onboarding import _error, _sniff
 from core.auth import verify_token
+from core.store_hours import VN_TZ
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_complaints import ComplaintOpenExists, DAOComplaints
+from dao.dao_users import DAOUsers
 from schemas import Schema
-from services import push_service
+from services import email_service, push_service
 from utils.storage import compress_to_jpeg, signed_url, upload_private
 
 router = APIRouter(prefix="/complaints")
@@ -29,6 +33,11 @@ CATEGORIES = {
 MAX_LENGTH = 2000            # description length: an input format check, not a business parameter
 ENDED = ("done", "cancelled", "delivery_failed")
 SIGNED_URL_SECONDS = 600
+# Email to support (docs/dev/complaint-email Q5): Vietnamese labels as on the admin Complaints page
+EMAIL_CATEGORY = {"wrong_item": "Không đúng mô tả", "damaged": "Hư hỏng / không an toàn", "missing_item": "Thiếu món",
+                  "late": "Giao trễ / không giao", "buyer_issue": "Vấn đề với người mua",
+                  "delivery_issue": "Đơn vị giao hàng", "payment_issue": "Thanh toán / chi trả", "other": "Khác"}
+EMAIL_ROLE = {"buyer": "Người mua", "seller": "Quán"}
 SETTINGS_DEFAULTS = {"complaint_window_hours": 24, "complaint_max_images": 3, "onboarding_max_file_mb": 5,
                      "complaint_ack_hours": 24, "complaint_resolve_working_days": 7}
 
@@ -76,6 +85,52 @@ def complaints_for_order(order: dict, user_id: str, role: str) -> dict:
         return {"complaints": [], "can_complain": False}
 
 
+def email_support(row: dict, order: dict):
+    """New complaint → one plain-text email to support (COMPLAINT_EMAIL_TO), in the background: SMTP must never
+    slow down or break filing a complaint. Not configured → nothing."""
+    to = email_service.complaint_recipient()
+    if to:
+        threading.Thread(target=_send_complaint_email, args=(to, row, order), daemon=True).start()
+
+
+def complaint_email(row: dict, order: dict, sender: dict) -> dict:
+    """Subject, body and Reply-To of the support email (Q5). Photos are uploaded after the complaint is
+    created, so the email only points to the admin for them."""
+    category = EMAIL_CATEGORY.get(row["category"], row["category"])
+    env = os.getenv("ENV", "local")
+    prefix = "" if env == "prd" else f"[{env.upper()}] "
+    who = " · ".join(x for x in (EMAIL_ROLE.get(row["sender_role"], row["sender_role"]), sender.get("name"),
+                                  sender.get("email"), sender.get("phone")) if x)
+    created = datetime.fromisoformat(row["created_at"]).astimezone(VN_TZ).strftime("%H:%M %d/%m/%Y")
+    store = (order.get("seller_profiles") or {}).get("store_name") or ""
+    link = f"{(os.getenv('ADMIN_APP_URL') or 'https://admin.sariko.store').rstrip('/')}/complaints?open={row['id']}"
+    body = "\n".join([
+        f"Khiếu nại mới {row['code']}",
+        "",
+        f"Người gửi: {who}",
+        "Kênh: Ứng dụng",
+        f"Loại: {category}",
+        f"Đơn: #{order['id'][:8].upper()}" + (f" · {store}" if store else ""),
+        f"Thời điểm: {created} (giờ Việt Nam)",
+        "",
+        "Nội dung:",
+        row["description"],
+        "",
+        f"Mở trong admin: {link}",
+        "Ảnh (nếu có): xem trong admin.",
+    ])
+    return {"subject": f"{prefix}[Sariko] Khiếu nại mới {row['code']} - {category}", "body": body,
+            "reply_to": sender.get("email")}
+
+
+def _send_complaint_email(to: str, row: dict, order: dict):
+    try:
+        mail = complaint_email(row, order, DAOUsers().get_users(row["user_id"]) or {})
+        email_service.send(to, mail["subject"], mail["body"], mail["reply_to"])
+    except Exception as e:   # one line: error type + code, never the password or the complaint text
+        logger.error(f"[Complaint] {row.get('code')} email not sent: {type(e).__name__}")
+
+
 @router.get("/config")
 def get_config():
     s = _settings()
@@ -111,6 +166,7 @@ def create_complaint(body: Schema.RequestCreateComplaint, user=Depends(verify_to
     if role == "buyer":
         push_service.notify_seller_complaint((order.get("seller_profiles") or {}).get("user_id"), order["id"])
     push_service.notify_admins("admin_new_complaint", f"/complaints?open={row['id']}", code=row["code"], category=body.category)
+    email_support(row, order)
     logger.warning(f"[Complaint] {row['code']} order={order['id']} role={role} held={row['held_payout']}")
     return {"success": True, "complaint": {"id": row["id"], "code": row["code"], "status": row["status"]}}
 
