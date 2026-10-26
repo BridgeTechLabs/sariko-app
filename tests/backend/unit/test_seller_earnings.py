@@ -1,5 +1,5 @@
 """P1-1: seller earnings — per-order split and payout state, exact money (Decimal, int in
-JSON), expected payout day = Vietnam day the order became done + payout_delay_days."""
+JSON), expected payout day = the weekly payout day of the order (docs/dev/payout-auto Q1-Q2, Q6)."""
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from apis import sellers
 from core.auth import verify_token
-from core.payout_cycle import cycle_start, expected_payout_date
+from core.payout_cycle import expected_payout_date
 from dao.dao_admin_config import DAOAdminConfig
 
 
@@ -28,7 +28,7 @@ def earnings(monkeypatch):
         app.dependency_overrides[verify_token] = lambda: {"id": "user-1"}
         monkeypatch.setattr("apis.sellers.DAOSellerProfiles", lambda: type("P", (), {
             "read_seller_profile_by_user_id": lambda self, uid: {"id": "seller-1"} if seller_profile else None})())
-        values = {"seller_order_history_days": 30, "payout_delay_days": 3, **(settings or {})}
+        values = {"seller_order_history_days": 30, **(settings or {})}   # payout keys missing = defaults
         monkeypatch.setattr(DAOAdminConfig, "__init__", lambda self: None)
         monkeypatch.setattr(DAOAdminConfig, "get_setting", lambda self, key: values.get(key))
         asked = {}
@@ -105,21 +105,6 @@ def test_done_query_filters():  # TC-26: only done + paid orders of this seller 
         assert call in calls
 
 
-@pytest.mark.parametrize("delay, want", [(3, "2026-10-24"), (None, "2026-10-24"), (0, "2026-10-21")])
-def test_expected_payout_date(earnings, delay, want):  # TC-27
-    # 17:30 UTC on 20/10 is 00:30 on 21/10 in Vietnam; a missing setting means 3 days
-    res, _ = earnings(orders=[_order(1, status_changed_at="2026-10-20T17:30:00+00:00"),   # 00:30 VN on 21/10
-                              _order(2, payout_status="paid_out")], settings={"payout_delay_days": delay})
-    first, paid = res.json()["orders"]
-    assert first["expected_payout_date"] == want
-    assert paid["expected_payout_date"] is None
-
-
-def test_expected_day_uses_vietnam_date(earnings):  # TC-27: 23:30 VN stays on that VN day
-    res, _ = earnings(orders=[_order(1, status_changed_at="2026-10-20T16:30:00+00:00")])
-    assert res.json()["orders"][0]["expected_payout_date"] == "2026-10-23"
-
-
 def test_payouts(earnings):  # TC-28
     payouts = [
         {"id": "p2", "period_start": "2026-10-16", "period_end": "2026-10-16", "order_count": 2,
@@ -154,31 +139,75 @@ def test_money_rounds_half_up(earnings):  # TC-25: DB keeps 2 decimals; JSON rou
     assert body["payouts_limit"] == 12
 
 
-# payout-cycle §6 (TC-33, TC-34): start 28/10 (Wed), cycle 3, delay 2 → payout days 28/10, 31/10, …
+# payout-auto: weekly periods Mon 00:00 - Sun 23:59 (VN), paid on payout_weekday once the complaint window is over
+VN = timezone(timedelta(hours=7))
+
+
+def _vn(text):
+    return datetime.fromisoformat(text).replace(tzinfo=VN)
+
+
 @pytest.mark.parametrize("done, want", [
-    ("2026-10-26", "2026-10-28"),   # last day of the 28/10 period
-    ("2026-10-27", "2026-10-31"),   # first day of the next one
-    ("2026-10-23", "2026-10-25"),   # done + delay before the start date: day by day
-    ("2026-10-29", "2026-10-31"),   # last day of the 31/10 period
-    ("2026-10-30", "2026-11-03"),
+    ("2026-10-26 00:00", "2026-11-03"),   # Monday 00:00: first instant of the period
+    ("2026-11-01 23:59", "2026-11-03"),   # Sunday 23:59: same period, window ends Mon 23:59 < Tue 08:00
+    ("2026-11-02 00:00", "2026-11-10"),   # next Monday: next period
 ])
-def test_expected_payout_date_cycle(done, want):  # TC-34
-    assert expected_payout_date(date.fromisoformat(done), 2, 3, date(2026, 10, 28)) == date.fromisoformat(want)
+def test_tc1_one_week_tuesday(done, want):  # TC-1
+    assert expected_payout_date(_vn(done), 1, 2, 8, 24) == date.fromisoformat(want)
 
 
-@pytest.mark.parametrize("value, want", [(99991231, None), (20261028, date(2026, 10, 28)), (20261399, None)])
-def test_cycle_start(value, want):
-    assert cycle_start(value) == want
+@pytest.mark.parametrize("done, want", [
+    ("2026-10-26 00:00", "2026-11-10"),   # 2-week periods from Monday 26/10: 26/10 - 08/11, paid Tue 10/11
+    ("2026-11-08 23:59", "2026-11-10"),
+    ("2026-11-09 00:00", "2026-11-24"),   # 09/11 - 22/11
+    ("2026-10-25 12:00", "2026-10-27"),   # before the anchor: 12/10 - 25/10, paid Tue 27/10
+])
+def test_tc2_two_weeks(done, want):  # TC-2
+    assert expected_payout_date(_vn(done), 2, 2, 8, 24) == date.fromisoformat(want)
 
 
-def test_expected_date_cycle_from_settings(earnings):  # TC-34 through the endpoint (17:30 UTC 26/10 = 00:30 VN 27/10)
-    res, _ = earnings(orders=[_order(1, status_changed_at="2026-10-26T17:30:00+00:00")],
-                      settings={"payout_delay_days": 2, "payout_cycle_days": 3, "payout_cycle_start_date": 20261028})
-    assert res.json()["orders"][0]["expected_payout_date"] == "2026-10-31"
+@pytest.mark.parametrize("done, hour, want", [
+    ("2026-11-01 23:00", 8, "2026-11-09"),    # Monday payout 02/11 08:00 is before the window ends (02/11 23:00)
+    ("2026-11-01 07:00", 8, "2026-11-02"),    # window ends 02/11 07:00, before 08:00: paid 02/11
+    ("2026-11-01 08:30", 8, "2026-11-09"),    # ends 08:30, after the payout is made at 08:00
+])
+def test_tc3_window_moves_to_next_period(done, hour, want):  # TC-3
+    assert expected_payout_date(_vn(done), 1, 1, hour, 24) == date.fromisoformat(want)
 
 
-@pytest.mark.parametrize("settings", [{}, {"payout_cycle_days": 3, "payout_cycle_start_date": 99991231}])
-def test_expected_date_cycle_off(earnings, settings):  # TC-33: off (or keys missing) = done + delay as before
-    res, _ = earnings(orders=[_order(1, status_changed_at="2026-10-26T17:30:00+00:00")],
-                      settings={"payout_delay_days": 2, **settings})
-    assert res.json()["orders"][0]["expected_payout_date"] == "2026-10-29"
+@pytest.mark.parametrize("settings, want", [
+    ({}, "2026-11-03"),                                            # keys missing: 1 week, Tuesday, 08:00, 24 h
+    ({"payout_weekday": 1}, "2026-11-02"),                         # 00:30 VN 27/10 + 24 h < Mon 02/11 08:00
+    ({"payout_period_weeks": 2}, "2026-11-10"),
+    ({"payout_weekday": 9, "payout_period_weeks": 0}, "2026-11-03"),   # out of range: defaults
+])
+def test_tc9_endpoint(earnings, settings, want):  # TC-9: 17:30 UTC 26/10 = 00:30 VN 27/10
+    res, _ = earnings(orders=[_order(1, status_changed_at="2026-10-26T17:30:00+00:00"),
+                              _order(2, payout_status="paid_out"), _order(3, payout_hold=True)], settings=settings)
+    first, paid, held = res.json()["orders"]
+    assert first["expected_payout_date"] == want
+    assert paid["expected_payout_date"] is None and held["expected_payout_date"] is None
+    assert "payout_delay_days" not in res.json()
+
+
+def test_cancelled_payouts_hidden():  # payout-auto D2: a cancelled payout is not shown to the seller
+    from dao.dao_admin_payouts import DAOAdminPayouts
+    calls = []
+
+    class Q:
+        data = []
+
+        def __getattr__(self, name):
+            def record(*args, **kwargs):
+                calls.append((name, args))
+                return self
+            return record
+
+        def execute(self):
+            return self
+
+    dao = DAOAdminPayouts.__new__(DAOAdminPayouts)
+    dao._table_name = "admin_payouts"
+    dao._supabase_client = type("C", (), {"table": lambda self, t: Q()})()
+    dao.read_payouts_by_seller_id("seller-1", 12)
+    assert ("neq", ("status", "cancelled")) in calls and ("eq", ("seller_id", "seller-1")) in calls

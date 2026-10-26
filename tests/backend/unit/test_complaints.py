@@ -3,6 +3,9 @@ the SQL side (code, hold, status) is checked on DEV with docs/dev/complaints/tc_
 import base64
 import io
 from datetime import datetime, timedelta, timezone
+from email import message_from_bytes
+from email import policy as email_policy
+from email.header import decode_header, make_header
 
 import pytest
 from fastapi import FastAPI
@@ -231,7 +234,11 @@ class FakeSMTP:
         FakeSMTP.logins.append(user)
 
     def send_message(self, msg):
-        FakeSMTP.sent.append(msg)
+        # what a mail client reads: the wire bytes parsed back, subject decoded strictly (RFC 2047 drops
+        # whitespace between encoded words, the bug QA saw)
+        parsed = message_from_bytes(msg.as_bytes(), policy=email_policy.default)
+        parsed.strict_subject = str(make_header(decode_header(message_from_bytes(msg.as_bytes())["Subject"])))
+        FakeSMTP.sent.append(parsed)
 
 
 @pytest.fixture
@@ -263,7 +270,7 @@ def test_email_tc1_sent_to_support(mail):
     (msg,) = FakeSMTP.sent
     assert msg["From"] == "Sariko <support@sariko.store>" and msg["To"] == "support@sariko.store"
     assert msg["Reply-To"] == "mai@example.com"
-    assert msg["Subject"] == "[TEST DEV] [Sariko] Khiếu nại mới KN000001 - Hư hỏng / không an toàn"
+    assert msg.strict_subject == "[TEST DEV] [Sariko] Khiếu nại mới KN000001 - Hư hỏng / không an toàn"
     body = msg.get_content()
     for line in ("Khiếu nại mới KN000001", "Người gửi: Người mua · Mai Buyer · mai@example.com · +84901234567",
                  "Kênh: Ứng dụng", "Loại: Hư hỏng / không an toàn", "Đơn: #A805E862 · Rosa Home Kitchen",
@@ -275,7 +282,7 @@ def test_email_tc1_sent_to_support(mail):
 def test_email_prd_has_no_prefix(mail, monkeypatch):
     monkeypatch.setenv("ENV", "prd")
     file(mail)
-    assert FakeSMTP.sent[0]["Subject"].startswith("[Sariko] Khiếu nại mới")
+    assert FakeSMTP.sent[0].strict_subject == "[Sariko] Khiếu nại mới KN000001 - Hư hỏng / không an toàn"   # QA saw "Hưhỏng"
 
 
 @pytest.mark.parametrize("unset", ["SMTP_PASSWORD", "COMPLAINT_EMAIL_TO"])
