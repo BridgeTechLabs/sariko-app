@@ -48,6 +48,9 @@ export default {
             <div class="food-name">{{ item.name }}</div>
             <div class="food-price">{{ foodPriceDisplay(item) }}</div>
             <div v-if="item.unit_label && !hasVariants(item)" class="food-unit">/ {{ item.unit_label }}</div>
+            <div v-if="item.daily_portions" class="food-portions" :class="{ 'food-portions--out': item.remaining_today === 0 }">
+                {{ $t('seller_menu.portions_left_today', { left: item.remaining_today ?? item.daily_portions, total: item.daily_portions }) }}
+            </div>
         </div>
         <div class="food-actions">
             <button class="btn-edit" @click="showEditModal = true">
@@ -111,6 +114,13 @@ export default {
 .food-unit {
     font-size: 11px;
     color: var(--text-muted);
+}
+
+.food-portions {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    &--out { color: var(--color-error); }
 }
 
 .food-actions {

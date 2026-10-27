@@ -9,8 +9,8 @@ from dao.dao_cart_items import DAOCartItems
 from dao.dao_carts import DAOCarts
 from dao.dao_food_item_variants import DAOFoodItemVariants
 from dao.dao_food_items import DAOFoodItems
-from apis.orders import STORE_CLOSED_DETAIL, is_same_day
-from core.store_hours import is_open_now
+from apis.orders import STORE_CLOSED_DETAIL, is_same_day, portions_error
+from core.store_hours import VN_TZ, is_open_now
 from core.seller_status import with_buyer_status
 from schemas import Schema
 
@@ -77,6 +77,15 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This store is not taking orders yet")
     if gate and is_same_day(gate.get("preorder_day")) and not is_open_now(seller.get("is_open"), seller.get("opening_time"), seller.get("closing_time")):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=STORE_CLOSED_DETAIL)
+    # T134: today's portions of a same-day dish (a pre-order dish is checked for its delivery day at POST /orders)
+    if gate and gate.get("daily_portions") and is_same_day(gate.get("preorder_day")):
+        cart_now = DAOCartItems().read_cart_items_by_user_id(user_id=user_id) or {}
+        in_cart = sum(i["quantity"] for i in cart_now.get("cart_items") or []
+                      if (i.get("food_items") or {}).get("id") == request.food_item_id)
+        short = portions_error({request.food_item_id: in_cart + request.quantity}, {request.food_item_id: gate.get("name")},
+                               datetime.datetime.now(VN_TZ).date())
+        if short:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=short)
 
     dao_cart = DAOCarts()    
     cart = dao_cart.read_cart_by_user_id_seller_id(user_id=user_id)

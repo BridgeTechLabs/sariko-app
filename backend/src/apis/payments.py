@@ -272,8 +272,10 @@ def apply_vnpay_result(params: dict) -> JSONResponse:
     if response_code == "00" and transaction_status == "00":
         # Payment successful — update status
         try:
-            dao_orders.update_payment_status(order_id=order_id, payment_status="paid", transaction_ref=txn_ref)
+            # ipn_data first: a dish sold out meanwhile cancels the order inside update_payment_status, and
+            # its refund needs the IPN data (vnp_TransactionNo) the admin sends to VNPay.
             dao_orders.update_ipn_data(order_id=order_id, ipn_data=params)
+            dao_orders.update_payment_status(order_id=order_id, payment_status="paid", transaction_ref=txn_ref)
             DAOPayments().create_payment(
                 order_id=order_id,
                 method="vnpay",

@@ -6,9 +6,10 @@ import FoodCard from '@/components/seller/seller-page/FoodCard.vue'
 import MenuEmptyState from '@/components/seller/seller-page/MenuEmptyState.vue'
 import ModalCartConflict from '@/components/order-cart/ModalCartConflict.vue';
 import { foodPriceDisplay, hasVariants } from '@/utils/priceDisplay';
+import { portionsLeftToday } from '@/utils/portions';
 
 export default {
-    methods: { foodPriceDisplay, hasVariants },
+    methods: { foodPriceDisplay, hasVariants, portionsLeftToday },
     components: {
         FoodCard,
         MenuEmptyState,
@@ -45,6 +46,7 @@ export default {
                 :unit-label="food.unit_label || 'pcs'"
                 :preorder-day="food.preorder_day || 0"
                 :is-available="food.is_available !== false"
+                :portions-left="portionsLeftToday(food)"
                 :rating-avg="food.rating_avg"
                 :rating-count="food.rating_count || 0"
                 />

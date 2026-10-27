@@ -12,5 +12,6 @@ class RequestCreateFoodItem(BaseModel):
     quantity_step: Optional[int] = Field(default=1, ge=1)
     preorder_day: Optional[int] = Field(default=0, ge=0)
     is_available: Optional[bool] = True
+    daily_portions: Optional[int] = Field(default=None, gt=0)   # null = no daily limit
     is_featured: Optional[bool] = False
     image_url: Optional[str] = None

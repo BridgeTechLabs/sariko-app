@@ -75,6 +75,7 @@ export default {
                 unit_label: '',
                 min_quantity: 1,
                 preorder_day: 0,
+                daily_portions: null,   // empty = no daily limit
                 is_preorder: false,   // UI only: off = instant (preorder_day 0), on = preorder_day ≥ 1
                 is_available: true,
                 is_featured: false,
@@ -95,6 +96,7 @@ export default {
                     unit_label: this.item.unit_label || '',
                     min_quantity: this.item.min_quantity ?? 1,
                     preorder_day: this.item.preorder_day ?? 0,
+                    daily_portions: this.item.daily_portions ?? null,
                     is_preorder: (this.item.preorder_day ?? 0) > 0,
                     is_available: this.item.is_available ?? true,
                     is_featured: this.item.is_featured ?? false,
@@ -173,6 +175,7 @@ export default {
                     preorder_day: this.form.is_preorder ? Math.max(1, Number(this.form.preorder_day) || 1) : 0,
                     is_available: this.form.is_available,
                     is_featured: this.form.is_featured,
+                    daily_portions: this.form.daily_portions > 0 ? Math.floor(this.form.daily_portions) : null,
                 }
 
                 // Clear image explicitly if removed
@@ -334,6 +337,11 @@ export default {
                     <div class="field-group flex-1">
                         <div class="field-label">{{ $t('seller_menu.item_min_quantity') }}</div>
                         <q-input v-model.number="form.min_quantity" dense outlined dark type="number" :min="1" />
+                    </div>
+                    <div class="field-group flex-1">
+                        <div class="field-label">{{ $t('seller_menu.item_daily_portions') }}</div>
+                        <q-input v-model.number="form.daily_portions" dense outlined dark type="number" step="1" min="1" inputmode="numeric" @keydown="blockNonDigit"
+                            :placeholder="$t('seller_menu.item_daily_portions_placeholder')" />
                     </div>
                 </div>
 

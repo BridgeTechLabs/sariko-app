@@ -5,6 +5,7 @@ import { useSellerStore } from '@/stores/seller/sellerStore';
 import { useCartStore } from '@/stores/cart/cartStore';
 import { useAuthStore } from '@/stores/auth/authStore';
 import { formatVnd } from '@/utils/priceDisplay';
+import { portionsLeftToday } from '@/utils/portions';
 
 export default {
     components: { Minus, Plus, ShoppingBasket },
@@ -30,7 +31,10 @@ export default {
             return !!this.food && this.quantity > 1
         },
         soldOut() {
-            return this.food?.is_available === false
+            return this.food?.is_available === false || this.soldOutToday
+        },
+        soldOutToday() {
+            return portionsLeftToday(this.food) === 0
         },
         storeClosed() {
             return blockedByClosedStore(this.seller, this.food?.preorder_day)
@@ -157,7 +161,7 @@ export default {
         >
             <span v-if="loading" class="cta__spinner" aria-hidden="true"></span>
             <ShoppingBasket v-else :size="20" />
-            <span class="cta__label">{{ soldOut ? $t('food_detail_page.button_sold_out') : storeClosed ? $t('food_detail_page.button_store_closed') : $t('food_detail_page.button_add_to_cart') }}</span>
+            <span class="cta__label">{{ soldOutToday ? $t('seller_page.section_food_cards.label_sold_out_today') : soldOut ? $t('food_detail_page.button_sold_out') : storeClosed ? $t('food_detail_page.button_store_closed') : $t('food_detail_page.button_add_to_cart') }}</span>
         </button>
     </div>
 </template>
