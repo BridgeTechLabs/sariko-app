@@ -66,7 +66,6 @@ export const useCartStore = defineStore("cartStore", {
                             "variantName": _variant?.name || null,
                             "name": _cartItems[i]?.food_items?.name,
                             "price": _variant ? _variant.price : _cartItems[i]?.food_items?.price,
-                            "priceText": _variant ? _variant.price_text : _cartItems[i]?.food_items?.price_text,
                             "imgSrc": _cartItems[i]?.food_items?.image_url,
                             "category":  _cartItems[i]?.food_items?.menu_categories?.name,
                             "quantity": _cartItems[i]?.quantity,

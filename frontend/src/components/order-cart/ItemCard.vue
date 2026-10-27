@@ -16,10 +16,6 @@ export default {
             required: true,
             type: Number,
         },
-        itemPriceText: {
-            required: true,
-            type: String,
-        },
         itemCategory: {
             required: true,
             type: String,

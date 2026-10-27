@@ -55,7 +55,6 @@ export default {
                 :item-id="item.id"
                 :item-name="item.name"
                 :item-price="item.price"
-                :item-price-text="item.priceText"
                 :item-category="item.category"
                 :item-img-src="item.imgSrc || '/images/default-food-image.webp'"
                 :item-quantity="item.quantity"
