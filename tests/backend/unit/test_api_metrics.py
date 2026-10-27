@@ -92,7 +92,7 @@ def test_tc4_cleanup_cutoff(monkeypatch, setting, days):  # TC-4: rows older tha
         assert (now - timedelta(days=31)).isoformat() < cutoff < (now - timedelta(days=1)).isoformat()
 
 
-def test_dao_queries():  # the DAO writes / deletes on history_api_metrics only
+def test_dao_queries():  # the DAO writes / deletes on metrics_api only
     from dao.dao_api_metrics import DAOApiMetrics
     calls = []
 
@@ -104,7 +104,7 @@ def test_dao_queries():  # the DAO writes / deletes on history_api_metrics only
             return record
 
     dao = DAOApiMetrics.__new__(DAOApiMetrics)
-    dao._table_name = "history_api_metrics"
+    dao._table_name = "metrics_api"
     dao._supabase_client = type("C", (), {"table": lambda self, t: (calls.append(("table", (t,))), Q())[1]})()
     dao.delete_before("2026-09-27T03:00:00+00:00")
-    assert ("table", ("history_api_metrics",)) in calls and ("lt", ("bucket_start", "2026-09-27T03:00:00+00:00")) in calls
+    assert ("table", ("metrics_api",)) in calls and ("lt", ("bucket_start", "2026-09-27T03:00:00+00:00")) in calls
