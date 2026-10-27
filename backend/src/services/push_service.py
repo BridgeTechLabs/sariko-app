@@ -94,11 +94,11 @@ MESSAGES = {
     },
 }
 
-# The same admin events in the team's Zalo groups (T136): kind + Vietnamese text, {category} translated like above.
+# The same admin events in the team's Zalo groups (T136): kind + English text (Q4), {category} translated like above.
 ZALO_ADMIN = {
-    "admin_new_complaint": ("support", "📣 Khiếu nại mới {code} · {category}"),
-    "admin_order_expiring": ("ops", "⏰ Đơn #{code} chưa được quán nhận, còn {minutes} phút là tự huỷ. Hãy gọi quán."),
-    "admin_delivery_failed": ("ops", "🚚 Đơn #{code} giao thất bại: Lalamove không giao được."),
+    "admin_new_complaint": ("support", "📣 New complaint {code} · {category}"),
+    "admin_order_expiring": ("ops", "⏰ Order #{code} not accepted by the seller, auto-cancels in {minutes} min. Call the seller."),
+    "admin_delivery_failed": ("ops", "🚚 Order #{code}: delivery failed, Lalamove could not deliver it."),
 }
 
 # Complaint types (apis/complaints.py CATEGORIES), same words as the app's complaint form.
@@ -186,7 +186,7 @@ def notify_admins(event: str, url: str, **fields):
             kind, text = ZALO_ADMIN[event]
             f = {**fields, "code": str(fields.get("code", "")).upper()}
             if "category" in f:
-                f["category"] = COMPLAINT_CATEGORIES.get(f["category"], {}).get("vi", f["category"])
+                f["category"] = COMPLAINT_CATEGORIES.get(f["category"], {}).get("en", f["category"])
             zalo.send(kind, f"{text.format(**f)}\n{zalo.link(url)}")
     except Exception as e:
         logger.error(f"[Zalo] {event} message skipped: {type(e).__name__}")

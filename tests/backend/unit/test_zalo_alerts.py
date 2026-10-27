@@ -111,13 +111,13 @@ def test_tc3_new_order_message(http, paid):
     assert body["RspCode"] == "00" and order["payment_status"] == "paid"
     [msg] = http
     assert msg["chat_id"] == "c-orders"
-    assert msg["text"] == ("🛒 Đơn mới #ABC12345 · TEST Quán Adobo · 125.000 ₫ · Giao ngay\n"
+    assert msg["text"] == ("🛒 New order #ABC12345 · TEST Quán Adobo · 125.000 ₫ · Deliver now\n"
                            f"https://admin.sariko.store/orders?open={ORDER_ID}")
 
 
 def test_tc3_appointment_in_vietnam_time(http, paid):
     paid(appointment="2026-10-28T05:30:00+00:00")
-    assert "125.000 ₫ · Hẹn 28/10 12:30\n" in http[0]["text"]
+    assert "125.000 ₫ · Scheduled 28/10 12:30\n" in http[0]["text"]
 
 
 def test_tc3_switch_off_and_sold_out(http, paid):
@@ -142,10 +142,10 @@ def test_tc4_admin_events(http, monkeypatch):
     push_service.notify_admins("admin_delivery_failed", "/orders?open=o1", code="abc12345")
     push_service.notify_admins("admin_unknown", "/x")
     assert [(m["chat_id"], m["text"]) for m in http] == [
-        ("c-support", "📣 Khiếu nại mới KN-0001 · Thiếu món\nhttps://admin.sariko.store/complaints?open=c1"),
-        ("c-ops", "⏰ Đơn #ABC12345 chưa được quán nhận, còn 4 phút là tự huỷ. Hãy gọi quán.\n"
+        ("c-support", "📣 New complaint KN-0001 · Missing item\nhttps://admin.sariko.store/complaints?open=c1"),
+        ("c-ops", "⏰ Order #ABC12345 not accepted by the seller, auto-cancels in 4 min. Call the seller.\n"
                   "https://admin.sariko.store/orders?open=o1"),
-        ("c-ops", "🚚 Đơn #ABC12345 giao thất bại: Lalamove không giao được.\nhttps://admin.sariko.store/orders?open=o1"),
+        ("c-ops", "🚚 Order #ABC12345: delivery failed, Lalamove could not deliver it.\nhttps://admin.sariko.store/orders?open=o1"),
     ]
 
 
@@ -183,7 +183,7 @@ def test_tc5_refund_message(http, reason, label):
     assert _refund(_Refunds(), reason)["id"] == "r1"
     [msg] = http
     assert msg["chat_id"] == "c-support"
-    assert msg["text"] == f"💸 Hoàn tiền chờ xử lý · đơn #ABC12345 · 125.000 ₫ · {label}\nhttps://admin.sariko.store/refunds"
+    assert msg["text"] == f"💸 Refund to process · order #ABC12345 · 125.000 ₫ · {label}\nhttps://admin.sariko.store/refunds"
 
 
 def test_tc5_failed_insert_no_message(http):
@@ -194,4 +194,4 @@ def test_tc5_failed_insert_no_message(http):
 
 def test_tc5_ipn_int_amount(http):   # payments._refund_extra_payment passes an int
     _refund(_Refunds(), "duplicate_payment", amount=1250000)
-    assert "· 1.250.000 ₫ · Trả tiền 2 lần" in http[0]["text"]
+    assert "· 1.250.000 ₫ · Duplicate payment" in http[0]["text"]

@@ -19,10 +19,11 @@ CHATS = {"orders": "ZALO_CHAT_ORDERS", "support": "ZALO_CHAT_SUPPORT", "ops": "Z
 TIMEOUT_SECONDS = 10
 MAX_TEXT = 2000   # Bot API limit
 
+# Messages are in English (Q4: the team is multinational); same reason words as the admin Refunds page (en-PH).
 REFUND_REASONS = {
-    "buyer_cancel": "Người mua huỷ", "driver_booking_failed": "Không đặt được tài xế", "seller_cancel": "Quán huỷ",
-    "seller_timeout": "Quán không nhận đơn kịp", "admin_cancel": "Admin huỷ",
-    "late_payment": "Trả tiền sau khi đơn đã huỷ", "duplicate_payment": "Trả tiền 2 lần", "sold_out": "Hết suất",
+    "buyer_cancel": "Buyer cancelled", "driver_booking_failed": "Driver booking failed", "seller_cancel": "Seller cancelled",
+    "seller_timeout": "Seller did not confirm", "admin_cancel": "Admin cancelled", "late_payment": "Paid after cancel",
+    "duplicate_payment": "Duplicate payment", "sold_out": "Sold out",
 }
 
 def configured(kind: str) -> bool:
@@ -63,11 +64,11 @@ def vnd(amount) -> str:
 def new_order_text(order: dict) -> str:
     store = (order.get("seller_profiles") or {}).get("store_name") or ""
     when = order.get("delivery_appointment")
-    when = f"Hẹn {datetime.fromisoformat(when).astimezone(VN_TZ):%d/%m %H:%M}" if when else "Giao ngay"
+    when = f"Scheduled {datetime.fromisoformat(when).astimezone(VN_TZ):%d/%m %H:%M}" if when else "Deliver now"
     url = link(f"/orders?open={order['id']}")
-    return f"🛒 Đơn mới #{order['id'][:8].upper()} · {store} · {vnd(order['total_amount'])} · {when}\n{url}"
+    return f"🛒 New order #{order['id'][:8].upper()} · {store} · {vnd(order['total_amount'])} · {when}\n{url}"
 
 
 def refund_text(refund: dict) -> str:
-    return (f"💸 Hoàn tiền chờ xử lý · đơn #{refund['order_id'][:8].upper()} · {vnd(refund['amount'])} · "
+    return (f"💸 Refund to process · order #{refund['order_id'][:8].upper()} · {vnd(refund['amount'])} · "
             f"{REFUND_REASONS.get(refund['reason'], refund['reason'])}\n{link('/refunds')}")
