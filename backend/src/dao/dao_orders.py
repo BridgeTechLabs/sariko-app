@@ -6,9 +6,10 @@ from typing import Optional
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
 from core.sariko_cache import cache
+from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_base import DAOBase
 from dao.dao_refunds import DAORefunds
-from services import push_service
+from services import push_service, zalo
 
 logger = logging.getLogger(__name__)
 
@@ -326,7 +327,7 @@ class DAOOrders(DAOBase):
         """Read order by ID without user scoping (for IPN server-to-server)."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_user_id, payment_status, status, total_amount, transaction_ref") \
+                .select("id, seller_user_id, payment_status, status, total_amount, transaction_ref, delivery_appointment, seller_profiles(store_name)") \
                 .eq("id", order_id) \
                 .maybe_single() \
                 .execute()
@@ -392,8 +393,11 @@ class DAOOrders(DAOBase):
                     order = self.read_order_by_id_raw(order_id)
                     if order:
                         push_service.notify_new_order(order)
+                        # T136: the team's Zalo group; zalo_new_order_alerts 0 turns it off when orders get many
+                        if zalo.configured("orders") and DAOAdminConfig().get_int_in_range("zalo_new_order_alerts", 1, 0, 1):
+                            zalo.send("orders", zalo.new_order_text(order))
                 except Exception as e:
-                    logger.warning(f"new-order push skipped for order {order_id}: {e}")
+                    logger.warning(f"new-order push / Zalo skipped for order {order_id}: {e}")
             return True
 
         except PostgrestExceptionAPIError as e:

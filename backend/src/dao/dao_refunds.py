@@ -5,6 +5,7 @@ from typing import Optional
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
 from dao.dao_base import DAOBase
+from services import zalo
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,13 @@ class DAORefunds(DAOBase):
                 .insert(data) \
                 .execute()
 
-            return result.data[0] if result and result.data else None
+            refund = result.data[0] if result and result.data else None
+            try:   # every reason passes here, the IPN's late / duplicate payments too (T136); never fails the insert
+                if refund:
+                    zalo.send("support", zalo.refund_text(refund))
+            except Exception as e:
+                logger.error(f"[Zalo] refund message for order {order_id} skipped: {type(e).__name__}")
+            return refund
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - create_refund: {e}")

@@ -7,6 +7,7 @@ from pywebpush import webpush, WebPushException
 
 from dao.dao_push_subscriptions import DAOPushSubscriptions
 from dao.dao_users import DAOUsers
+from services import zalo
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,13 @@ MESSAGES = {
     },
 }
 
+# The same admin events in the team's Zalo groups (T136): kind + Vietnamese text, {category} translated like above.
+ZALO_ADMIN = {
+    "admin_new_complaint": ("support", "📣 Khiếu nại mới {code} · {category}"),
+    "admin_order_expiring": ("ops", "⏰ Đơn #{code} chưa được quán nhận, còn {minutes} phút là tự huỷ. Hãy gọi quán."),
+    "admin_delivery_failed": ("ops", "🚚 Đơn #{code} giao thất bại: Lalamove không giao được."),
+}
+
 # Complaint types (apis/complaints.py CATEGORIES), same words as the app's complaint form.
 COMPLAINT_CATEGORIES = {
     "wrong_item": {"en": "Not as described", "vi": "Không đúng mô tả"},
@@ -171,7 +179,17 @@ def notify_seller_complaint(seller_user_id, order_id: str):
 
 
 def notify_admins(event: str, url: str, **fields):
-    """Admin panel: every admin-app subscription gets it (no admin roles). url is an admin-panel path."""
+    """Admin panel: every admin-app subscription gets it (no admin roles), and the team's Zalo group.
+    url is an admin-panel path."""
+    try:
+        if event in ZALO_ADMIN:
+            kind, text = ZALO_ADMIN[event]
+            f = {**fields, "code": str(fields.get("code", "")).upper()}
+            if "category" in f:
+                f["category"] = COMPLAINT_CATEGORIES.get(f["category"], {}).get("vi", f["category"])
+            zalo.send(kind, f"{text.format(**f)}\n{zalo.link(url)}")
+    except Exception as e:
+        logger.error(f"[Zalo] {event} message skipped: {type(e).__name__}")
     if not VAPID_PRIVATE_KEY:
         return
     threading.Thread(target=_send_admins, args=(event, url, fields), daemon=True).start()
