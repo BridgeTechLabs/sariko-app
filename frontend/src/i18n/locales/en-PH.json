@@ -25,6 +25,7 @@
         "duplicate_order": "An order was just placed. Please wait a moment.",
         "store_closed": "This store is closed now. Same-day dishes can't be ordered; pre-order dishes still can.",
         "dish_sold_out": "This dish is sold out.",
+        "portions_left": "Only {remaining} left of {name}.",
         "option_sold_out": "This price option is sold out.",
         "choose_option": "Please choose a price option.",
         "another_seller": "Your cart has dishes from another store.",
@@ -201,7 +202,7 @@
         },
         "section_banner": {
             "banner_text_line_1": "BECOME A FOUNDING SELLER",
-            "banner_text_line_2": "4 months FREE, then 750,000₫/mo",
+            "banner_text_line_2": "4 months FREE, then 750.000 ₫/mo",
             "banner_text_line_3": "50 founding slots · 17% commission"
         },
         "section_zen_promo": {
@@ -235,11 +236,13 @@
             "banner_card_status_text_close": "Closed"
         },
         "section_banner_featured": {
-            "banner_text_line_1": "4 months FREE · then 750,000₫/mo",
+            "banner_text_line_1": "4 months FREE · then 750.000 ₫/mo",
             "banner_text_line_2": "· 17% commission · Founding Seller"
         },
         "section_food_cards": {
             "label_sold_out": "Sold out",
+            "label_sold_out_today": "Sold out today",
+            "label_portions_left": "{n} left",
             "label_item_instant": "Same-day",
             "lable_item_pre_order": "Pre-order",
             "lable_item_pre_order_unit_day": "days"
@@ -440,6 +443,7 @@
         "cancelled_reason": "Reason",
         "reason_seller_timeout": "The seller didn't confirm your order in time",
         "reason_seller_late": "Seller was late",
+        "reason_sold_out": "A dish sold out while you were paying",
         "late_cancel_hint": "Expected by {time}. After that you can cancel for a full refund.",
         "cancel_until_hint": "You can cancel this order until {time}.",
         "btn_late_cancel": "Order is late: Cancel and refund",
@@ -815,6 +819,9 @@
         "item_unit_label": "Unit",
         "item_unit_label_placeholder": "E.g. serving",
         "item_min_quantity": "Min Qty",
+        "item_daily_portions": "Portions per day",
+        "item_daily_portions_placeholder": "Empty = no limit",
+        "portions_left_today": "Left today: {left} / {total}",
         "item_preorder": "Pre-order",
         "item_preorder_day": "Preorder (days)",
         "item_available": "On sale",

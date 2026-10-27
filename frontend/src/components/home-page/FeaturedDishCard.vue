@@ -92,7 +92,7 @@ export default {
             <div class="food-name">{{ name }}</div>
             <div class="seller-name">{{ sellerName }}</div>
             <div class="price-row">
-                <div class="food-price">₫{{ price }}</div>
+                <div class="food-price">{{ price }}</div>
                 <q-btn flat dense no-caps :loading="loading" @click="handleAddToCart">
                     <q-icon name="fa-solid fa-circle-plus" style="color: #f5A623" />
                     <template #loading>

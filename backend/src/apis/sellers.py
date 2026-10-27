@@ -514,13 +514,17 @@ def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depe
     try:
         seller_id = _get_seller_id(user)
         fields = body.model_dump(exclude_none=True)
+        if "daily_portions" in body.model_fields_set:   # null clears the daily limit
+            fields["daily_portions"] = body.daily_portions
         if not fields:
             raise HTTPException(status_code=400, detail="No fields to update")
         if "price" in fields:
             fields["price_text"] = _make_price_text(fields["price"])
-        item = DAOFoodItems().update(item_id, seller_id, fields)
+        dao = DAOFoodItems()
+        item = dao.update(item_id, seller_id, fields)
         if not item:
             raise HTTPException(status_code=404, detail="Item not found")
+        dao.add_remaining_today([item])
         return {"success": True, "item": item}
     except HTTPException:
         raise

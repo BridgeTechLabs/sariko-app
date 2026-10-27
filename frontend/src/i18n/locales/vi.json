@@ -25,6 +25,7 @@
         "duplicate_order": "Đơn hàng vừa được tạo. Vui lòng chờ một chút.",
         "store_closed": "Quán đang đóng cửa. Món trong ngày không đặt được; món đặt trước vẫn đặt được.",
         "dish_sold_out": "Món này đã hết.",
+        "portions_left": "{name} chỉ còn {remaining} suất.",
         "option_sold_out": "Lựa chọn này đã hết.",
         "choose_option": "Vui lòng chọn một mức giá.",
         "another_seller": "Giỏ hàng đang có món của quán khác.",
@@ -201,7 +202,7 @@
         },
         "section_banner": {
             "banner_text_line_1": "TRỞ THÀNH NGƯỜI BÁN SÁNG LẬP",
-            "banner_text_line_2": "MIỄN PHÍ 4 tháng, sau đó 750.000₫/tháng",
+            "banner_text_line_2": "MIỄN PHÍ 4 tháng, sau đó 750.000 ₫/tháng",
             "banner_text_line_3": "50 suất · Hoa hồng 17%"
         },
         "section_zen_promo": {
@@ -235,11 +236,13 @@
             "banner_card_status_text_close": "Đóng"
         },
         "section_banner_featured": {
-            "banner_text_line_1": "MIỄN PHÍ 4 tháng · sau đó 750.000₫/tháng",
+            "banner_text_line_1": "MIỄN PHÍ 4 tháng · sau đó 750.000 ₫/tháng",
             "banner_text_line_2": "· Hoa hồng 17% · Người bán sáng lập"
         },
         "section_food_cards": {
             "label_sold_out": "Bán hết",
+            "label_sold_out_today": "Bán hết hôm nay",
+            "label_portions_left": "Còn {n} suất",
             "label_item_instant": "Giao ngay",
             "lable_item_pre_order": "Cần đặt trước",
             "lable_item_pre_order_unit_day": "ngày"
@@ -440,6 +443,7 @@
         "cancelled_reason": "Lý do",
         "reason_seller_timeout": "Người bán không xác nhận đơn kịp thời",
         "reason_seller_late": "Người bán trễ hạn",
+        "reason_sold_out": "Món đã hết suất trong lúc bạn thanh toán",
         "late_cancel_hint": "Dự kiến trước {time}. Quá giờ này bạn có thể hủy và được hoàn tiền.",
         "cancel_until_hint": "Bạn có thể hủy đơn này trước {time}.",
         "btn_late_cancel": "Đơn đang chậm: Hủy và hoàn tiền",
@@ -818,6 +822,9 @@
         "item_unit_label": "Đơn vị",
         "item_unit_label_placeholder": "VD: phần",
         "item_min_quantity": "SL tối thiểu",
+        "item_daily_portions": "Số suất mỗi ngày",
+        "item_daily_portions_placeholder": "Để trống = không giới hạn",
+        "portions_left_today": "Hôm nay còn {left} / {total}",
         "item_preorder": "Đặt trước",
         "item_preorder_day": "Đặt trước (ngày)",
         "item_available": "Đang bán",

@@ -12,5 +12,6 @@ class RequestUpdateFoodItem(BaseModel):
     quantity_step: Optional[int] = Field(default=None, ge=1)
     preorder_day: Optional[int] = Field(default=None, ge=0)
     is_available: Optional[bool] = None
+    daily_portions: Optional[int] = Field(default=None, gt=0)   # null = no daily limit
     is_featured: Optional[bool] = None
     image_url: Optional[str] = None

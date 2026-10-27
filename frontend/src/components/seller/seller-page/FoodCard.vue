@@ -48,6 +48,11 @@ export default {
         ratingCount: {
             type: Number,
             default: 0
+        },
+        // Portions left today (utils/portions.js); null = not shown. 0 = sold out today, not tappable
+        portionsLeft: {
+            type: Number,
+            default: null
         }
     },
 
@@ -70,12 +75,15 @@ export default {
         },
         hasRating() {
             return this.ratingCount > 0 && this.ratingAvg != null
+        },
+        canOrder() {
+            return this.isAvailable && this.portionsLeft !== 0
         }
     },
 
     methods: {
         goToDetail() {
-            if (!this.isAvailable) return
+            if (!this.canOrder) return
             if (this.seller?.slug) {
                 this.$router.push(`/food/${this.seller.slug}/${this.itemId}`)
             }
@@ -83,7 +91,7 @@ export default {
 
         async handleAddToCart(e) {
             e.stopPropagation()
-            if (!this.isAvailable) return
+            if (!this.canOrder) return
             // No single price to add — the level is picked on the detail page.
             if (this.hasVariants) return this.goToDetail()
             const authStore = useAuthStore()
@@ -111,7 +119,7 @@ export default {
 </script>
 
 <template>
-    <div class="food-row" :class="{ 'sold-out': !isAvailable }" @click="goToDetail">
+    <div class="food-row" :class="{ 'sold-out': !canOrder }" @click="goToDetail">
 
         <div class="thumb-wrap">
             <img
@@ -120,7 +128,7 @@ export default {
             class="food-thumb"
             @error="$event.target.src = '/images/default-food-image.webp'"
             />
-            <div v-if="!isAvailable" class="sold-out-label">{{ $t('seller_page.section_food_cards.label_sold_out') }}</div>
+            <div v-if="!canOrder" class="sold-out-label">{{ isAvailable ? $t('seller_page.section_food_cards.label_sold_out_today') : $t('seller_page.section_food_cards.label_sold_out') }}</div>
         </div>
 
         <div class="food-info">
@@ -140,6 +148,9 @@ export default {
                 <q-badge v-else class="preorder-badge" color="positive">
                     {{ $t('seller_page.section_food_cards.label_item_instant') }}
                 </q-badge>
+                <q-badge v-if="portionsLeft > 0" class="preorder-badge" color="grey-8">
+                    {{ $t('seller_page.section_food_cards.label_portions_left', { n: portionsLeft }) }}
+                </q-badge>
             </div>
 
             <div class="price-row">
@@ -147,7 +158,7 @@ export default {
                     <div class="food-price">{{ price }}</div>
                     <div v-if="unitLabel" class="unit-label">/ {{ unitLabel }}</div>
                 </div>
-                <q-btn flat dense no-caps :loading="loading" :disable="storeClosed || !isAvailable" @click="handleAddToCart">
+                <q-btn flat dense no-caps :loading="loading" :disable="storeClosed || !canOrder" @click="handleAddToCart">
                     <q-icon name="fa-solid fa-circle-plus" size="26px" style="color: #f5A623" />
                     <template #loading>
                         <q-spinner-dots color="orange" size="20px" />

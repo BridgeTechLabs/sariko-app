@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import apiCarts from "@/apis/cart/apiCart";
 import { Notify } from "quasar";
 import { i18n } from "@/plugins/i18n";
+import { apiErrorMessage } from "@/lib/axiosPolicy.js";
 
 export const useCartStore = defineStore("cartStore", {
     state() {
@@ -65,7 +66,6 @@ export const useCartStore = defineStore("cartStore", {
                             "variantName": _variant?.name || null,
                             "name": _cartItems[i]?.food_items?.name,
                             "price": _variant ? _variant.price : _cartItems[i]?.food_items?.price,
-                            "priceText": _variant ? _variant.price_text : _cartItems[i]?.food_items?.price_text,
                             "imgSrc": _cartItems[i]?.food_items?.image_url,
                             "category":  _cartItems[i]?.food_items?.menu_categories?.name,
                             "quantity": _cartItems[i]?.quantity,
@@ -94,6 +94,8 @@ export const useCartStore = defineStore("cartStore", {
                     this.pendingVariantId = variantId
                     this.pendingSellerName = newSellerName
                     this.showConflictModal(e.currentSellerName || '', newSellerName || '')
+                } else if (e.detail?.code === 'portions_left') {
+                    Notify.create({ classes: 'quasar-notify-negative', message: apiErrorMessage({ detail: e.detail }), position: 'bottom', timeout: 3000 })
                 } else if (e.message.includes('sold out')) {
                     Notify.create({ classes: 'quasar-notify-negative', message: i18n.global.t('cart_page.dish_sold_out'), position: 'bottom', timeout: 3000 })
                 } else if (e.message.includes('store is closed')) {

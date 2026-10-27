@@ -15,6 +15,7 @@ from core.store_hours import VN_TZ
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_carts import DAOCarts
 from dao.dao_cart_items import DAOCartItems
+from dao.dao_food_items import DAOFoodItems
 from dao.dao_orders import DAOOrders
 from dao.dao_order_items import DAOOrderItems
 from dao.dao_seller_profiles import DAOSellerProfiles
@@ -43,6 +44,20 @@ def unavailable_names(cart_items: list) -> list:
         elif variant and variant.get("is_available") is False:
             names.append(f"{food.get('name')} ({variant.get('name')})")
     return names
+
+
+def portions_error(wanted: dict, names: dict, sale_date):
+    """T134 Q4: the 409 detail for the first dish asked beyond its portions left on sale_date (Vietnam day),
+    wanted = {food_item_id: quantity} of dishes with a daily limit. Only tells the buyer early: the portions
+    are taken when the money comes in (reserve_order_portions)."""
+    if not wanted:
+        return None
+    left = DAOFoodItems().read_portions_left(list(wanted), sale_date)
+    for food_id, qty in wanted.items():
+        if food_id in left and qty > left[food_id]:
+            return {"code": "portions_left", "message": f"Only {left[food_id]} portion(s) left: {names[food_id]}",
+                    "name": names[food_id], "remaining": left[food_id]}
+    return None
 
 
 # Shared with POST /cart/add. A closed store still takes pre-orders (delivered on a later
@@ -121,6 +136,17 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
             detail={"code": "no_longer_available", "message": f"No longer available: {', '.join(sold_out)}",
                     "names": ", ".join(sold_out)},
         )
+
+    wanted, names = {}, {}
+    for item in cart_items:
+        food = item.get("food_items") or {}
+        if food.get("daily_portions"):
+            wanted[food["id"]] = wanted.get(food["id"], 0) + item["quantity"]
+            names[food["id"]] = food.get("name")
+    sale_date = (appointment or datetime.now(timezone.utc)).astimezone(VN_TZ).date()
+    short = portions_error(wanted, names, sale_date)
+    if short:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=short)
 
     # 3. Get seller user_id + effective commission rate in one query
     dao_seller_profile = DAOSellerProfiles()

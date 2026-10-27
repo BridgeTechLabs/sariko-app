@@ -20,6 +20,7 @@ from apis import (
     address, moit, search, chat, reviews,
     user_addresses, onboarding, seller_profile_completion, complaints, launch
 )
+from services import api_metrics
 
 log_level = logging.WARNING
 formatter = logging.Formatter(
@@ -107,6 +108,10 @@ async def catch_unhandled_exceptions(request: Request, call_next):
             status_code=500,
             content={"detail": "Internal server error"}
         )
+
+# T135: time every request (services/api_metrics). Added after the catch-all, so it wraps it and sees its 500s;
+# CORS, added next, stays the outermost.
+app.middleware("http")(api_metrics.middleware)
 
 app.add_middleware(
     CORSMiddleware,
