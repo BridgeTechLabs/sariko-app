@@ -148,7 +148,7 @@
             },
             "signup": {
                 "greeting_text_signup": "Tham gia Sariko! 🇵🇭",
-                "greeting_subtext_signup": "Mua hoặc bán đồ ăn Filipino tại TPHCM",
+                "greeting_subtext_signup": "Tạo tài khoản người mua để đặt đồ ăn Filipino tại TPHCM",
                 "title_text_role_buyer": "Mua",
                 "title_subtext_role_buyer": "Tìm đồ ăn Filipino",
                 "title_text_role_seller": "Bán",
