@@ -4,11 +4,11 @@ from dao.dao_base import DAOBase
 
 
 class DAOApiMetrics(DAOBase):
-    """history_api_metrics (docs/dev/monitoring Q1): written by services/api_metrics, read by the admin."""
+    """metrics_api (docs/dev/monitoring Q1): written by services/api_metrics, read by the admin."""
 
     def __init__(self):
         super().__init__()
-        self._table_name = "history_api_metrics"
+        self._table_name = "metrics_api"
 
     def insert_many(self, rows: list) -> None:
         try:

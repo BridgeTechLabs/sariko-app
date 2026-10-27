@@ -1,6 +1,6 @@
 """T135 (docs/dev/monitoring Q1): how long each API takes. A middleware times every request (except /health) and
 counts it in memory per (method, route pattern, status class); every FLUSH_SECONDS a background loop writes one row
-per group to history_api_metrics (count, p50 / p95 / max in whole ms) and starts counting again. A failed write is
+per group to metrics_api (count, p50 / p95 / max in whole ms) and starts counting again. A failed write is
 logged and that batch dropped: requests never wait on it. No IP, user or query string is kept. Once a day rows older
 than api_metrics_retention_days are deleted."""
 import asyncio
