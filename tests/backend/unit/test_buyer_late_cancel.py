@@ -271,3 +271,38 @@ def test_pending_cancel_unchanged():
     assert buyer_cancel()["success"]
     assert FakeOrders.row["cancellation_reason"] is None
     assert refunds == [("o1", "buyer_cancel", 125000)]
+
+
+# T129: GET /orders/{id} gives the last moment a pending scheduled order may be cancelled, from the same
+# cancel_before() the cancel API checks, so the app shows "Cancel" only while it is allowed.
+def order_detail(monkeypatch):
+    monkeypatch.setattr(orders, "complaints_for_order", lambda o, uid, role: {})
+    return orders.get_order_detail("o1", user={"id": "buyer"})["order"]
+
+
+def test_t129_scheduled_more_than_24h_ahead_gives_the_cutoff(monkeypatch):
+    appointment = datetime.now(timezone.utc) + timedelta(hours=30)
+    order("pending", delivery_appointment=appointment.isoformat())
+    assert datetime.fromisoformat(order_detail(monkeypatch)["cancel_before"]) == appointment - timedelta(hours=24)
+    assert buyer_cancel()["success"]
+
+
+def test_t129_scheduled_less_than_24h_ahead_cutoff_passed(monkeypatch):
+    order("pending", delivery_appointment=(datetime.now(timezone.utc) + timedelta(hours=10)).isoformat())
+    last = datetime.fromisoformat(order_detail(monkeypatch)["cancel_before"])
+    assert last < datetime.now(timezone.utc)            # the app hides Cancel
+    assert assert_refused() == "pending"                # and the API agrees
+
+
+def test_t129_cutoff_follows_admin_settings(monkeypatch):
+    FakeSettings.rows = {"buyer_cancel_before_appointment_minutes": 120}
+    appointment = datetime.now(timezone.utc) + timedelta(hours=3)
+    order("pending", delivery_appointment=appointment.isoformat())
+    assert datetime.fromisoformat(order_detail(monkeypatch)["cancel_before"]) == appointment - timedelta(hours=2)
+
+
+def test_t129_no_cutoff_for_asap_or_accepted_orders(monkeypatch):
+    order("pending")                                     # deliver now: cancel any time before acceptance
+    assert order_detail(monkeypatch)["cancel_before"] is None
+    order("confirmed", delivery_appointment=(datetime.now(timezone.utc) + timedelta(hours=30)).isoformat())
+    assert order_detail(monkeypatch)["cancel_before"] is None

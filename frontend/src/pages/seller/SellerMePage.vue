@@ -42,7 +42,7 @@ export default {
         </template>
 
         <template #Reviews>
-            <SellerMeReviews />
+            <SellerMeReviews :preview="3" />
         </template>
 
         <template #SignOut>

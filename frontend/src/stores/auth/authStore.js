@@ -6,6 +6,13 @@ import apiAuth from "@/apis/auth/apiAuth";
 import apiUsers from "@/apis/users/apiUsers";
 import { useCartStore } from "@/stores/cart/cartStore";
 import { useOrderStore } from "@/stores/order/orderStore";
+import { useChatStore } from "@/stores/chat/chatStore";
+import { useDeliveryStore } from "@/stores/delivery/deliveryStore";
+import { useDashboardStore } from "@/stores/seller/dashboardStore";
+import { useMenuStore } from "@/stores/seller/menuStore";
+import { useProfileCompletionStore } from "@/stores/seller/profileCompletionStore";
+import { useReviewStore } from "@/stores/review/reviewStore";
+import { useComplaintStore } from "@/stores/complaint/complaintStore";
 import { i18n } from "@/plugins/i18n";
 import { disablePush } from "@/composables/pushNotifications";
 
@@ -15,6 +22,23 @@ const ROLE_KEY = 'sariko.role';
 const ROLE_USER_KEY = 'sariko.roleUserId';
 
 let _redirectingToSignIn = false;
+
+// Sign-out is a route change, not a reload: drop every store that holds the old account's data.
+// Stores with a poller / channel have their own reset() that stops it first; orderStore keeps its
+// poller handles (a $reset() would drop them while the intervals keep running), so only its data goes.
+function resetAccountStores() {
+    useCartStore().$reset();
+    const orderStore = useOrderStore();
+    orderStore.orders = [];
+    orderStore.currentOrder = null;
+    useChatStore().reset();
+    useDeliveryStore().reset();
+    useDashboardStore().reset();
+    useMenuStore().$reset();
+    useProfileCompletionStore().$reset();
+    useReviewStore().$reset();
+    useComplaintStore().$reset();
+}
 
 // The axios interceptor reads the token via supabase.auth.getSession() (storage),
 // so wait until the new session is persisted before anything calls the API.
@@ -61,6 +85,9 @@ function applyLocale(preferredLanguage) {
     localStorage.setItem('lang', locale);
 }
 
+// What a buyer still needs before checkout: the cart blocks Place order on these, the home banner lists them.
+export const BUYER_MISSING_ROUTES = { phone: '/account/profile', address: '/account/address' };
+
 export const useAuthStore = defineStore("authStore", {
     state() {
         return {
@@ -97,11 +124,17 @@ export const useAuthStore = defineStore("authStore", {
             user: null,
             isLoading: false,
             sellerId: null,
+            buyerInfoLoaded: false,  // profile + address fetched for this session (no banner flash while loading)
 
             // auth subscription
             _authSub: null,
             isPasswordRecovery: false,
         }
+    },
+
+    getters: {
+        buyerMissing: (state) => Object.keys(BUYER_MISSING_ROUTES).filter((k) =>
+            k === 'phone' ? !state.user?.phone : !state.inputAddress),
     },
 
     actions: {
@@ -173,6 +206,7 @@ export const useAuthStore = defineStore("authStore", {
                     } catch (e) {
                         console.error(`authStore - bootstrap - address fetch failed: ${e}`);
                     }
+                    this.buyerInfoLoaded = true;
 
                     try {
                         const cartStore = useCartStore();
@@ -289,6 +323,7 @@ export const useAuthStore = defineStore("authStore", {
                 // Setting user triggers App.vue to load conversations — token must be stored first
                 const session = await waitForStoredSession(res.session.access_token);
                 this._setFromSession(session);
+                this.buyerInfoLoaded = false;
 
                 try {
                     const profile = await apiUsers.getProfile()
@@ -318,6 +353,7 @@ export const useAuthStore = defineStore("authStore", {
                 } catch (e) {
                     console.error(`authStore - onClickedSignin - address fetch failed: ${e}`);
                 }
+                this.buyerInfoLoaded = true;
 
                 try {
                     const cartStore = useCartStore();
@@ -412,10 +448,12 @@ export const useAuthStore = defineStore("authStore", {
                 // Shared phone: stop this device getting the old account's order pushes
                 await disablePush().catch((error) => console.warn(`authStore - disablePush - ${error}`));
                 await apiAuth.authSignout();
-                this.session = null;
-                this.user = null;
+                // Sign-out is a route change, not a reload: drop the old account's address, phone, flags
+                const sub = this._authSub;
+                this.$reset();
+                this._authSub = sub;
                 clearStoredRole();
-                useCartStore().$reset();
+                resetAccountStores();
                 Notify.create({
                     classes: 'quasar-notify-positive',
                     message: i18n.global.t("common.toast_signed_out"),
@@ -438,10 +476,11 @@ export const useAuthStore = defineStore("authStore", {
             } catch (error) {
                 console.error(`authStore - signOutRedirectSignIn - ${error}`);
             }
-            this.session = null;
-            this.user = null;
+            const sub = this._authSub;
+            this.$reset();
+            this._authSub = sub;
             clearStoredRole();
-            useCartStore().$reset();
+            resetAccountStores();
             Notify.create({
                 classes: 'quasar-notify-negative',
                 message: i18n.global.t("common.toast_session_expired"),

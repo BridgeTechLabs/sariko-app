@@ -11,6 +11,10 @@ import { apiClient } from '@/lib/axiosPolicy.js';
 export default {
     components: { MapPin, LocateFixed, Search, X },
 
+    // embedded: inside another page (seller profile form): emit "saved" instead of leaving.
+    props: { embedded: { type: Boolean, default: false } },
+    emits: ['saved'],
+
     data() {
         return {
             query: '',
@@ -201,7 +205,8 @@ export default {
                     position: 'bottom',
                     timeout: 1500,
                 })
-                this.$router.push('/account')
+                if (this.embedded) this.$emit('saved')
+                else this.$router.push('/account')
             } catch (e) {
                 this.$q.notify({
                     classes: 'quasar-notify-negative',

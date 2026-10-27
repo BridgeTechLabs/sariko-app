@@ -22,9 +22,12 @@ from urllib.parse import urlparse
 import requests
 from fastapi import APIRouter, Header, HTTPException, Request
 
+from core.client_ip import client_ip
 from core.phone import to_e164_vn
+from core.seller_kyc import age, bank_holder_matches, id_error, same_name, valid_bank_account
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_onboarding import DAOOnboarding
+from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
 from utils.storage import compress_to_jpeg, remove_private, upload_private
 
@@ -34,7 +37,6 @@ logger = logging.getLogger(__name__)
 TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 BUCKET = "onboarding-files"
 TIERS = ("community", "tindahan", "negosyo", "enterprise")
-ID_TYPES = ("passport", "cccd")
 FILE_KINDS = ("id_document", "residence_card", "food_safety", "business_registration", "dish_photo")
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
@@ -49,9 +51,11 @@ SETTINGS_DEFAULTS = {
     "onboarding_max_preorder_days": 14,
     "onboarding_min_age": 18,               # đề án III.1
     "onboarding_review_days": 2,
-    "seller_agreement_version": 20261018,   # change together with public/docs/sariko_seller_agreement.html
+    "seller_agreement_version": 20261023,   # change together with public/docs/sariko_seller_agreement.html
+    "onboarding_min_id_validity_months": 6, # passport valid at least this long (NĐ 248/2026 Đ18.1.b)
     "founding_slots": 50,                   # also GET /sellers/founding/slots
     "founding_free_months": 4,
+    "enterprise_slots": 5,                  # Enterprise is invitation only, capped at this many sellers
 }
 
 
@@ -79,8 +83,7 @@ def _vnd(amount) -> int:
 
 
 def _client_ip(request: Request) -> str:
-    # nginx sets X-Real-IP; the API is not behind Cloudflare.
-    return request.headers.get("x-real-ip") or (request.client.host if request.client else "")
+    return client_ip(request)
 
 
 def _rate_limited(ip: str, limit: int) -> bool:
@@ -118,16 +121,6 @@ def _verify_turnstile(token: str, ip: str) -> None:
 
 def _squash(text: str) -> str:
     return " ".join(text.split())
-
-
-def _same_name(signature: str, first: str, last: str) -> bool:
-    sig = _squash(signature).casefold()
-    first, last = _squash(first).casefold(), _squash(last).casefold()
-    return sig in (f"{first} {last}", f"{last} {first}")
-
-
-def _age(born: date, today: date) -> int:
-    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
 
 def _is_maps_link(link: str) -> bool:
@@ -236,6 +229,7 @@ def get_settings():
         "min_age": s["onboarding_min_age"],
         "review_days": s["onboarding_review_days"],
         "agreement_version": s["seller_agreement_version"],
+        "min_id_validity_months": s["onboarding_min_id_validity_months"],
         "tiers": [
             {
                 "tier": t,
@@ -253,6 +247,10 @@ def get_settings():
             "commission_percent": _percent(founding["commission_rate"]) if founding else None,
             "monthly_fee_vnd": _vnd(founding["monthly_fee_vnd"]) if founding else None,
         },
+        "enterprise": {
+            "slots": s["enterprise_slots"],
+            "taken": DAOSellerProfiles().count_sellers_by_tier("enterprise"),
+        },
     }
 
 
@@ -266,9 +264,11 @@ def create_application(body: Schema.RequestCreateOnboardingApplication, request:
 
     if not body.agreed:
         raise _error(400, "agreement_required", "Please accept the Seller Agreement")
+    if not body.personal_data_consent:
+        raise _error(400, "consent_required", "Please accept the processing of your personal data")
     if body.agreement_version != settings["seller_agreement_version"]:
         raise _error(409, "agreement_outdated", "The Seller Agreement was updated, please reload the page")
-    if not _same_name(body.signature_name, body.first_name, body.last_name):
+    if not same_name(body.signature_name, body.first_name, body.last_name):
         raise _error(400, "signature_mismatch", "Type your full name exactly as above")
 
     required = ("first_name", "last_name", "nationality", "id_number", "residential_address",
@@ -276,17 +276,27 @@ def create_application(body: Schema.RequestCreateOnboardingApplication, request:
     for field in required:
         if not _squash(getattr(body, field)):
             raise _error(400, "missing_field", "Required field is empty", field=field)
-    if body.id_type not in ID_TYPES:
-        raise _error(400, "invalid_id_type", "Invalid ID type")
+    if body.tax_resident is None:
+        raise _error(400, "missing_field", "Required field is empty", field="tax_resident")
+    code = id_error(body.id_type, body.id_number, body.id_expiry_date, date.today(),
+                    settings["onboarding_min_id_validity_months"])
+    if code:
+        raise _error(400, code, "Check the ID document", months=settings["onboarding_min_id_validity_months"])
+    if not valid_bank_account(body.bank_account_number):
+        raise _error(400, "invalid_bank_account", "Account number must be 6 to 20 digits")
+    if not bank_holder_matches(body.bank_account_holder, body.first_name, body.last_name):
+        raise _error(400, "bank_holder_mismatch", "The bank account must be in your own name")
     if body.tier not in TIERS:
         raise _error(400, "invalid_tier", "Invalid plan")
+    if body.tier == "enterprise" and DAOSellerProfiles().count_sellers_by_tier("enterprise") >= settings["enterprise_slots"]:
+        raise _error(409, "enterprise_full", "No Enterprise places left", slots=settings["enterprise_slots"])
     if not EMAIL_RE.match(body.email.strip()):
         raise _error(400, "invalid_email", "Invalid email")
     try:
         phone = to_e164_vn(body.phone)
     except ValueError:
         raise _error(400, "invalid_phone", "Invalid phone number")
-    if _age(body.date_of_birth, date.today()) < settings["onboarding_min_age"]:
+    if age(body.date_of_birth, date.today()) < settings["onboarding_min_age"]:
         raise _error(400, "under_age", "Seller is under the minimum age", min_age=settings["onboarding_min_age"])
     maps_link = (body.maps_link or "").strip() or None
     if maps_link and not _is_maps_link(maps_link):
@@ -309,6 +319,7 @@ def create_application(body: Schema.RequestCreateOnboardingApplication, request:
         "nationality": _squash(body.nationality),
         "id_type": body.id_type,
         "id_number": _squash(body.id_number),
+        "id_expiry_date": body.id_expiry_date.isoformat(),
         "email": body.email.strip(),
         "phone": phone,
         "residential_address": _squash(body.residential_address),
@@ -324,10 +335,11 @@ def create_application(body: Schema.RequestCreateOnboardingApplication, request:
         "tier": body.tier,
         "founding_invited": body.founding_invited,
         "bank_name": _squash(body.bank_name),
-        "bank_account_number": _squash(body.bank_account_number),
+        "bank_account_number": _squash(body.bank_account_number).replace(" ", ""),
         "bank_account_holder": _squash(body.bank_account_holder),
         "agreement_version": str(body.agreement_version),
         "agreed_at": datetime.now(timezone.utc).isoformat(),
+        "personal_data_consent_at": datetime.now(timezone.utc).isoformat(),
         "signature_name": _squash(body.signature_name),
         "ip": ip,
         "user_agent": (request.headers.get("user-agent") or "")[:500],
@@ -349,6 +361,9 @@ def upload_file(
 
     if body.kind not in FILE_KINDS:
         raise _error(400, "invalid_file_kind", "Invalid document type")
+    if body.kind == "id_document" and app.get("id_type") != "passport":
+        # Vietnamese sellers give the ID number only (NĐ 356: no CCCD photos, eKYC later)
+        raise _error(400, "id_document_not_needed", "Only a passport photo is needed")
     item_key = body.item_key if body.kind == "dish_photo" else None
     if body.kind == "dish_photo" and item_key not in {m["key"] for m in app["menu"]}:
         raise _error(400, "unknown_dish", "This dish is not in the menu")
@@ -404,8 +419,8 @@ def submit_application(application_id: str, x_upload_token: str = Header(default
     app = _load_draft(dao, application_id, x_upload_token, _settings())
 
     files = dao.list_files(application_id)
-    if not any(f["kind"] == "id_document" for f in files):
-        raise _error(400, "id_document_required", "Upload your passport or CCCD")
+    if app.get("id_type") == "passport" and not any(f["kind"] == "id_document" for f in files):
+        raise _error(400, "id_document_required", "Upload your passport photo page")
     photos = {f["item_key"] for f in files if f["kind"] == "dish_photo"}
     missing = [m["key"] for m in app["menu"] if m["key"] not in photos]
     if missing:

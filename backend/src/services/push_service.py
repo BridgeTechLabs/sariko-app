@@ -62,10 +62,47 @@ MESSAGES = {
         "en": ("Order about to auto-cancel", "A paid order hasn't been accepted yet. Accept it in the next few minutes or it will be cancelled and refunded."),
         "vi": ("Đơn sắp tự hủy", "Một đơn đã thanh toán chưa được nhận. Hãy nhận đơn trong vài phút tới, nếu không đơn sẽ tự hủy và hoàn tiền cho khách."),
     },
+    "payment_confirmed": {
+        "en": ("Payment confirmed", "VNPay confirmed your payment. Your order is with the seller."),
+        "vi": ("Đã xác nhận thanh toán", "VNPay đã xác nhận thanh toán. Đơn hàng đã được gửi tới người bán."),
+    },
+    "payment_failed": {
+        "en": ("Payment not completed", "VNPay did not take the payment for your order. You can pay again."),
+        "vi": ("Thanh toán không thành công", "VNPay không ghi nhận thanh toán cho đơn hàng. Bạn có thể thanh toán lại."),
+    },
+    "seller_complaint": {
+        "en": ("New complaint on an order", "A customer filed a complaint about an order. Tap to see it."),
+        "vi": ("Có khiếu nại về đơn hàng", "Khách vừa gửi khiếu nại về một đơn hàng. Nhấn để xem."),
+    },
     "seller_order_expired": {
         "en": ("Order cancelled: not confirmed in time", "A paid order wasn't confirmed in time, so it was cancelled and the customer will be refunded."),
         "vi": ("Đơn đã tự hủy", "Một đơn đã thanh toán không được xác nhận kịp thời nên đã bị hủy, khách sẽ được hoàn tiền."),
     },
+    # Admin panel (notify_admins): {fields} come from the caller, {category} is translated below.
+    "admin_new_complaint": {
+        "en": ("New complaint {code}", "{category}. Tap to open it."),
+        "vi": ("Khiếu nại mới {code}", "{category}. Nhấn để xem."),
+    },
+    "admin_order_expiring": {
+        "en": ("Order #{code} not accepted", "{minutes} min left before it auto-cancels. Call the seller."),
+        "vi": ("Đơn #{code} chưa được nhận", "Còn {minutes} phút trước khi tự hủy. Hãy gọi người bán."),
+    },
+    "admin_delivery_failed": {
+        "en": ("Order #{code}: delivery failed", "Lalamove could not deliver it. Tap to open the order."),
+        "vi": ("Đơn #{code} giao thất bại", "Lalamove không giao được. Nhấn để mở đơn."),
+    },
+}
+
+# Complaint types (apis/complaints.py CATEGORIES), same words as the app's complaint form.
+COMPLAINT_CATEGORIES = {
+    "wrong_item": {"en": "Not as described", "vi": "Không đúng mô tả"},
+    "damaged": {"en": "Damaged or unsafe", "vi": "Hư hỏng hoặc không an toàn"},
+    "missing_item": {"en": "Missing item", "vi": "Thiếu món"},
+    "late": {"en": "Late or not delivered", "vi": "Giao trễ hoặc không giao"},
+    "buyer_issue": {"en": "Problem with the customer", "vi": "Vấn đề với khách hàng"},
+    "delivery_issue": {"en": "Delivery problem", "vi": "Vấn đề giao hàng"},
+    "payment_issue": {"en": "Payment or payout", "vi": "Thanh toán hoặc chi trả"},
+    "other": {"en": "Other", "vi": "Khác"},
 }
 
 
@@ -118,6 +155,39 @@ def notify_seller_delivered(order: dict):
     _send_async(order.get("seller_user_id"), "seller_delivered", f"/seller/orders/{order['id']}")
 
 
+def notify_payment_confirmed(order: dict):
+    """Buyer side: the reconcile job found the payment at VNPay after the IPN did not come (T125)."""
+    _send_async(order.get("user_id"), "payment_confirmed", f"/orders/{order['id']}")
+
+
+def notify_payment_failed(order: dict):
+    """Buyer side: VNPay says the pay link was not paid; once per link (T125)."""
+    _send_async(order.get("user_id"), "payment_failed", f"/orders/{order['id']}")
+
+
+def notify_seller_complaint(seller_user_id, order_id: str):
+    """Seller side: the buyer filed a complaint about this order (T35)."""
+    _send_async(seller_user_id, "seller_complaint", f"/seller/orders/{order_id}")
+
+
+def notify_admins(event: str, url: str, **fields):
+    """Admin panel: every admin-app subscription gets it (no admin roles). url is an admin-panel path."""
+    if not VAPID_PRIVATE_KEY:
+        return
+    threading.Thread(target=_send_admins, args=(event, url, fields), daemon=True).start()
+
+
+def _send_admins(event: str, url: str, fields: dict):
+    try:
+        by_user = {}
+        for sub in DAOPushSubscriptions().read_admin_subscriptions():
+            by_user.setdefault(sub["user_id"], []).append(sub)
+        for user_id, subscriptions in by_user.items():
+            _deliver(user_id, subscriptions, event, url, fields)
+    except Exception as e:
+        logger.exception(f"push_service - _send_admins failed for event {event}: {repr(e)}")
+
+
 def _send_async(user_id, event: str, url: str):
     # Push services can take seconds to answer; never hold up the request
     # (or the VNPay IPN) that changed the order.
@@ -128,14 +198,26 @@ def _send_async(user_id, event: str, url: str):
 
 def _send(user_id: str, event: str, url: str):
     try:
-        dao_subs = DAOPushSubscriptions()
-        subscriptions = dao_subs.read_subscriptions_by_user_id(user_id)
-        if not subscriptions:
-            return
+        subscriptions = DAOPushSubscriptions().read_subscriptions_by_user_id(user_id)
+        if subscriptions:
+            _deliver(user_id, subscriptions, event, url, {})
+    except Exception as e:
+        logger.exception(f"push_service - _send failed for user {user_id}, event {event}: {repr(e)}")
 
+
+def _message(event: str, lang: str, fields: dict):
+    title, body = MESSAGES[event][lang]
+    if "category" in fields:
+        fields = {**fields, "category": COMPLAINT_CATEGORIES.get(fields["category"], {}).get(lang, fields["category"])}
+    return title.format(**fields), body.format(**fields)
+
+
+def _deliver(user_id: str, subscriptions: list, event: str, url: str, fields: dict):
+    try:
+        dao_subs = DAOPushSubscriptions()
         user = DAOUsers().get_users(user_id=user_id)
         lang = "vi" if user and user.get("preferred_language") == "Tiếng Việt" else "en"
-        title, body = MESSAGES[event][lang]
+        title, body = _message(event, lang, fields)
         payload = json.dumps({"title": title, "body": body, "url": url})
 
         for sub in subscriptions:
@@ -155,4 +237,4 @@ def _send(user_id: str, event: str, url: str):
                     logger.warning(f"push_service - webpush failed for user {user_id}: {repr(e)}")
 
     except Exception as e:
-        logger.exception(f"push_service - _send failed for user {user_id}, event {event}: {repr(e)}")
+        logger.exception(f"push_service - _deliver failed for user {user_id}, event {event}: {repr(e)}")

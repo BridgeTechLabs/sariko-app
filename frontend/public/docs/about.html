@@ -387,6 +387,25 @@
     .contact-block .cb-row { flex-direction: column; gap: 2px; }
     .hero::before { display: none; }
   }
+  /* Phones (docs-mobile, BUGS #36): 16px margins, a short header and hero, tables scroll in their own box.
+     .table-scroll keeps the table's 20px margin outside the box, so desktop spacing is unchanged. */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 20px 0; }
+  .table-scroll > table { margin: 0; }
+  @media (max-width: 600px) {
+    .site-header { padding: 12px 16px; }
+    .site-header .wordmark { font-size: 22px; }
+    .hero { padding: 24px 16px 20px; }
+    .hero h1 { font-size: 30px; margin-bottom: 10px; }
+    .hero-meta { gap: 2px 16px; }
+    .layout { padding: 28px 16px 48px; }
+    .section { margin-bottom: 28px; padding-bottom: 28px; }
+    .section h2 { font-size: 24px; margin-bottom: 12px; }
+    .fee-table, .data-table { font-size: 14px; }
+    .fee-table th, .fee-table td, .data-table th, .data-table td { padding: 8px 10px; }
+    .fee-table th, .data-table th { font-size: 13px; }
+    .page-footer { padding: 20px 16px; }
+    .method-card p, .payout-card p, .provider-card p, .node-card p, .team-card p, .parent-note, .fee-table .mono { font-size: 14px; }
+  }
 </style>
 </head>
 <body>
@@ -446,7 +465,7 @@
         <span class="oc-value">0316852554</span>
 
         <span class="oc-label">Registered Address</span>
-        <span class="oc-value">195/3 Dien Bien Phu, Binh Thanh District,<br>Ho Chi Minh City, Vietnam</span>
+        <span class="oc-value">6th Floor, Rosana Building, 60 Nguyen Dinh Chieu,<br>Tan Dinh Ward, Ho Chi Minh City, Vietnam</span>
 
         <span class="oc-label">Website</span>
         <span class="oc-value"><a href="https://www.sariko.store" target="_blank">www.sariko.store</a></span>
@@ -543,7 +562,7 @@
       </div>
       <div class="cb-row">
         <span class="cb-key">Address</span>
-        <span class="cb-val">195/3 Dien Bien Phu, Binh Thanh District,<br>Ho Chi Minh City, Vietnam</span>
+        <span class="cb-val">6th Floor, Rosana Building, 60 Nguyen Dinh Chieu,<br>Tan Dinh Ward, Ho Chi Minh City, Vietnam</span>
       </div>
       <div class="cb-row">
         <span class="cb-key">Tax ID (MST)</span>
@@ -559,7 +578,7 @@
   <div class="divider"></div>
   <p>
     SariKo · Operated by Zen Tech Asia Co., Ltd. (MST 0316852554)<br>
-    195/3 Dien Bien Phu, Binh Thanh District, Ho Chi Minh City, Vietnam<br>
+    6th Floor, Rosana Building, 60 Nguyen Dinh Chieu, Tan Dinh Ward, Ho Chi Minh City, Vietnam<br>
     support@sariko.store · +84 909 074 793 · www.sariko.store<br>
     © 2026 Zen Tech Asia Co., Ltd. All rights reserved.
   </p>

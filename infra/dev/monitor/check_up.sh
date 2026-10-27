@@ -1,11 +1,8 @@
 #!/bin/bash
 # Uptime check for Healthchecks.io (TODO T5). Cron on each EC2, every 5 minutes:
+# Deployed from the repo with infra/sync.sh dev --apply.
 #   */5 * * * * $HOME/monitor/check_up.sh <slug> <url>
 # e.g. check_up.sh prod-api https://api.sariko.store/health
-#
-# /health never touches the database (2026-10-15: prod DB down, /health 200).
-# prod-db watches a tiny public read that goes through PostgREST to Postgres:
-#   check_up.sh prod-db https://api.sariko.store/rest/v1/sellers/founding/slots
 #
 # Hits the PUBLIC url (DNS, nginx, TLS, app) and pings hc-ping.com/<key>/<slug>:
 # success if it answered 2xx, /fail otherwise. A dead box sends nothing, so

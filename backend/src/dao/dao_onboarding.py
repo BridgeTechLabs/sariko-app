@@ -46,7 +46,7 @@ class DAOOnboarding(DAOBase):
         try:
             result = (
                 self._supabase_client.table("onboarding_applications")
-                .select("id, status, created_at, upload_token, menu")
+                .select("id, status, created_at, upload_token, menu, id_type")
                 .eq("id", application_id)
                 .maybe_single()
                 .execute()

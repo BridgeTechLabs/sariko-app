@@ -2,11 +2,12 @@ import { apiClient } from "@/lib/axiosPolicy.js"
 
 export const apiReviews = {
 
-    createReview: async (orderId, overallRating, items = []) => {
+    createReview: async (orderId, overallRating, overallComment = null, items = []) => {
         try {
             const payload = {
                 order_id: orderId,
                 overall_rating: overallRating,
+                overall_comment: overallComment,
                 items,
             }
             const response = await apiClient.post('/v1/reviews', payload)

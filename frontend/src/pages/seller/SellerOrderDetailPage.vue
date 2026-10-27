@@ -4,11 +4,12 @@ import LayoutSellerOrderDetail from '@/layouts/seller/LayoutSellerOrderDetail.vu
 import SellerOrderDetailContent from '@/components/seller-order-detail/SellerOrderDetailContent.vue';
 import SellerOrderActionBar from '@/components/seller-order-detail/SellerOrderActionBar.vue';
 import PageBreadcrumbs from '@/components/shared/PageBreadcrumbs.vue';
+import OrderComplaintSection from '@/components/complaints/OrderComplaintSection.vue';
 
 export default {
     name: 'SellerOrderDetailPage',
 
-    components: { LayoutSellerOrderDetail, SellerOrderDetailContent, SellerOrderActionBar, PageBreadcrumbs },
+    components: { LayoutSellerOrderDetail, SellerOrderDetailContent, SellerOrderActionBar, PageBreadcrumbs, OrderComplaintSection },
 
     props: ['orderId'],
 
@@ -94,6 +95,7 @@ export default {
                 </div>
             </div>
             <SellerOrderDetailContent v-else-if="order" :order="order" :delivery="delivery" />
+            <OrderComplaintSection v-if="order && !loading" role="seller" />
         </template>
 
         <template #Actions>

@@ -1,5 +1,6 @@
 import logging
 from datetime import timedelta
+from decimal import Decimal
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 from dao.dao_base import DAOBase
 
@@ -11,7 +12,7 @@ class DAOAdminConfig(DAOBase):
     def __init__(self):
         super().__init__()
 
-    def get_tax_rate(self, key: str = "vat_rate") -> float:
+    def get_tax_rate(self, key: str = "vat_rate") -> Decimal:
         try:
             result = (
                 self._supabase_client
@@ -22,7 +23,7 @@ class DAOAdminConfig(DAOBase):
                 .execute()
             )
             if result and result.data:
-                return float(result.data["rate"])
+                return Decimal(str(result.data["rate"]))
             raise Exception(f"Tax config key '{key}' not found")
 
         except PostgrestExceptionAPIError as e:
@@ -74,6 +75,15 @@ class DAOAdminConfig(DAOBase):
         if isinstance(value, int) and not isinstance(value, bool) and value > 0:
             return value
         logger.error(f"[Settings] invalid {key}={value!r}, using {default}")
+        return default
+
+    def get_int_in_range(self, key: str, default: int, lo: int, hi: int) -> int:
+        """An integer setting that may be 0 (e.g. payout_generate_hour 0..23). Missing or
+        out of range falls back to the default, like get_positive_int."""
+        value = self.get_setting(key)
+        if isinstance(value, int) and not isinstance(value, bool) and lo <= value <= hi:
+            return value
+        logger.error(f"[Settings] invalid {key}={value!r} (integer {lo}..{hi}), using {default}")
         return default
 
     def get_minutes(self, key: str, default: int) -> timedelta:

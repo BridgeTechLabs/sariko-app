@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Optional
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
@@ -37,13 +38,13 @@ class DAOOrders(DAOBase):
         self._table_name = "orders"
 
     def create_order(self, user_id: str, seller_id: str, seller_user_id: str,
-        subtotal: float, total_amount: float,
-        commission_rate: float, commission_amount: float,
-        vat_rate: float, vat_amount: float,
-        payout_amount: float,
+        subtotal: Decimal, total_amount: Decimal,
+        commission_rate: Decimal, commission_amount: Decimal,
+        vat_rate: Decimal, vat_amount: Decimal,
+        payout_amount: Decimal,
         delivery_method: str, delivery_address: Optional[str] = None, note: Optional[str] = None,
         delivery_lat: Optional[float] = None, delivery_lon: Optional[float] = None,
-        delivery_fee: Optional[float] = None, quotation_id: Optional[str] = None,
+        delivery_fee: Optional[int] = None, quotation_id: Optional[str] = None,
         delivery_appointment=None
     ):
         try:
@@ -51,13 +52,14 @@ class DAOOrders(DAOBase):
                 "user_id": user_id,
                 "seller_id": seller_id,
                 "seller_user_id": seller_user_id,
-                "subtotal": subtotal,
-                "total_amount": total_amount,
-                "commission_rate": commission_rate,
-                "commission_amount": commission_amount,
-                "vat_rate": vat_rate,
-                "vat_amount": vat_amount,
-                "payout_amount": payout_amount,
+                # numeric columns; PostgREST's JSON body can't carry a Decimal
+                "subtotal": str(subtotal),
+                "total_amount": str(total_amount),
+                "commission_rate": str(commission_rate),
+                "commission_amount": str(commission_amount),
+                "vat_rate": str(vat_rate),
+                "vat_amount": str(vat_amount),
+                "payout_amount": str(payout_amount),
                 "delivery_method": delivery_method,
                 "delivery_address": delivery_address,
                 "note": note,
@@ -98,10 +100,10 @@ class DAOOrders(DAOBase):
     def read_orders_by_user_id(self, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), reviews(id), deliveries(status)") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), review_stores(id), deliveries(status)") \
                 .eq("user_id", user_id) \
+                .neq("refunds.reason", "duplicate_payment") \
                 .order("created_at", desc=True) \
-                .limit(1, foreign_table="reviews") \
                 .execute()
 
             if result and result.data:
@@ -120,6 +122,7 @@ class DAOOrders(DAOBase):
                 .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url)), refunds(status)") \
                 .eq("id", order_id) \
                 .eq("user_id", user_id) \
+                .neq("refunds.reason", "duplicate_payment") \
                 .maybe_single() \
                 .execute()
 
@@ -133,12 +136,18 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_order_by_id: {e}")
 
-    def read_orders_by_seller_id(self, seller_id: str):
+    _SELLER_LIST_SELECT = "id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, created_at, paid_at, status_changed_at, users{join}(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status)"
+
+    def read_orders_by_seller_id(self, seller_id: str, finished_since: datetime):
+        """Running orders of any age + done / cancelled orders created since `finished_since` (UTC)."""
+        # orders.created_at is timestamp without time zone holding UTC: compare against naive UTC.
+        since = finished_since.astimezone(timezone.utc).replace(tzinfo=None).isoformat()
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, created_at, paid_at, status_changed_at, users(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status)") \
+                .select(self._SELLER_LIST_SELECT.format(join="")) \
                 .eq("seller_id", seller_id) \
                 .eq("payment_status", "paid") \
+                .or_(f"status.not.in.(done,cancelled),created_at.gte.{since}") \
                 .order("created_at", desc=True) \
                 .execute()
 
@@ -148,6 +157,56 @@ class DAOOrders(DAOBase):
             raise Exception(f"Supabase error - read_orders_by_seller_id: {e}")
         except Exception as e:
             raise Exception(f"error read_orders_by_seller_id: {e}")
+
+    def read_done_orders_for_earnings(self, seller_id: str, done_since: datetime):
+        """Seller's paid orders that became done since `done_since`, with their money split."""
+        try:
+            result = self._supabase_client.table(self._table_name) \
+                .select("id, subtotal, commission_amount, vat_amount, payout_amount, payout_status, payout_hold, status_changed_at, wh_vat_amount, wh_pit_amount") \
+                .eq("seller_id", seller_id) \
+                .eq("payment_status", "paid") \
+                .eq("status", "done") \
+                .gte("status_changed_at", done_since.isoformat()) \
+                .order("status_changed_at", desc=True) \
+                .execute()
+
+            return result.data or []
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_done_orders_for_earnings: {e}")
+        except Exception as e:
+            raise Exception(f"error read_done_orders_for_earnings: {e}")
+
+    def search_orders_for_seller(self, seller_id: str, code: Optional[str], name: Optional[str], limit: int):
+        """Seller order search, any age. `code`: lowercase hex prefix of the order id;
+        `name`: substring of the buyer's name (caller strips filter characters)."""
+        def query(join):
+            return self._supabase_client.table(self._table_name) \
+                .select(self._SELLER_LIST_SELECT.format(join=join)) \
+                .eq("seller_id", seller_id) \
+                .eq("payment_status", "paid") \
+                .order("created_at", desc=True) \
+                .limit(limit)
+
+        def as_uuid(hex32):
+            return f"{hex32[:8]}-{hex32[8:12]}-{hex32[12:16]}-{hex32[16:20]}-{hex32[20:]}"
+
+        try:
+            found = {}
+            if code:
+                # uuid has no LIKE: a prefix is the range [prefix000…, prefixfff…].
+                rows = query("").gte("id", as_uuid((code + "0" * 32)[:32])) \
+                    .lte("id", as_uuid((code + "f" * 32)[:32])).execute().data or []
+                found.update({r["id"]: r for r in rows})
+            if name:
+                rows = query("!inner").ilike("users.name", f"*{name}*").execute().data or []
+                found.update({r["id"]: r for r in rows})
+            return sorted(found.values(), key=lambda r: r["created_at"], reverse=True)[:limit]
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - search_orders_for_seller: {e}")
+        except Exception as e:
+            raise Exception(f"error search_orders_for_seller: {e}")
 
     def read_orders_head_by_seller_id(self, seller_id: str):
         """Signature of the seller's order list: newest updated_at + row count.
@@ -190,6 +249,23 @@ class DAOOrders(DAOBase):
             raise Exception(f"Supabase error - read_order_by_id_for_seller: {e}")
         except Exception as e:
             raise Exception(f"error read_order_by_id_for_seller: {e}")
+
+    def read_status_history(self, order_id: str):
+        """[{status, changed_at}] oldest first, written by the log_order_status trigger.
+        Orders older than that trigger (2026-10-16) have none."""
+        try:
+            result = self._supabase_client.table("history_order_status") \
+                .select("status, changed_at") \
+                .eq("order_id", order_id) \
+                .order("changed_at") \
+                .execute()
+
+            return result.data or []
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_status_history: {e}")
+        except Exception as e:
+            raise Exception(f"error read_status_history: {e}")
 
     def update_order_status(self, order_id: str, status: str, cancellation_reason: Optional[str] = None,
                             expected_status: Optional[str] = None):
@@ -247,7 +323,7 @@ class DAOOrders(DAOBase):
         """Read order by ID without user scoping (for IPN server-to-server)."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_user_id, payment_status, status, total_amount") \
+                .select("id, seller_user_id, payment_status, status, total_amount, transaction_ref") \
                 .eq("id", order_id) \
                 .maybe_single() \
                 .execute()
@@ -295,6 +371,12 @@ class DAOOrders(DAOBase):
             # Same rule as the cache drop: the payment is already written, so a
             # failed push lookup must not turn the IPN into an error.
             if payment_status == "paid":
+                # Seller tax withholding snapshot (Decree 252, per order at payment). A failure
+                # must not fail the IPN: the payout computes the missing orders first.
+                try:
+                    self._supabase_client.rpc('compute_order_withholding', {'p_order_id': order_id}).execute()
+                except Exception as e:
+                    logger.error(f"withholding not computed for order {order_id}, payout will compute it: {e}")
                 try:
                     order = self.read_order_by_id_raw(order_id)
                     if order:
@@ -341,8 +423,10 @@ class DAOOrders(DAOBase):
 
     def update_payment_create_date(self, order_id: str, payment_create_date: str):
         try:
+            # A new pay link: the querydr state of the previous one no longer applies (T125)
             result = self._supabase_client.table(self._table_name) \
-                .update({"payment_create_date": payment_create_date}) \
+                .update({"payment_create_date": payment_create_date, "vnpay_checked_at": None,
+                         "vnpay_check": None, "vnpay_fail_notified_at": None}) \
                 .eq("id", order_id) \
                 .execute()
 
@@ -352,6 +436,56 @@ class DAOOrders(DAOBase):
             raise Exception(f"Supabase error - update_payment_create_date: {e}")
         except Exception as e:
             raise Exception(f"error update_payment_create_date: {e}")
+
+    # T125: what the VNPay check (querydr) needs about an unpaid order, with refunds (never asked
+    # about: querydr after a refund still answers "paid") and payment rows (an IPN result is final).
+    _VNPAY_STATE = ("id, user_id, status, payment_status, total_amount, payment_create_date, vnpay_checked_at, "
+                    "vnpay_check, vnpay_fail_notified_at, refunds(id), payments(transaction_ref, status)")
+
+    def read_vnpay_state(self, order_id: str):
+        try:
+            result = self._supabase_client.table(self._table_name).select(self._VNPAY_STATE) \
+                .eq("id", order_id).maybe_single().execute()
+            return result.data if result and result.data else None
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_vnpay_state: {e}")
+
+    def read_unpaid_vnpay_orders(self, created_since: datetime):
+        """Unpaid orders that got a VNPay pay link, created since `created_since` (UTC)."""
+        try:
+            return self._supabase_client.table(self._table_name).select(self._VNPAY_STATE) \
+                .eq("payment_status", "pending") \
+                .not_.is_("payment_create_date", "null") \
+                .gte("created_at", created_since.astimezone(timezone.utc).replace(tzinfo=None).isoformat()) \
+                .execute().data or []
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_unpaid_vnpay_orders: {e}")
+
+    def claim_vnpay_check(self, order_id: str, now: datetime, last_before: datetime) -> bool:
+        """Take this order's turn to ask VNPay: true only for the caller whose conditional update set
+        vnpay_checked_at (never asked, or last asked before `last_before`). The job and a buyer's new-link
+        request can't both ask (a second ask within ~15 minutes gets 94)."""
+        try:
+            result = self._supabase_client.table(self._table_name) \
+                .update({"vnpay_checked_at": now.isoformat()}).eq("id", order_id) \
+                .or_(f"vnpay_checked_at.is.null,vnpay_checked_at.lt.{last_before.astimezone(timezone.utc):%Y-%m-%dT%H:%M:%SZ}").execute()
+            return bool(result.data)
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - claim_vnpay_check: {e}")
+
+    def save_vnpay_check(self, order_id: str, check: dict, checked_at: datetime):
+        try:
+            self._supabase_client.table(self._table_name) \
+                .update({"vnpay_check": check, "vnpay_checked_at": checked_at.isoformat()}).eq("id", order_id).execute()
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - save_vnpay_check: {e}")
+
+    def set_vnpay_fail_notified(self, order_id: str, at: datetime):
+        try:
+            self._supabase_client.table(self._table_name) \
+                .update({"vnpay_fail_notified_at": at.isoformat()}).eq("id", order_id).execute()
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - set_vnpay_fail_notified: {e}")
 
     def update_ipn_data(self, order_id: str, ipn_data: dict):
         try:

@@ -125,6 +125,9 @@ def test_webhook_terminal_status_clears_driver_and_marks_failed(
     fake_ord = _FakeOrderDAO(order)
     monkeypatch.setattr("apis.deliveries.DAODeliveries", lambda: fake_del)
     monkeypatch.setattr("apis.deliveries.DAOOrders", lambda: fake_ord)
+    admin_pushes = []
+    monkeypatch.setattr("apis.deliveries.push_service.notify_admins",
+                        lambda event, url, **fields: admin_pushes.append((event, url, fields)))
 
     body, raw = _make_webhook_body(
         lalamove_api_key, lalamove_secret,
@@ -142,6 +145,8 @@ def test_webhook_terminal_status_clears_driver_and_marks_failed(
     assert fake_del.last_update["driver_name"] is None
     assert fake_del.last_update["driver_phone"] is None
     assert fake_ord.last_status == "delivery_failed"
+    # admin-push TC-3: every admin device is told, the push opens the order in the admin panel
+    assert admin_pushes == [("admin_delivery_failed", "/orders?open=ord-uuid", {"code": "ord-uuid"[:8]})]
 
 
 def test_webhook_invalid_signature_rejected(

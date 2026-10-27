@@ -11,6 +11,7 @@ from dao.dao_food_item_variants import DAOFoodItemVariants
 from dao.dao_food_items import DAOFoodItems
 from apis.orders import STORE_CLOSED_DETAIL, is_same_day
 from core.store_hours import is_open_now
+from core.seller_status import with_buyer_status
 from schemas import Schema
 
 from fastapi import (
@@ -71,6 +72,9 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
     if gate and gate.get("is_available") is False:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This dish is sold out")
     seller = (gate or {}).get("seller_profiles") or {}
+    # Coming soon (or active without pickup coordinates): no menu to order from yet
+    if gate and with_buyer_status(dict(seller)).get("status") != "active":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This store is not taking orders yet")
     if gate and is_same_day(gate.get("preorder_day")) and not is_open_now(seller.get("is_open"), seller.get("opening_time"), seller.get("closing_time")):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=STORE_CLOSED_DETAIL)
 

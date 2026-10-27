@@ -146,19 +146,6 @@ export default {
                 <span class="date-text">{{ dateText }}</span>
                 <span class="time-text">{{ timeText }}</span>
             </div>
-            <q-toggle
-                v-if="sellerInfo"
-                :model-value="isOpen"
-                :label="isOpen ? $t('seller_home.store_open') : $t('seller_home.store_closed')"
-                color="positive"
-                dense
-                class="open-toggle"
-                @update:model-value="onToggleOpen"
-            />
-            <div v-if="sellerInfo" class="hours-row">
-                <span>{{ $t('seller_home.hours_label') }}: {{ hoursText || $t('seller_home.hours_all_day') }}</span>
-                <button class="hours-edit" @click="openHoursDialog">{{ $t('seller_home.hours_edit') }}</button>
-            </div>
             <div v-if="outsideHours" class="hours-hint">{{ $t('seller_home.hours_outside_hint') }}</div>
 
             <q-dialog v-model="hoursDialog">
@@ -182,16 +169,31 @@ export default {
             </q-dialog>
         </div>
 
-        <div class="avatar-wrap" @click="$router.push('/seller/me')">
-            <q-avatar v-if="user?.avatarUrl" size="64px">
-                <img :src="user.avatarUrl" :alt="user.fullName">
-            </q-avatar>
-            <div v-else-if="user" class="initials-avatar">
-                {{ initials }}
+        <!-- Right column like the buyer header's .user-column: avatar, open switch, hours -->
+        <div class="user-column">
+            <div class="avatar-wrap" @click="$router.push('/seller/me')">
+                <q-avatar v-if="user?.avatarUrl" size="64px">
+                    <img :src="user.avatarUrl" :alt="user.fullName">
+                </q-avatar>
+                <div v-else-if="user" class="initials-avatar">
+                    {{ initials }}
+                </div>
+                <div v-else class="guest-icon">
+                    <User :size="24" />
+                </div>
             </div>
-            <div v-else class="guest-icon">
-                <User :size="24" />
-            </div>
+            <q-toggle
+                v-if="sellerInfo"
+                :model-value="isOpen"
+                :label="isOpen ? $t('seller_home.store_open') : $t('seller_home.store_closed')"
+                color="positive"
+                dense
+                class="open-toggle"
+                @update:model-value="onToggleOpen"
+            />
+            <button v-if="sellerInfo" class="hours-row" :aria-label="$t('seller_home.hours_edit')" @click="openHoursDialog">
+                {{ hoursText || $t('seller_home.hours_all_day') }}
+            </button>
         </div>
     </div>
 </template>
@@ -207,7 +209,7 @@ export default {
 .greeting-header {
     display: flex;
     justify-content: space-between;
-    align-items:center;
+    align-items: flex-start;
     gap: 12px;
 }
 
@@ -250,9 +252,16 @@ export default {
     color: var(--color-accent);
 }
 
+.user-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
 .avatar-wrap {
     cursor: pointer;
-    flex-shrink: 0;
 }
 
 .avatar-wrap :deep(img) {
@@ -288,25 +297,17 @@ export default {
 }
 
 .open-toggle {
-    margin-top: 8px;
     font-size: 13px;
+    white-space: nowrap;
 }
 
 .hours-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 4px;
-    font-size: 12px;
-    opacity: 0.8;
-}
-
-.hours-edit {
     background: none;
     border: none;
     padding: 0;
     color: #f5A623;
     font-size: 12px;
+    white-space: nowrap;
     cursor: pointer;
 }
 

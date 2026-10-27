@@ -22,7 +22,7 @@ TIER_LIMITS = {
     "enterprise": {"max_items": None, "max_categories": None},
     "founding": {"max_items": None, "max_categories": None},
 }
-FEES = {"community": 0, "tindahan": 720000, "negosyo": 1200000, "enterprise": 2200000, "founding": 720000}
+FEES = {"community": 0, "tindahan": 750000, "negosyo": 1250000, "enterprise": 2300000, "founding": 750000}
 
 
 class FakeConfig:
@@ -73,6 +73,14 @@ class FakeDAO:
         return True
 
 
+class FakeProfiles:
+    enterprise = 0   # sellers already on the enterprise plan
+
+    def count_sellers_by_tier(self, tier):
+        assert tier == "enterprise"
+        return self.enterprise
+
+
 class FakeResponse:
     def __init__(self, success):
         self._success = success
@@ -85,7 +93,9 @@ class FakeResponse:
 def env(monkeypatch):
     FakeDAO.apps, FakeDAO.files = {}, {}
     FakeConfig.raw = {}
+    FakeProfiles.enterprise = 0
     monkeypatch.setattr(onboarding, "DAOAdminConfig", FakeConfig)
+    monkeypatch.setattr(onboarding, "DAOSellerProfiles", FakeProfiles)
     onboarding._rate_hits.clear()
     storage = {"uploaded": [], "removed": []}
     captcha = {"success": True}
@@ -108,6 +118,7 @@ def _body(**over):
     body = {
         "first_name": "Maria", "last_name": "Santos", "date_of_birth": adult.isoformat(),
         "nationality": "Philippines", "id_type": "passport", "id_number": "P1234567",
+        "id_expiry_date": "2035-01-01", "tax_resident": True,
         "email": "maria@example.com", "phone": "0901234567",
         "residential_address": "12 Nguyen Hue, District 1",
         "store_name": "Maria's Kitchen", "pickup_address": "12 Nguyen Hue, District 1",
@@ -116,7 +127,8 @@ def _body(**over):
         "menu": [_dish("a"), _dish("b")],
         "tier": "tindahan",
         "bank_name": "Vietcombank", "bank_account_number": "0123456789", "bank_account_holder": "MARIA SANTOS",
-        "agreed": True, "agreement_version": onboarding.SETTINGS_DEFAULTS["seller_agreement_version"],
+        "agreed": True, "personal_data_consent": True,
+        "agreement_version": onboarding.SETTINGS_DEFAULTS["seller_agreement_version"],
         "signature_name": "maria  santos", "turnstile_token": "tok",
     }
     body.update(over)
@@ -232,12 +244,27 @@ def test_rate_limit_sixth_is_429(env):
 
 def test_settings_endpoint_serves_defaults_and_plan_limits(env):
     res = env["client"].get("/onboarding/settings").json()
-    assert res["max_dish_price"] == 10_000_000 and res["min_age"] == 18 and res["agreement_version"] == 20261018
+    assert res["max_dish_price"] == 10_000_000 and res["min_age"] == 18 and res["agreement_version"] == 20261023
     assert [t["tier"] for t in res["tiers"]] == ["community", "tindahan", "negosyo", "enterprise"]
     assert res["tiers"][0]["max_items"] == 3 and res["tiers"][3]["max_items"] is None
-    assert res["tiers"][1]["monthly_fee_vnd"] == 720000
+    assert res["tiers"][1]["monthly_fee_vnd"] == 750000
     assert res["tiers"][1]["commission_percent"] == 17
-    assert res["founding"] == {"slots": 50, "free_months": 4, "commission_percent": 17, "monthly_fee_vnd": 720000}
+    assert res["founding"] == {"slots": 50, "free_months": 4, "commission_percent": 17, "monthly_fee_vnd": 750000}
+    assert res["enterprise"] == {"slots": 5, "taken": 0}
+
+
+def test_tc4_enterprise_places(env):
+    FakeProfiles.enterprise = 2
+    assert env["client"].get("/onboarding/settings").json()["enterprise"] == {"slots": 5, "taken": 2}
+    _create(env, tier="enterprise")                       # 3 places left
+
+    FakeProfiles.enterprise = 5
+    res = env["client"].post("/onboarding/applications", json=_body(tier="enterprise"))
+    assert res.status_code == 409 and _code(res) == "enterprise_full"
+    _create(env, tier="tindahan")                         # other plans are not capped
+
+    FakeConfig.raw = {"enterprise_slots": 6}              # admin adds a place
+    _create(env, tier="enterprise")
 
 
 def test_percent_uses_decimal_half_up():
@@ -254,6 +281,16 @@ def test_changed_setting_applies_at_once(env):
     res = env["client"].post("/onboarding/applications", json=_body())
     assert _code(res) == "invalid_price" and res.json()["detail"]["max"] == 50000
     assert env["client"].get("/onboarding/settings").json()["max_dish_price"] == 50000
+
+
+def test_tc11_agreement_20261021(env):
+    FakeConfig.raw = {"seller_agreement_version": 20261021}            # after migration 20261021040000
+    assert env["client"].get("/onboarding/settings").json()["agreement_version"] == 20261021
+    res = env["client"].post("/onboarding/applications", json=_body(agreement_version=20261018))   # page opened before
+    assert res.status_code == 409 and _code(res) == "agreement_outdated"
+    _create(env, agreement_version=20261021)
+    FakeConfig.raw = {}                                                 # row missing: the default is the new text too
+    _create(env, agreement_version=20261023)
 
 
 def test_new_agreement_version_rejects_old_signature(env):
@@ -346,3 +383,53 @@ def test_submit_ok_then_second_submit_is_404(env):
     assert res.status_code == 200 and res.json()["reference"] == app_id[:8].upper()
     assert FakeDAO.apps[app_id]["status"] == "submitted" and FakeDAO.apps[app_id]["upload_token"] is None
     assert _submit(env, app_id, token).status_code == 404
+
+
+# ── Q6 / Q9-Q12 (spec docs/dev/seller-profile-completion, TC-33..35) ──────────
+
+CCCD = {"nationality": "Vietnam", "id_type": "cccd", "id_number": "079090001234",
+        "first_name": "An", "last_name": "Nguyễn Văn", "signature_name": "Nguyễn Văn An",
+        "bank_account_holder": "NGUYEN VAN AN"}
+
+
+def test_tc33_cccd_seller_needs_no_photo(env):
+    app_id, token = _create(env, **CCCD)
+    assert _code(_upload(env, app_id, token, "id_document", _jpeg())) == "id_document_not_needed"
+    for key in ("a", "b"):
+        _upload(env, app_id, token, "dish_photo", _jpeg(), item_key=key)
+    assert _submit(env, app_id, token).status_code == 200
+
+
+def test_tc34_passport_seller_still_needs_the_photo(env):
+    app_id, token = _create(env)
+    for key in ("a", "b"):
+        _upload(env, app_id, token, "dish_photo", _jpeg(), item_key=key)
+    assert _code(_submit(env, app_id, token)) == "id_document_required"
+
+
+@pytest.mark.parametrize("over,code", [
+    ({"id_expiry_date": None}, "id_expiry_required"),
+    ({"id_expiry_date": (date.today() - timedelta(days=1)).isoformat()}, "id_expired"),
+    ({"id_expiry_date": (date.today() + timedelta(days=60)).isoformat()}, "id_expiring"),
+    ({**CCCD, "id_number": "12345"}, "invalid_id_number"),
+    ({"tax_resident": None}, "missing_field"),
+    ({"personal_data_consent": False}, "consent_required"),
+    ({"bank_account_number": "12345"}, "invalid_bank_account"),
+    ({"bank_account_holder": "JUAN CRUZ"}, "bank_holder_mismatch"),
+])
+def test_tc35_identity_rules(env, over, code):
+    res = env["client"].post("/onboarding/applications", json=_body(**over))
+    assert res.status_code == 400 and _code(res) == code
+    assert FakeDAO.apps == {}
+
+
+def test_tc35_stores_expiry_and_consent(env):
+    app_id, _ = _create(env, **CCCD)
+    row = FakeDAO.apps[app_id]
+    assert row["id_expiry_date"] == "2035-01-01" and row["personal_data_consent_at"]
+
+
+def test_tc35_months_setting_is_served_and_applied(env):
+    FakeConfig.raw = {"onboarding_min_id_validity_months": 1}
+    assert env["client"].get("/onboarding/settings").json()["min_id_validity_months"] == 1
+    _create(env, id_expiry_date=(date.today() + timedelta(days=60)).isoformat())

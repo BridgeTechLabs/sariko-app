@@ -156,6 +156,7 @@ export default {
                     <div class="store-name">
                         <span class="store-name__label">{{ seller?.store_name }}</span>
                         <BadgeCheck v-if="isVerified" :size="18" class="verified-check" />
+                        <q-badge v-if="seller?.is_founding" rounded class="founding">{{ $t('seller_page.founding_seller') }}</q-badge>
                     </div>
                 </div>
 
@@ -164,11 +165,6 @@ export default {
                 <!-- Row 2: meta line (left) + chat button (right) -->
                 <div class="meta-row">
                     <div class="status-line">
-                        <template v-if="!hasRating">
-                            <span class="founding">{{ $t('seller_page.founding_seller') }}</span>
-                            <span class="dot-sep"></span>
-                        </template>
-
                         <span>{{ $t('seller_page.item_count', totalItems, { count: totalItems }) }}</span>
 
                         <template v-if="distanceLabel">
@@ -418,8 +414,14 @@ export default {
 }
 
 .founding {
-    color: #ffd000;
+    flex-shrink: 0;
+    font-family: $sariko-font-family-secondary;
+    font-size: 11px;
     font-weight: 700;
+    padding: 3px 8px;
+    color: #ffd000;
+    border: solid 1px #ffd000;
+    background: transparent;
 }
 
 .distance {

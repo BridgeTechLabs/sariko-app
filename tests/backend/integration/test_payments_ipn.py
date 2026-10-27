@@ -74,6 +74,9 @@ class _FakePaymentsDAO:
     def create_payment(self, **kwargs):
         self.create_called = True
 
+    def has_transaction(self, transaction_ref):
+        return False
+
 
 # ─── Tests ───────────────────────────────────────────────────────────────────
 def test_ipn_valid_payment_success(fastapi_client, vnp_secret, monkeypatch):
@@ -84,6 +87,7 @@ def test_ipn_valid_payment_success(fastapi_client, vnp_secret, monkeypatch):
         "id": order_id,
         "total_amount": 100000,
         "payment_status": "pending",
+        "status": "pending",
     })
     fake_payments = _FakePaymentsDAO()
 
@@ -109,6 +113,7 @@ def test_ipn_invalid_signature_rejected(fastapi_client, vnp_secret, monkeypatch)
         "id": order_id,
         "total_amount": 100000,
         "payment_status": "pending",
+        "status": "pending",
     })
     monkeypatch.setattr("apis.payments.DAOOrders", lambda: fake_orders)
 
@@ -130,6 +135,7 @@ def test_ipn_amount_mismatch_rejected(fastapi_client, vnp_secret, monkeypatch):
         "id": order_id,
         "total_amount": 100000,  # actual order amount
         "payment_status": "pending",
+        "status": "pending",
     })
     monkeypatch.setattr("apis.payments.DAOOrders", lambda: fake_orders)
 
@@ -186,6 +192,7 @@ def test_ipn_failed_payment_logs_attempt_keeps_order_pending(fastapi_client, vnp
         "id": order_id,
         "total_amount": 100000,
         "payment_status": "pending",
+        "status": "pending",
     })
     fake_payments = _FakePaymentsDAO()
     monkeypatch.setattr("apis.payments.DAOOrders", lambda: fake_orders)
@@ -202,3 +209,22 @@ def test_ipn_failed_payment_logs_attempt_keeps_order_pending(fastapi_client, vnp
     assert fake_orders._order["payment_status"] == "pending"
     assert fake_payments.create_called is True, \
         "Must record the failed attempt for audit trail"
+
+
+def test_ipn_payment_row_amount_is_order_total_decimal(fastapi_client, vnp_secret, monkeypatch):
+    """T89: payments.amount is the order's numeric total_amount as Decimal, to the đồng,
+    for a success and a failure (PostgREST returns numeric as "65000.00")."""
+    from decimal import Decimal
+    order_id = "abc12345-678a-4bcd-9012-345678901234"
+    for code, status in (("00", "succeeded"), ("24", "failed")):
+        sent = {}
+        fake_payments = _FakePaymentsDAO()
+        fake_payments.create_payment = lambda **kw: sent.update(kw)
+        monkeypatch.setattr("apis.payments.DAOOrders", lambda: _FakeOrderDAO({
+            "id": order_id, "total_amount": "65000.00", "payment_status": "pending", "status": "pending"}))
+        monkeypatch.setattr("apis.payments.DAOPayments", lambda: fake_payments)
+
+        params = _make_ipn_params(vnp_secret, order_id, amount_vnd=65000, response_code=code)
+        assert fastapi_client.get("/payments/vnpay/ipn", params=params).json()["RspCode"] == "00"
+        assert sent["status"] == status
+        assert sent["amount"] == Decimal("65000.00") and type(sent["amount"]) is Decimal

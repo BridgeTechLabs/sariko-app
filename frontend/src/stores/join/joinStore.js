@@ -20,9 +20,9 @@ function emptyForm() {
     return {
         first_name: '', last_name: '', date_of_birth: '',
         nationality: 'Philippines', nationality_other: '',
-        id_type: 'passport', id_number: '',
+        id_type: 'passport', id_number: '', id_expiry_date: '',
         email: '', phone: '', residential_address: '',
-        tax_code: '', tax_resident: null,               // 'yes' | 'no' | 'unsure'
+        tax_code: '', tax_resident: null,               // 'yes' | 'no' (required: it sets the PIT rate)
         tier: 'tindahan', founding_invited: false,
         store_name: '', store_description: '', pickup_address: '', maps_link: '',
         opening_time: '', closing_time: '',
@@ -39,6 +39,16 @@ function isVnPhone(phone) {
     if (digits.startsWith('84')) digits = digits.slice(2)
     else if (digits.startsWith('0')) digits = digits.slice(1)
     return /^[1-9]\d{8,9}$/.test(digits)
+}
+
+// Local date as "YYYY-MM-DD", comparable as a string with <input type="date"> values.
+function localIso(date) {
+    return date.toLocaleDateString('sv-SE')
+}
+
+// "Nguyễn Văn Ân" -> "nguyen van an": bank holder names are written without accents.
+function plainName(text) {
+    return squash(text).replace(/đ/g, 'd').replace(/Đ/g, 'D').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 }
 
 function ageOn(dob, today) {
@@ -123,6 +133,7 @@ export const useJoinStore = defineStore('joinStore', {
 
     getters: {
         tiers(state) {
+            const ent = state.settings?.enterprise
             return (state.settings?.tiers || []).map(t => ({
                 id: t.tier,
                 monthlyFee: t.monthly_fee_vnd,
@@ -130,6 +141,9 @@ export const useJoinStore = defineStore('joinStore', {
                 maxItems: t.max_items,
                 maxCategories: t.max_categories,
                 invite: INVITE_ONLY.includes(t.tier),
+                // Enterprise places: { left, slots }; full = can't be picked (backend answers 409 enterprise_full)
+                places: t.tier === 'enterprise' && ent ? { left: Math.max(0, ent.slots - ent.taken), slots: ent.slots } : null,
+                full: t.tier === 'enterprise' && !!ent && ent.taken >= ent.slots,
             }))
         },
 
@@ -151,6 +165,7 @@ export const useJoinStore = defineStore('joinStore', {
                 maxPrice: new Intl.NumberFormat('vi-VN').format(s.max_dish_price || 0),
                 maxPreorder: s.max_preorder_days,
                 minAge: s.min_age,
+                months: s.min_id_validity_months,
                 days: s.review_days,
                 items: this.maxItems,
                 categories: this.tier?.maxCategories,
@@ -203,6 +218,14 @@ export const useJoinStore = defineStore('joinStore', {
                     if (!EMAIL_RE.test(f.email.trim())) e.email = 'join_page.error_email'
                     if (!isVnPhone(f.phone)) e.phone = 'join_page.error_phone'
                     if (!f.tax_resident) e.tax_resident = 'join_page.error_required'
+                    // Same rules as core/seller_kyc.py id_error (NĐ 248/2026 Đ18.1.b)
+                    if (f.id_type === 'cccd' && !/^\d{12}$/.test(squash(f.id_number))) e.id_number = 'join_page.error_cccd'
+                    const today = new Date()
+                    const minValid = new Date(today)
+                    minValid.setMonth(minValid.getMonth() + (s.min_id_validity_months || 0))
+                    if (!f.id_expiry_date) e.id_expiry_date = 'join_page.error_required'
+                    else if (f.id_expiry_date <= localIso(today)) e.id_expiry_date = 'join_page.error_id_expired'
+                    else if (f.id_type === 'passport' && f.id_expiry_date < localIso(minValid)) e.id_expiry_date = 'join_page.error_id_expiring'
                 }
                 if (step === 4) {
                     need('store_name'); need('pickup_address')
@@ -229,13 +252,18 @@ export const useJoinStore = defineStore('joinStore', {
                     }
                 }
                 if (step === 6) {
-                    if (!state.documents.id_document.length) e.id_document = 'join_page.error_id_document'
+                    // Passport photo only: Vietnamese sellers give the CCCD number, no photo (NĐ 356)
+                    if (f.id_type === 'passport' && !state.documents.id_document.length) e.id_document = 'join_page.error_id_document'
                 }
                 if (step === 7) {
                     need('bank_account_holder')
                     if (!f.bank_name) e.bank_name = 'join_page.error_required'
                     else if (f.bank_name === 'Other') need('bank_name_other')
                     if (!/^\d{6,20}$/.test(f.bank_account_number.replace(/\s/g, ''))) e.bank_account_number = 'join_page.error_account_number'
+                    // The account must be in the seller's own name (Luật TMĐT 122/2025 Đ21.2.b)
+                    const holder = plainName(f.bank_account_holder)
+                    const first = plainName(f.first_name), last = plainName(f.last_name)
+                    if (holder && holder !== `${first} ${last}` && holder !== `${last} ${first}`) e.bank_account_holder = 'join_page.error_bank_holder'
                 }
                 if (step === 8) {
                     if (!Object.values(state.agree).every(Boolean)) e.agree = 'join_page.error_agree'
@@ -355,7 +383,7 @@ export const useJoinStore = defineStore('joinStore', {
                 first_name: squash(f.first_name), last_name: squash(f.last_name),
                 date_of_birth: f.date_of_birth,
                 nationality: f.nationality === 'Other' ? squash(f.nationality_other) : f.nationality,
-                id_type: f.id_type, id_number: squash(f.id_number),
+                id_type: f.id_type, id_number: squash(f.id_number), id_expiry_date: f.id_expiry_date || null,
                 email: f.email.trim(), phone: f.phone.trim(),
                 residential_address: squash(f.residential_address),
                 tax_code: squash(f.tax_code) || null,
@@ -373,7 +401,8 @@ export const useJoinStore = defineStore('joinStore', {
                 bank_name: f.bank_name === 'Other' ? squash(f.bank_name_other) : f.bank_name,
                 bank_account_number: f.bank_account_number.replace(/\s/g, ''),
                 bank_account_holder: squash(f.bank_account_holder),
-                agreed: true, agreement_version: this.settings.agreement_version,
+                // Every box is required before submit; consent is its own field (stored with a time).
+                agreed: true, personal_data_consent: this.agree.data, agreement_version: this.settings.agreement_version,
                 signature_name: squash(this.signature_name),
             }
         },
@@ -381,6 +410,7 @@ export const useJoinStore = defineStore('joinStore', {
         uploadJobs() {
             const jobs = []
             for (const kind of DOCUMENT_KINDS) {
+                if (kind === 'id_document' && this.form.id_type !== 'passport') continue   // no CCCD photo
                 this.documents[kind].forEach((doc, i) => jobs.push({ id: `${kind}:${i}`, kind, file: doc.file }))
             }
             for (const dish of this.menu) {
@@ -450,7 +480,7 @@ export const useJoinStore = defineStore('joinStore', {
                     this.submitError = e?.response ? apiErrorMessage(data) : i18n.global.t('join_page.error_network')
                 }
                 // Agreement changed since the page loaded: pick up the new version (the iframe shows the new text).
-                if (code === 'agreement_outdated') await this.loadSettings()
+                if (code === 'agreement_outdated' || code === 'enterprise_full') await this.loadSettings()
                 console.error('joinStore - submit -', e)
             } finally {
                 this.submitting = false

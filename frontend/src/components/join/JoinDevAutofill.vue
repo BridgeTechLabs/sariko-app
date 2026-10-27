@@ -67,6 +67,7 @@ export default {
                     first_name: 'Maria', last_name: 'Santos', date_of_birth: isoDate(dob),
                     nationality: 'Philippines', nationality_other: '',
                     id_type: 'passport', id_number: `P${String(now.getTime()).slice(-7)}`,
+                    id_expiry_date: `${now.getFullYear() + 5}-01-01`,
                     email: `test+${now.getTime()}@example.com`, phone: '0901234567',
                     residential_address: '12 Nguyen Hue, Ben Nghe, District 1, Ho Chi Minh City',
                     tax_code: '', tax_resident: 'yes',

@@ -23,7 +23,7 @@ export default {
             ]
         },
         residentOptions() {
-            return ['yes', 'no', 'unsure'].map(v => ({ value: v, label: this.$t(`join_page.resident_${v}`) }))
+            return ['yes', 'no'].map(v => ({ value: v, label: this.$t(`join_page.resident_${v}`) }))
         },
     },
 
@@ -53,6 +53,7 @@ export default {
         </div>
         <div class="join-grid">
             <q-input v-model="form.id_number" dark outlined dense color="amber" :label="$t('join_page.label_id_number')" :error="!!err('id_number')" :error-message="err('id_number')" maxlength="300" />
+            <q-input v-model="form.id_expiry_date" dark outlined dense color="amber" stack-label type="date" :label="$t('join_page.label_id_expiry')" :hint="form.id_type === 'passport' ? $t('join_page.hint_passport_validity', store.limits) : ''" :error="!!err('id_expiry_date')" :error-message="err('id_expiry_date')" />
         </div>
 
         <div class="join-section-title">{{ $t('join_page.section_contact') }}</div>

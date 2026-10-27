@@ -3,7 +3,7 @@ import { ScanBarcode, AlertCircle, Calendar } from 'lucide-vue-next';
 import { mapGetters, mapState } from 'pinia';
 import { useCartStore } from '@/stores/cart/cartStore.js';
 import { useOrderStore } from '@/stores/order/orderStore.js';
-import { useAuthStore } from '@/stores/auth/authStore.js';
+import { useAuthStore, BUYER_MISSING_ROUTES } from '@/stores/auth/authStore.js';
 import { useDeliveryStore } from '@/stores/delivery/deliveryStore.js';
 import apiPayments from '@/apis/payments/apiPayments.js';
 
@@ -23,7 +23,7 @@ export default {
     },
 
     computed: {
-        ...mapGetters(useCartStore, ['subtotalText', 'subtotal', 'maxPreorderDay']),
+        ...mapGetters(useCartStore, ['subtotalText', 'subtotal', 'maxPreorderDay', 'unavailableNames']),
         ...mapState(useCartStore, ['cartItems', 'note', 'cart']),
 
         deliveryStore() {
@@ -56,14 +56,17 @@ export default {
             d.setDate(d.getDate() + this.maxPreorderDay)
             return d
         },
+        // local (Vietnam) date like the hour / minute limits below; toISOString gave the UTC date, so from
+        // 00:00 to 07:00 any time on the next day passed and the server refused it (T127)
         minAppointmentDate() {
-            return this.minAppointmentDatetime.toISOString().slice(0, 10).replace(/-/g, '/')
+            const d = this.minAppointmentDatetime
+            return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
         },
         validationIssues() {
             const auth = useAuthStore()
-            const issues = []
-            if (!auth.user?.phone) issues.push({ msg: this.$t('cart_page.validation.missing_phone'), route: '/account/profile' })
-            if (!auth.inputAddress) issues.push({ msg: this.$t('cart_page.validation.missing_address'), route: '/account/address' })
+            // same list as the home banner (authStore.buyerMissing)
+            const issues = auth.buyerMissing.map((k) => ({ msg: this.$t(`cart_page.validation.missing_${k}`), route: BUYER_MISSING_ROUTES[k] }))
+            if (this.unavailableNames.length) issues.push({ msg: this.$t('cart_page.validation.remove_unavailable', { names: this.unavailableNames.join(', ') }), route: null })
             if (this.isPreorder && !this.deliveryAppointment) issues.push({ msg: this.$t('cart_page.validation.missing_appointment'), route: null })
             return issues
         },
@@ -285,7 +288,7 @@ export default {
 
         <div class="button-checkout">
             <q-btn class="button" dense no-caps :loading="submitting" :disable="!canPlaceOrder" @click="onPlaceOrder">
-                <ScanBarcode class="icon" /> Place Order · {{ totalAmountText }}
+                <ScanBarcode class="icon" /> {{ $t('cart_page.section_total_amount.button_label_checkout') }} · {{ totalAmountText }}
             </q-btn>
         </div>
         <p class="partners-note">{{ $t('cart_page.section_total_amount.partners_note') }}</p>
