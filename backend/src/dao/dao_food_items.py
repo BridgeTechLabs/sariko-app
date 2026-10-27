@@ -1,7 +1,9 @@
 import logging
+from datetime import datetime
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
+from core.store_hours import VN_TZ
 from dao.dao_base import DAOBase
 
 logger = logging.getLogger(__name__)
@@ -63,13 +65,32 @@ class DAOFoodItems(DAOBase):
     def read_menu_by_seller_id(self, seller_id: str):
         result = (
             self._supabase_client.table("menu_categories")
-            .select("id, name, sort_order, is_active, food_items(id, name, description, price, price_text, unit_label, min_quantity, quantity_step, preorder_day, is_available, is_featured, image_url, category_id, rating_avg, rating_count, food_item_variants(id, name, price, price_text, sort_order, is_available))")
+            .select("id, name, sort_order, is_active, food_items(id, name, description, price, price_text, unit_label, min_quantity, quantity_step, preorder_day, is_available, is_featured, daily_portions, image_url, category_id, rating_avg, rating_count, food_item_variants(id, name, price, price_text, sort_order, is_available))")
             .eq("seller_id", seller_id)
             .order("sort_order")
             .order("sort_order", foreign_table="food_items.food_item_variants")
             .execute()
         )
-        return result.data or []
+        menu = result.data or []
+        self.add_remaining_today([f for c in menu for f in c.get("food_items") or []])
+        return menu
+
+    def add_remaining_today(self, items: list) -> list:
+        """T134: remaining_today = portions left for today's deliveries on each dish with a daily limit
+        (seller menu "X / N left today"; buyer: same-day dishes)."""
+        limited = [f for f in items if f and f.get("daily_portions")]
+        if limited:
+            left = self.read_portions_left([f["id"] for f in limited], datetime.now(VN_TZ).date())
+            for f in limited:
+                f["remaining_today"] = left.get(f["id"], f["daily_portions"])
+        return items
+
+    def read_portions_left(self, food_item_ids: list, sale_date) -> dict:
+        """{food_item_id: portions left on sale_date} for the dishes with a daily limit (docs/dev/daily-portions)."""
+        rows = self._supabase_client.rpc(
+            "portions_left", {"p_food_item_ids": food_item_ids, "p_sale_date": sale_date.isoformat()}
+        ).execute().data or []
+        return {r["food_item_id"]: r["remaining"] for r in rows}
 
     def create(self, seller_id: str, fields: dict):
         fields["seller_id"] = seller_id
@@ -89,7 +110,7 @@ class DAOFoodItems(DAOBase):
         """is_available + preorder_day + the seller's switch and hours: enough to decide if the dish can be ordered now."""
         result = (
             self._supabase_client.table(self._table_name)
-            .select("is_available, preorder_day, seller_profiles(status, lat, lon, is_open, opening_time, closing_time)")
+            .select("name, is_available, preorder_day, daily_portions, seller_profiles(status, lat, lon, is_open, opening_time, closing_time)")
             .eq("id", item_id)
             .limit(1)
             .execute()

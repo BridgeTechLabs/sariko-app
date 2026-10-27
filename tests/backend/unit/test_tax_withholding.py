@@ -7,6 +7,8 @@ from test_seller_earnings import _order, earnings  # noqa: F401  (fixture)
 
 
 class _Client:
+    data = True   # reserve_order_portions: the portions were taken (T134)
+
     def __init__(self, fail_compute=False):
         self.rpcs, self.fail_compute = [], fail_compute
 
@@ -44,7 +46,7 @@ def test_tc5_compute_error_keeps_payment(monkeypatch, caplog):
     client = _Client(fail_compute=True)
     with caplog.at_level(logging.ERROR):
         assert _dao(client, monkeypatch).update_payment_status("o1", "paid", "TXN") is True
-    assert client.rpcs[0][0] == "update_order_payment_status"
+    assert "update_order_payment_status" in [name for name, _ in client.rpcs]
     assert "withholding not computed for order o1" in caplog.text
 
 

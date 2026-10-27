@@ -6,10 +6,14 @@ from typing import Optional
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
 from core.sariko_cache import cache
+from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_base import DAOBase
-from services import push_service
+from dao.dao_refunds import DAORefunds
+from services import push_service, zalo
 
 logger = logging.getLogger(__name__)
+
+SOLD_OUT_REASON = "Sold out"  # the buyer UI translates this exact text (OrderStatusHeader.vue)
 
 
 def seller_orders_key(seller_id: str) -> str:
@@ -323,7 +327,7 @@ class DAOOrders(DAOBase):
         """Read order by ID without user scoping (for IPN server-to-server)."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_user_id, payment_status, status, total_amount, transaction_ref") \
+                .select("id, seller_user_id, payment_status, status, total_amount, transaction_ref, delivery_appointment, seller_profiles(store_name)") \
                 .eq("id", order_id) \
                 .maybe_single() \
                 .execute()
@@ -353,6 +357,10 @@ class DAOOrders(DAOBase):
 
     def update_payment_status(self, order_id: str, payment_status: str, transaction_ref: Optional[str] = None):
         try:
+            # T134: the order takes its dish portions before it reaches the seller. The last portion
+            # going while the buyer paid: still marked paid (the money came in), then cancelled + refunded.
+            sold_out = payment_status == "paid" and not self._supabase_client.rpc(
+                'reserve_order_portions', {'p_order_id': order_id}).execute().data
             self._supabase_client.rpc(
                 'update_order_payment_status',
                 {
@@ -368,6 +376,10 @@ class DAOOrders(DAOBase):
             # payment, against a cache that serves every poll tick in between.
             self._invalidate_cache_for_order(order_id)
 
+            if sold_out:
+                self._cancel_sold_out(order_id)
+                return True
+
             # Same rule as the cache drop: the payment is already written, so a
             # failed push lookup must not turn the IPN into an error.
             if payment_status == "paid":
@@ -381,14 +393,24 @@ class DAOOrders(DAOBase):
                     order = self.read_order_by_id_raw(order_id)
                     if order:
                         push_service.notify_new_order(order)
+                        # T136: the team's Zalo group; zalo_new_order_alerts 0 turns it off when orders get many
+                        if zalo.configured("orders") and DAOAdminConfig().get_int_in_range("zalo_new_order_alerts", 1, 0, 1):
+                            zalo.send("orders", zalo.new_order_text(order))
                 except Exception as e:
-                    logger.warning(f"new-order push skipped for order {order_id}: {e}")
+                    logger.warning(f"new-order push / Zalo skipped for order {order_id}: {e}")
             return True
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - update_payment_status: {e}")
         except Exception as e:
             raise Exception(f"error update_payment_status: {e}")
+
+    def _cancel_sold_out(self, order_id: str):
+        """docs/dev/daily-portions Q3: no seller push; the status hook pushes the buyer, a full refund is queued."""
+        cancelled = self.update_order_status(order_id, "cancelled", SOLD_OUT_REASON, expected_status="pending")
+        if cancelled:
+            DAORefunds().create_refund_for_order(cancelled, "sold_out")
+        logger.warning(f"order {order_id} paid but a dish sold out meanwhile: cancelled, refund queued")
 
     def touch_order(self, order_id: str):
         """Bump orders.updated_at (the on_orders_update trigger sets it) and drop the
