@@ -148,7 +148,7 @@
             },
             "signup": {
                 "greeting_text_signup": "Join Sariko! 🇵🇭",
-                "greeting_subtext_signup": "Buy or sell Filipino goods in HCMC",
+                "greeting_subtext_signup": "Create a buyer account to order Filipino food in HCMC",
                 "title_text_role_buyer": "Buy",
                 "title_subtext_role_buyer": "Find Filipino goods",
                 "title_text_role_seller": "Sell",
