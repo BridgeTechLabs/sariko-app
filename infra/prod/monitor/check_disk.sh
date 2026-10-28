@@ -3,7 +3,7 @@
 #   0 * * * * $HOME/monitor/check_disk.sh <slug>
 # e.g. check_disk.sh prod-disk
 #
-# Pings hc-ping.com/<key>/<slug> with "disk N%" as the body: success below
+# Pings hc-ping.com/<key>/<slug> with "Disk N% used" as the body (a webhook shows it via $BODY): success below
 # LIMIT % used on /, /fail at or above it. GitHub runners leave the old version
 # behind on each self-update (_work/_update, bin.*, externals.*), so the disk
 # fills slowly. The default period (1 day) is enough: /fail alerts at once.
@@ -15,7 +15,7 @@ PCT=$(df --output=pcent / | tail -1 | tr -dc 0-9)
 PING="https://hc-ping.com/$HC_PING_KEY/$SLUG"
 
 if [ "$PCT" -lt "$LIMIT" ]; then
-  curl -fsS -m 10 --retry 3 -o /dev/null --data-raw "disk $PCT%" "$PING?create=1"
+  curl -fsS -m 10 --retry 3 -o /dev/null --data-raw "Disk $PCT% used" "$PING?create=1"
 else
-  curl -fsS -m 10 --retry 3 -o /dev/null --data-raw "disk $PCT% (limit $LIMIT%)" "$PING/fail?create=1"
+  curl -fsS -m 10 --retry 3 -o /dev/null --data-raw "Disk almost full: $PCT% used (alert at $LIMIT%)" "$PING/fail?create=1"
 fi
