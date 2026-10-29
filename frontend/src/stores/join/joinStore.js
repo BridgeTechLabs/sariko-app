@@ -3,6 +3,7 @@ import apiOnboarding from '@/apis/onboarding/apiOnboarding'
 import { apiErrorMessage } from '@/lib/axiosPolicy.js'
 import { fileToBase64 } from '@/utils/fileToBase64'
 import { i18n } from '@/plugins/i18n'
+import { cleanFullName, nameMatches, squash } from '@/utils/sellerName'
 
 const INVITE_ONLY = ['enterprise']
 
@@ -18,7 +19,7 @@ const MAPS_RE = /^https?:\/\/(maps\.app\.goo\.gl\/|goo\.gl\/maps|maps\.google\.c
 
 function emptyForm() {
     return {
-        first_name: '', last_name: '', date_of_birth: '',
+        full_name: '', date_of_birth: '',
         nationality: 'Philippines', nationality_other: '',
         id_type: 'passport', id_number: '', id_expiry_date: '',
         email: '', phone: '', residential_address: '',
@@ -28,10 +29,6 @@ function emptyForm() {
         opening_time: '', closing_time: '',
         bank_name: '', bank_name_other: '', bank_account_number: '', bank_account_holder: '',
     }
-}
-
-function squash(text) {
-    return (text || '').trim().replace(/\s+/g, ' ')
 }
 
 function isVnPhone(phone) {
@@ -44,11 +41,6 @@ function isVnPhone(phone) {
 // Local date as "YYYY-MM-DD", comparable as a string with <input type="date"> values.
 function localIso(date) {
     return date.toLocaleDateString('sv-SE')
-}
-
-// "Nguyễn Văn Ân" -> "nguyen van an": bank holder names are written without accents.
-function plainName(text) {
-    return squash(text).replace(/đ/g, 'd').replace(/Đ/g, 'D').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 }
 
 function ageOn(dob, today) {
@@ -199,7 +191,7 @@ export const useJoinStore = defineStore('joinStore', {
         },
 
         fullName(state) {
-            return squash(`${state.form.first_name} ${state.form.last_name}`)
+            return squash(state.form.full_name)
         },
 
         // { field: i18n key } for one step. Empty object = step is valid.
@@ -211,7 +203,8 @@ export const useJoinStore = defineStore('joinStore', {
                 const need = (field, value = f[field]) => { if (!squash(value)) e[field] = 'join_page.error_required' }
 
                 if (step === 2) {
-                    need('first_name'); need('last_name'); need('id_number'); need('residential_address')
+                    need('full_name'); need('id_number'); need('residential_address')
+                    if (squash(f.full_name) && !cleanFullName(f.full_name)) e.full_name = 'join_page.error_full_name'
                     if (!f.date_of_birth) e.date_of_birth = 'join_page.error_required'
                     else if (ageOn(f.date_of_birth, new Date()) < s.min_age) e.date_of_birth = 'join_page.error_age'
                     if (f.nationality === 'Other') need('nationality_other')
@@ -261,16 +254,11 @@ export const useJoinStore = defineStore('joinStore', {
                     else if (f.bank_name === 'Other') need('bank_name_other')
                     if (!/^\d{6,20}$/.test(f.bank_account_number.replace(/\s/g, ''))) e.bank_account_number = 'join_page.error_account_number'
                     // The account must be in the seller's own name (Luật TMĐT 122/2025 Đ21.2.b)
-                    const holder = plainName(f.bank_account_holder)
-                    const first = plainName(f.first_name), last = plainName(f.last_name)
-                    if (holder && holder !== `${first} ${last}` && holder !== `${last} ${first}`) e.bank_account_holder = 'join_page.error_bank_holder'
+                    if (squash(f.bank_account_holder) && !nameMatches(f.bank_account_holder, f.full_name, true)) e.bank_account_holder = 'join_page.error_bank_holder'
                 }
                 if (step === 8) {
                     if (!Object.values(state.agree).every(Boolean)) e.agree = 'join_page.error_agree'
-                    const sig = squash(state.signature_name).toLowerCase()
-                    const first = squash(f.first_name).toLowerCase()
-                    const last = squash(f.last_name).toLowerCase()
-                    if (sig !== `${first} ${last}` && sig !== `${last} ${first}`) e.signature_name = 'join_page.error_signature'
+                    if (!nameMatches(state.signature_name, f.full_name)) e.signature_name = 'join_page.error_signature'
                 }
                 return e
             }
@@ -316,7 +304,10 @@ export const useJoinStore = defineStore('joinStore', {
             try {
                 const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
                 if (!draft) return
-                this.form = { ...emptyForm(), ...draft.form }
+                const { first_name: first, last_name: last, ...form } = draft.form || {}
+                this.form = { ...emptyForm(), ...form }
+                // A draft from the two-box form: its name goes in the one box (the seller can fix it)
+                if (!this.form.full_name) this.form.full_name = squash(`${first || ''} ${last || ''}`)
                 this.menu = Array.isArray(draft.menu) ? draft.menu : []
                 this.step = draft.step || 1
             } catch (e) {
@@ -380,7 +371,7 @@ export const useJoinStore = defineStore('joinStore', {
         payload() {
             const f = this.form
             return {
-                first_name: squash(f.first_name), last_name: squash(f.last_name),
+                full_name: squash(f.full_name),
                 date_of_birth: f.date_of_birth,
                 nationality: f.nationality === 'Other' ? squash(f.nationality_other) : f.nationality,
                 id_type: f.id_type, id_number: squash(f.id_number), id_expiry_date: f.id_expiry_date || null,

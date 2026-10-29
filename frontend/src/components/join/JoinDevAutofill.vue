@@ -49,7 +49,7 @@ export default {
     methods: {
         hasData() {
             const s = this.store
-            return !!(s.form.first_name || s.form.store_name || s.menu.some(d => d.name) || DOCUMENT_KINDS.some(k => s.documents[k].length))
+            return !!(s.form.full_name || s.form.store_name || s.menu.some(d => d.name) || DOCUMENT_KINDS.some(k => s.documents[k].length))
         },
 
         async fill() {
@@ -64,7 +64,7 @@ export default {
                 dob.setFullYear(now.getFullYear() - settings.min_age - 12)
 
                 Object.assign(s.form, {
-                    first_name: 'Maria', last_name: 'Santos', date_of_birth: isoDate(dob),
+                    full_name: 'Maria Cruz Santos', date_of_birth: isoDate(dob),
                     nationality: 'Philippines', nationality_other: '',
                     id_type: 'passport', id_number: `P${String(now.getTime()).slice(-7)}`,
                     id_expiry_date: `${now.getFullYear() + 5}-01-01`,

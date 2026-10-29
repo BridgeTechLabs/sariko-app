@@ -6,6 +6,7 @@ from datetime import date
 
 CCCD_RE = re.compile(r"^\d{12}$")            # số định danh cá nhân
 BANK_ACCOUNT_RE = re.compile(r"^\d{6,20}$")
+PUNCT = str.maketrans("’ʼ‘–—", "'''--")   # phone keyboards type curly quotes / long dashes
 
 
 def squash(text: str) -> str:
@@ -18,15 +19,27 @@ def _plain(text: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn").casefold()
 
 
-def same_name(typed: str, first: str, last: str, ignore_accents: bool = False) -> bool:
-    """typed == "first last" or "last first" (spaces squashed, case ignored)."""
-    norm = _plain if ignore_accents else (lambda s: squash(s).casefold())
-    return norm(typed) in (f"{norm(first)} {norm(last)}", f"{norm(last)} {norm(first)}")
+def name_matches(typed: str, full_name: str, ignore_accents: bool = False) -> bool:
+    """Same words as the full name, any order, each as many times; case, - ' . ignored (accents too
+    for a bank holder). "Nguyễn Văn Ân" matches "AN VAN NGUYEN" but not "NGUYEN AN" (seller-full-name N2)."""
+    def words(text):
+        # "Anne-Marie O'Brien Jr." -> anne marie obrien jr: banks drop the punctuation
+        text = (text or "").translate(PUNCT).replace("-", " ").replace("'", "").replace(".", "")
+        return sorted((_plain(text) if ignore_accents else unicodedata.normalize("NFC", squash(text)).casefold()).split())
+
+    return bool(words(full_name)) and words(typed) == words(full_name)
 
 
-def bank_holder_matches(holder: str, first: str, last: str) -> bool:
+def bank_holder_matches(holder: str, full_name: str) -> bool:
     """Luật TMĐT 122/2025 Đ21.2.b: the payout account is in the seller's own name (Q12)."""
-    return same_name(holder, first, last, ignore_accents=True)
+    return name_matches(holder, full_name, ignore_accents=True)
+
+
+def clean_full_name(text: str):
+    """NFC, spaces squashed; None unless it is letters, spaces and - ' . only (one word is fine)."""
+    name = unicodedata.normalize("NFC", squash(text)).translate(PUNCT)
+    ok = all(c.isalpha() or unicodedata.category(c).startswith("M") or c in " -'." for c in name)
+    return name if ok and any(c.isalpha() for c in name) else None
 
 
 def age(born: date, today: date) -> int:

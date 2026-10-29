@@ -19,6 +19,7 @@ const ERRORS = {
     agreement_required: ['agreed', 'seller_profile.error_agree'],
     consent_required: ['agreed', 'seller_profile.error_agree'],
     signature_mismatch: ['signature_name', 'join_page.error_signature'],
+    invalid_full_name: ['full_name', 'join_page.error_full_name'],
     agreement_outdated: ['', 'seller_profile.error_outdated'],
     missing_group: ['', 'seller_profile.error_missing_group'],
     invalid_location: ['', 'seller_profile.error_location'],
@@ -37,6 +38,7 @@ export default {
             banks: BANKS,
             nationalities: NATIONALITIES,
             shown: [],          // cards to show: the groups missing when the page opened
+            nameFix: false,     // full name shown in the bank card: the account holder lacks a word of it
             form: null,
             idFile: null,       // passport photo, sent right after the identity is saved
             errors: {},
@@ -66,9 +68,7 @@ export default {
             return (this.has('identity') && this.form.id_type === 'passport') || this.missing.includes('id_document')
         },
         fullName() {
-            const first = this.form.first_name || this.prefill.first_name
-            const last = this.form.last_name || this.prefill.last_name
-            return [first, last].filter(Boolean).join(' ')
+            return this.form.full_name || this.prefill.full_name
         },
         // The pickup address is saved by its own form above; the rest goes in one request.
         waitingForAddress() {
@@ -99,7 +99,7 @@ export default {
             const knownNationality = !p.nationality || NATIONALITIES.includes(p.nationality)
             const knownBank = !p.bank_name || BANKS.includes(p.bank_name)
             this.form = {
-                first_name: p.first_name, last_name: p.last_name, date_of_birth: p.date_of_birth || '',
+                full_name: p.full_name, date_of_birth: p.date_of_birth || '',
                 nationality: knownNationality ? p.nationality : 'Other', nationality_other: knownNationality ? '' : p.nationality,
                 id_type: p.id_type || 'cccd', id_number: '', id_expiry_date: p.id_expiry_date || '',
                 residential_address: p.residential_address, email: p.email,
@@ -116,12 +116,13 @@ export default {
             const body = {}
             if (this.has('identity')) {
                 body.identity = {
-                    first_name: f.first_name, last_name: f.last_name, date_of_birth: f.date_of_birth || null,
+                    full_name: f.full_name, date_of_birth: f.date_of_birth || null,
                     nationality: f.nationality === 'Other' ? f.nationality_other : f.nationality,
                     id_type: f.id_type, id_number: f.id_number, id_expiry_date: f.id_expiry_date || null,
                     residential_address: f.residential_address, email: f.email,
                 }
             }
+            if (this.nameFix) body.full_name = f.full_name
             if (this.has('tax')) {
                 body.tax = { tax_resident: f.tax_resident ? f.tax_resident === 'yes' : null, tax_code: f.tax_code }
             }
@@ -185,6 +186,7 @@ export default {
     async mounted() {
         await this.fetch()
         this.shown = [...this.missing]
+        this.nameFix = !this.has('identity') && this.has('bank') && !!this.data?.name_mismatch
         this.initForm()
     },
 }
@@ -205,8 +207,7 @@ export default {
                 <div class="card-title">{{ $t('seller_profile.group_identity') }}</div>
                 <template v-if="has('identity')">
                     <div class="card-hint">{{ $t('join_page.about_hint') }}</div>
-                    <q-input v-model="form.first_name" dark outlined dense color="amber" :label="$t('join_page.label_first_name')" :error="!!err('first_name')" :error-message="err('first_name')" maxlength="300" />
-                    <q-input v-model="form.last_name" dark outlined dense color="amber" :label="$t('join_page.label_last_name')" :error="!!err('last_name')" :error-message="err('last_name')" maxlength="300" />
+                    <q-input v-model="form.full_name" dark outlined dense color="amber" :label="$t('join_page.label_full_name')" :hint="$t('join_page.hint_full_name')" :error="!!err('full_name')" :error-message="err('full_name')" maxlength="300" />
                     <q-input v-model="form.date_of_birth" dark outlined dense color="amber" stack-label type="date" :label="$t('join_page.label_date_of_birth')" :error="!!err('date_of_birth')" :error-message="err('date_of_birth')" />
                     <q-select v-model="form.nationality" dark outlined dense color="amber" :options="nationalities" :label="$t('join_page.label_nationality')" :error="!!err('nationality')" :error-message="err('nationality')" />
                     <q-input v-if="form.nationality === 'Other'" v-model="form.nationality_other" dark outlined dense color="amber" :label="$t('join_page.label_nationality_other')" maxlength="300" />
@@ -239,6 +240,7 @@ export default {
             <div v-if="has('bank')" class="card">
                 <div class="card-title">{{ $t('seller_profile.group_bank') }}</div>
                 <div class="card-hint">{{ $t('join_page.payout_hint') }}</div>
+                <q-input v-if="nameFix" v-model="form.full_name" dark outlined dense color="amber" :label="$t('join_page.label_full_name')" :hint="$t('join_page.hint_full_name')" :error="!!err('full_name')" :error-message="err('full_name')" maxlength="300" />
                 <q-select v-model="form.bank_name" dark outlined dense color="amber" :options="banks" :label="$t('join_page.label_bank_name')" :error="!!err('bank_name')" :error-message="err('bank_name')" />
                 <q-input v-if="form.bank_name === 'Other'" v-model="form.bank_name_other" dark outlined dense color="amber" :label="$t('join_page.label_bank_name_other')" maxlength="300" />
                 <q-input v-model="form.bank_account_number" dark outlined dense color="amber" inputmode="numeric" :label="$t('join_page.label_bank_account_number')" :hint="prefill.bank_account_number_masked ? $t('seller_profile.hint_keep_number', { masked: prefill.bank_account_number_masked }) : ''" :error="!!err('bank_account_number')" :error-message="err('bank_account_number')" maxlength="30" />

@@ -41,7 +41,7 @@ def seller(sid, **kw):
 
 def complete_app(sid, **kw):
     row = {"id": f"app-{sid}", "seller_profile_id": sid, "source": "existing_seller", "status": "submitted",
-           "created_at": "2026-10-20T00:00:00+00:00", "first_name": "An", "last_name": "Nguyễn Văn",
+           "created_at": "2026-10-20T00:00:00+00:00", "full_name": "Nguyễn Văn An",
            "date_of_birth": "1990-01-01", "nationality": "Việt Nam", "id_type": "cccd", "id_number": "079090001234",
            "id_expiry_date": "2035-01-01", "email": "a@x.vn", "residential_address": "2 Hai Ba Trung",
            "tax_code": None, "tax_resident": True, "agreement_version": str(VERSION),
@@ -70,7 +70,7 @@ class FakeDAO:
         return sum(f["application_id"] == application_id and f["kind"] == "id_document" for f in DB.files)
 
     def create_application(self, data):
-        for col in ("first_name", "last_name", "date_of_birth", "nationality", "id_type", "id_number", "email",
+        for col in ("full_name", "date_of_birth", "nationality", "id_type", "id_number", "email",
                     "phone", "residential_address", "store_name", "pickup_address", "menu", "tier",
                     "bank_name", "bank_account_number", "bank_account_holder",
                     "agreement_version", "agreed_at", "signature_name"):
@@ -122,7 +122,7 @@ class FakeSupabase:
         return type("R", (), {"data": {c: row.get(c) for c in self.cols} if row else None})()
 
 
-KYC_FIELDS = ("status", "first_name", "last_name", "date_of_birth", "id_type", "id_number", "id_expiry_date",
+KYC_FIELDS = ("status", "full_name", "date_of_birth", "id_type", "id_number", "id_expiry_date",
               "residential_address", "tax_resident", "agreement_version", "personal_data_consent_at", "signature_name")
 uploads = []
 
@@ -151,7 +151,7 @@ def client(user_id="user-a"):
 def body(**override):
     """Every group, valid, for a Vietnamese seller (cccd)."""
     b = {
-        "identity": {"first_name": "An", "last_name": "Nguyễn Văn", "date_of_birth": "1990-01-01",
+        "identity": {"full_name": "Nguyễn Văn An", "date_of_birth": "1990-01-01",
                      "nationality": "Việt Nam", "id_type": "cccd", "id_number": "079090001234",
                      "id_expiry_date": "2035-01-01", "residential_address": "2 Hai Ba Trung"},
         "tax": {"tax_resident": True},
@@ -276,7 +276,7 @@ def test_tc11_sign_new_agreement():
     r = client().post(P, json={"agreement": {**body()["agreement"], "agreement_version": VERSION + 1}})
     assert r.status_code == 200 and r.json()["complete"] is True
     app = DB.apps[f"app-{SELLER_A}"]
-    assert app["agreement_version"] == str(VERSION + 1) and app["first_name"] == "An" and app["status"] == "submitted"
+    assert app["agreement_version"] == str(VERSION + 1) and app["full_name"] == "Nguyễn Văn An" and app["status"] == "submitted"
 
 
 def test_missing_group_must_be_sent():
@@ -509,3 +509,106 @@ def test_tax_resident_also_on_seller_profile():   # tax-withholding TC-14: the w
     assert r.status_code == 200, r.text
     assert DB.sellers[SELLER_A]["tax_resident"] is False
     assert DB.apps[f"app-{SELLER_A}"]["tax_resident"] is False
+
+
+# G. One full name box (docs/dev/seller-full-name N1-N6, TC ids in the names)
+def _backfilled_without_middle_name():
+    """An older row: first "An" + last "Nguyễn" became full_name "An Nguyễn"; the account says NGUYEN VAN AN."""
+    make_complete(full_name="An Nguyễn", status="approved", signature_name="An Nguyễn")
+
+
+def test_tc8_holder_missing_a_word_shows_the_name_box():
+    _backfilled_without_middle_name()
+    r = client().get(P).json()
+    assert r["missing"] == ["bank"] and r["name_mismatch"] is True and r["prefill"]["full_name"] == "An Nguyễn"
+
+
+def test_tc8_no_name_box_when_the_holder_matches():
+    make_complete()
+    assert client().get(P).json()["name_mismatch"] is False
+    DB.sellers[SELLER_A]["bank_account_holder"] = None   # empty bank: the bank card, not a name problem
+    r = client().get(P).json()
+    assert r["missing"] == ["bank"] and r["name_mismatch"] is False
+
+
+def test_tc8_tc20_fixing_the_name_clears_bank_keeps_the_signature():
+    _backfilled_without_middle_name()
+    bank = {"bank_name": "VCB", "bank_account_number": "", "bank_account_holder": "NGUYEN VAN AN"}
+    r = client().post(P, json={"bank": bank, "full_name": " Nguyễn  Văn An "})
+    assert r.status_code == 200, r.text
+    assert r.json()["complete"] is True and r.json()["name_mismatch"] is False
+    app = DB.apps[f"app-{SELLER_A}"]
+    assert app["full_name"] == "Nguyễn Văn An" and app["signature_name"] == "An Nguyễn"   # no new signature
+    assert app["status"] == "submitted"   # a changed name goes back to review (Q13)
+
+
+def test_tc8_the_new_name_must_still_match_the_holder():
+    _backfilled_without_middle_name()
+    bank = {"bank_name": "VCB", "bank_account_number": "", "bank_account_holder": "NGUYEN VAN AN"}
+    _refused({"bank": bank, "full_name": "Trần Thị B"}, 400, "bank_holder_mismatch")
+    _refused({"bank": bank, "full_name": "Nguyễn Văn An2"}, 422, "invalid_full_name")
+
+
+def test_tc8_holder_still_mismatching_without_the_bank_card_is_refused():
+    _backfilled_without_middle_name()
+    r = client().post(P, json={"full_name": "Nguyễn Văn An"})
+    assert r.status_code == 400 and r.json()["detail"]["groups"] == ["bank"]
+
+
+def test_tc9_full_name_is_the_identity_name():
+    make_complete()
+    assert client().get(P).json()["missing"] == []
+    DB.apps[f"app-{SELLER_A}"]["full_name"] = ""   # backfill of an empty first + last
+    assert "identity" in client().get(P).json()["missing"]
+
+
+def test_tc9_holder_always_checked_against_full_name():
+    make_complete()
+    DB.sellers[SELLER_A]["bank_account_holder"] = "NGUYEN AN"
+    assert client().get(P).json()["missing"] == ["bank"]
+    DB.sellers[SELLER_A]["bank_account_holder"] = "AN VAN NGUYEN"   # same words, other order
+    assert client().get(P).json()["missing"] == []
+
+
+def test_tc10_signature_and_holder_by_words_at_save():
+    assert client().post(P, json=body(agreement={"signature_name": "An Văn Nguyễn"},
+                                      bank={"bank_account_holder": "AN NGUYEN VAN"})).status_code == 200
+
+
+def test_tc10_missing_middle_name_refused_at_save():
+    _refused(body(bank={"bank_account_holder": "NGUYEN AN"}), 400, "bank_holder_mismatch")
+    _refused(body(agreement={"signature_name": "Nguyễn An"}), 400, "signature_mismatch")
+
+
+def test_tc12_old_client_identity_first_last_is_joined():
+    identity = {k: v for k, v in body()["identity"].items() if k != "full_name"}
+    r = client().post(P, json=body(identity=None) | {"identity": {**identity, "first_name": "An", "last_name": "Nguyễn Văn"}})
+    assert r.status_code == 200, r.text
+    assert next(iter(DB.apps.values()))["full_name"] == "An Nguyễn Văn"
+
+
+def test_tc15_identity_name_rules():
+    _refused(body(identity={"full_name": "<script>"}), 422, "invalid_full_name")
+    _refused(body(identity={"full_name": " "}), 422, "missing_field")
+
+
+def test_tc21_two_saves_last_name_wins_whole():
+    make_complete(status="approved")
+    for name in ("Văn An Nguyễn", "Nguyễn Văn An"):
+        assert client().post(P, json={"identity": {**body()["identity"], "full_name": name}}).status_code == 200
+    app = DB.apps[f"app-{SELLER_A}"]
+    assert app["full_name"] == "Nguyễn Văn An" and "first_name" not in app and "last_name" not in app
+
+
+def test_tc22_name_not_in_logs(caplog, monkeypatch, tmp_path):
+    caplog.set_level(logging.DEBUG)
+    monkeypatch.chdir(tmp_path)
+    import main
+    c = client()
+    c.app.add_exception_handler(main.RequestValidationError, main.validation_exception_handler)
+    c.app.add_exception_handler(main.HTTPException, main.http_exception_handler)
+    for b, status in ((body(identity={"full_name": "Zyxwvu " + "x" * 300}), 422), (body(identity={"full_name": "Zyxwvu 1"}), 422),
+                      (body(identity={"full_name": "Zyxwvu Qpo"}), 400), ({"full_name": "Zyxwvu Qpo"}, 400)):
+        r = c.post(P, json=b)
+        assert r.status_code == status and "Zyxwvu" not in r.text
+    assert "Zyxwvu" not in caplog.text

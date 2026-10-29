@@ -39,9 +39,8 @@ export default {
     <div class="join-step">
         <div class="join-hint">{{ $t('join_page.about_hint') }}</div>
 
+        <q-input v-model="form.full_name" dark outlined dense color="amber" :label="$t('join_page.label_full_name')" :hint="$t('join_page.hint_full_name')" :error="!!err('full_name')" :error-message="err('full_name')" maxlength="300" />
         <div class="join-grid">
-            <q-input v-model="form.first_name" dark outlined dense color="amber" :label="$t('join_page.label_first_name')" :error="!!err('first_name')" :error-message="err('first_name')" maxlength="300" />
-            <q-input v-model="form.last_name" dark outlined dense color="amber" :label="$t('join_page.label_last_name')" :error="!!err('last_name')" :error-message="err('last_name')" maxlength="300" />
             <q-input v-model="form.date_of_birth" dark outlined dense color="amber" stack-label type="date" :label="$t('join_page.label_date_of_birth')" :error="!!err('date_of_birth')" :error-message="err('date_of_birth')" />
             <q-select v-model="form.nationality" dark outlined dense color="amber" :options="nationalities" :label="$t('join_page.label_nationality')" />
             <q-input v-if="form.nationality === 'Other'" v-model="form.nationality_other" dark outlined dense color="amber" :label="$t('join_page.label_nationality_other')" :error="!!err('nationality_other')" :error-message="err('nationality_other')" maxlength="300" />
