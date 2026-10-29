@@ -8,7 +8,8 @@ from pydantic import BaseModel, Field
 
 
 class ProfileIdentity(BaseModel):
-    first_name: str = Field(default="", max_length=300)
+    full_name: str = Field(default="", max_length=300)
+    first_name: str = Field(default="", max_length=300)  # older clients; full_name wins when both are sent
     last_name: str = Field(default="", max_length=300)
     date_of_birth: Optional[date] = None
     nationality: str = Field(default="", max_length=300)
@@ -48,5 +49,6 @@ class RequestSellerProfileCompletion(BaseModel):
     tax: Optional[ProfileTax] = None
     bank: Optional[ProfileBank] = None
     phone: Optional[str] = Field(default=None, max_length=300)
+    full_name: Optional[str] = Field(default=None, max_length=300)  # name fix when only the bank holder mismatches
     pickup_address: Optional[ProfilePickupAddress] = None
     agreement: Optional[ProfileAgreement] = None

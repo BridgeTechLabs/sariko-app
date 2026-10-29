@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from apis import onboarding as join
 from core.auth import verify_token
 from core.phone import to_e164_vn
-from core.seller_kyc import age, bank_holder_matches, id_error, mask, same_name, squash, valid_bank_account
+from core.seller_kyc import age, bank_holder_matches, id_error, mask, name_matches, squash, valid_bank_account
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_seller_profile_completion import DAOSellerProfileCompletion
 from schemas import Schema
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/sellers/me/profile-completion")
 logger = logging.getLogger(__name__)
 
 GROUPS = ("identity", "id_document", "tax", "bank", "phone", "pickup_address", "agreement")
-IDENTITY_FIELDS = ("first_name", "last_name", "date_of_birth", "nationality", "id_type", "id_number",
+IDENTITY_FIELDS = ("full_name", "date_of_birth", "nationality", "id_type", "id_number",
                    "id_expiry_date", "residential_address")
 BANK_FIELDS = ("bank_name", "bank_account_number", "bank_account_holder")
 DONE_STATUSES = ("submitted", "approved")
@@ -39,8 +39,17 @@ def _settings() -> dict:
     return DAOAdminConfig().get_positive_ints(SETTINGS_DEFAULTS)
 
 
+def holder_mismatch(seller: dict, app) -> bool:
+    """Q12: the bank account is in someone else's name (or the ID name lacks a word, e.g. the middle name)."""
+    app = app or {}
+    return bool(app.get("full_name") and seller.get("bank_account_holder")
+                and not bank_holder_matches(seller["bank_account_holder"], app["full_name"]))
+
+
 def missing_groups(seller: dict, app, id_documents: int, agreement_version: int) -> list:
-    """The one place that decides what is missing (banner, Me dot and form all use it)."""
+    """The one place that decides what is missing (banner, Me dot and form all use it). The admin Overview's
+    "Sellers missing info" card copies this rule (sariko-admin-panel backend/src/utils/seller_completion.py): keep
+    the two in sync."""
     app = app or {}
     missing = []
     if app.get("status") not in DONE_STATUSES or not all(app.get(f) for f in IDENTITY_FIELDS):
@@ -49,10 +58,7 @@ def missing_groups(seller: dict, app, id_documents: int, agreement_version: int)
         missing.append("id_document")
     if app.get("tax_resident") is None:
         missing.append("tax")
-    if not all(seller.get(f) for f in BANK_FIELDS) or (
-        # Q12: an account in someone else's name counts as missing
-        app.get("first_name") and not bank_holder_matches(seller["bank_account_holder"], app["first_name"], app["last_name"])
-    ):
+    if not all(seller.get(f) for f in BANK_FIELDS) or holder_mismatch(seller, app):
         missing.append("bank")
     if not seller.get("phone"):
         missing.append("phone")
@@ -81,6 +87,8 @@ def _state(dao, user, seller, app, id_documents, settings) -> dict:
         "complete": not missing,
         "missing": missing,
         "agreement_version_current": settings["seller_agreement_version"],
+        # The form then shows the full name next to the bank account, so a missing middle name can be fixed.
+        "name_mismatch": holder_mismatch(seller, app),
         "limits": {
             "min_age": settings["onboarding_min_age"],
             "min_id_validity_months": settings["onboarding_min_id_validity_months"],
@@ -90,8 +98,7 @@ def _state(dao, user, seller, app, id_documents, settings) -> dict:
         "id_document_files": id_documents,
         # Owner-only. ID and account numbers come back masked; an empty field on save keeps them.
         "prefill": {
-            "first_name": app.get("first_name") or "",
-            "last_name": app.get("last_name") or "",
+            "full_name": app.get("full_name") or "",
             "date_of_birth": app.get("date_of_birth"),
             "nationality": app.get("nationality") or "",
             "id_type": app.get("id_type") or "",
@@ -142,7 +149,7 @@ def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request
     lacking = [g for g in missing_groups(seller, app, id_documents, version) if g != "id_document" and g not in sent]
     if lacking:
         raise _error(400, "missing_group", "Fill in every missing section", groups=lacking)
-    if not sent:
+    if not sent and body.full_name is None:
         raise _error(400, "nothing_to_save", "Nothing to save")
 
     # 1. Check everything before writing anything.
@@ -152,8 +159,7 @@ def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request
         i = body.identity
         id_number = _new_value(i.id_number) or (app or {}).get("id_number") or ""
         app_data.update(
-            first_name=_required(i.first_name, "first_name"),
-            last_name=_required(i.last_name, "last_name"),
+            full_name=join.full_name(i.full_name, i.first_name, i.last_name),
             nationality=_required(i.nationality, "nationality"),
             residential_address=_required(i.residential_address, "residential_address"),
             id_type=i.id_type,
@@ -172,6 +178,8 @@ def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request
         app_data.update(date_of_birth=i.date_of_birth.isoformat(), id_expiry_date=i.id_expiry_date.isoformat())
         if email:
             app_data["email"] = email
+    if body.full_name is not None:
+        app_data["full_name"] = join.full_name(body.full_name)
     if body.tax:
         if body.tax.tax_resident is None:
             raise _error(400, "missing_field", "Required field is empty", field="tax_resident")
@@ -197,8 +205,7 @@ def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request
             raise _error(400, "invalid_location", "Pick the pickup address on the map")
         seller_data.update(address=_required(p.address, "address"), lat=p.lat, lon=p.lon)
 
-    first = app_data.get("first_name") or (app or {}).get("first_name") or ""
-    last = app_data.get("last_name") or (app or {}).get("last_name") or ""
+    name = app_data.get("full_name") or (app or {}).get("full_name") or ""
     if body.agreement:
         a = body.agreement
         if not a.agreed:
@@ -207,14 +214,14 @@ def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request
             raise _error(400, "consent_required", "Please accept the processing of your personal data")
         if a.agreement_version != version:
             raise _error(409, "agreement_outdated", "The Seller Agreement was updated, please reload the page")
-        if not same_name(a.signature_name, first, last):
+        if not name_matches(a.signature_name, name):
             raise _error(400, "signature_mismatch", "Type your full name exactly as above")
         now = datetime.now(timezone.utc).isoformat()
         app_data.update(agreement_version=str(version), agreed_at=now, personal_data_consent_at=now,
                         signature_name=squash(a.signature_name),
                         ip=join._client_ip(request), user_agent=(request.headers.get("user-agent") or "")[:500])
     holder = seller_data.get("bank_account_holder") or seller.get("bank_account_holder")
-    if (body.bank or body.identity) and first and holder and not bank_holder_matches(holder, first, last):
+    if (body.bank or "full_name" in app_data) and name and holder and not bank_holder_matches(holder, name):
         raise _error(400, "bank_holder_mismatch", "The bank account must be in your own name")
 
     # 2. Write: the application row first (it has the constraints), then seller_profiles.
@@ -224,7 +231,7 @@ def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request
     try:
         if app:
             update = {**app_data, **snapshot}
-            if body.identity and app["status"] != "submitted":
+            if "full_name" in app_data and app["status"] != "submitted":
                 # Q13: changed identity goes back to review (also after needs_info / rejected)
                 update.update(status="submitted", submitted_at=datetime.now(timezone.utc).isoformat())
             dao.update_application(app["id"], update)

@@ -4,7 +4,7 @@ from dao.dao_base import DAOBase
 
 SELLER_FIELDS = "id, user_id, store_name, tier, phone, address, lat, lon, bank_name, bank_account_number, bank_account_holder"
 APP_FIELDS = (
-    "id, status, source, created_at, first_name, last_name, date_of_birth, nationality, id_type, id_number, "
+    "id, status, source, created_at, full_name, date_of_birth, nationality, id_type, id_number, "
     "id_expiry_date, email, residential_address, tax_code, tax_resident, agreement_version, "
     "personal_data_consent_at, signature_name"
 )

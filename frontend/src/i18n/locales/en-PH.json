@@ -1048,9 +1048,8 @@
         "welcome_prepare_bank": "A Vietnamese bank account in your own name",
         "welcome_time": "Takes about 15 to 20 minutes. Your text is saved on this device as you go; photos and files are not, so add them in one sitting.",
         "about_hint": "Write your name exactly as on your passport or CCCD.",
-        "label_first_name": "First name (given names)",
-        "label_last_name": "Last name (surname)",
         "label_full_name": "Full name",
+        "hint_full_name": "Exactly as on your ID or passport, with your middle name",
         "label_date_of_birth": "Date of birth",
         "label_nationality": "Nationality",
         "label_nationality_other": "Your nationality",
@@ -1180,6 +1179,7 @@
         "hint_passport_validity": "Your passport must be valid for at least {months} more months.",
         "hint_no_cccd_photo": "With a CCCD you only give the number: no photo of the card is needed.",
         "error_cccd": "A CCCD number has 12 digits",
+        "error_full_name": "Use letters only (spaces and - ' . are fine)",
         "error_id_expired": "This ID document has expired",
         "error_id_expiring": "Your passport must be valid for at least {months} more months",
         "error_bank_holder": "The account must be in your own name, as above"

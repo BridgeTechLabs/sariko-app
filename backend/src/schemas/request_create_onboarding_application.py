@@ -14,8 +14,9 @@ class OnboardingMenuItem(BaseModel):
 
 
 class RequestCreateOnboardingApplication(BaseModel):
-    first_name: str = Field(min_length=1, max_length=300)
-    last_name: str = Field(min_length=1, max_length=300)
+    full_name: str = Field(default="", max_length=300)
+    first_name: str = Field(default="", max_length=300)  # older clients; full_name wins when both are sent
+    last_name: str = Field(default="", max_length=300)
     date_of_birth: date
     nationality: str = Field(min_length=1, max_length=300)
     id_type: str

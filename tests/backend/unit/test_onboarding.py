@@ -4,6 +4,7 @@ DAO, storage and Turnstile are faked. No DB, no network.
 Run from tests/backend:  pytest unit/test_onboarding.py
 """
 import base64
+import logging
 import io
 from datetime import date, datetime, timedelta, timezone
 
@@ -116,7 +117,7 @@ def _dish(key, category="Ulam", name=None, price=75000):
 def _body(**over):
     adult = date.today().replace(year=date.today().year - 30)
     body = {
-        "first_name": "Maria", "last_name": "Santos", "date_of_birth": adult.isoformat(),
+        "full_name": "Maria Santos", "date_of_birth": adult.isoformat(),
         "nationality": "Philippines", "id_type": "passport", "id_number": "P1234567",
         "id_expiry_date": "2035-01-01", "tax_resident": True,
         "email": "maria@example.com", "phone": "0901234567",
@@ -388,7 +389,7 @@ def test_submit_ok_then_second_submit_is_404(env):
 # ── Q6 / Q9-Q12 (spec docs/dev/seller-profile-completion, TC-33..35) ──────────
 
 CCCD = {"nationality": "Vietnam", "id_type": "cccd", "id_number": "079090001234",
-        "first_name": "An", "last_name": "Nguyễn Văn", "signature_name": "Nguyễn Văn An",
+        "full_name": "Nguyễn Văn An", "signature_name": "Nguyễn Văn An",
         "bank_account_holder": "NGUYEN VAN AN"}
 
 
@@ -433,3 +434,84 @@ def test_tc35_months_setting_is_served_and_applied(env):
     FakeConfig.raw = {"onboarding_min_id_validity_months": 1}
     assert env["client"].get("/onboarding/settings").json()["min_id_validity_months"] == 1
     _create(env, id_expiry_date=(date.today() + timedelta(days=60)).isoformat())
+
+
+# ── One full name box (docs/dev/seller-full-name N1-N6, TC ids in the names) ────
+
+def _refused_name(env, status, code, **over):
+    res = env["client"].post("/onboarding/applications", json=_body(**over))
+    assert res.status_code == status and res.json()["detail"]["code"] == code, res.text
+    assert FakeDAO.apps == {}
+    return res
+
+
+def test_tc3_full_name_is_stored_squashed_without_first_last(env):
+    app_id, _ = _create(env, full_name="  Nguyễn   Văn\tÂn ", signature_name="Nguyễn Văn Ân",
+                        bank_account_holder="NGUYEN VAN AN")
+    row = FakeDAO.apps[app_id]
+    assert row["full_name"] == "Nguyễn Văn Ân" and "first_name" not in row and "last_name" not in row
+
+
+def test_tc3_no_name_at_all_is_a_readable_422(env):
+    res = _refused_name(env, 422, "missing_field", full_name="  ")
+    assert res.json()["detail"]["field"] == "full_name"
+
+
+def test_tc1_tc4_holder_and_signature_by_words(env):
+    _refused_name(env, 400, "bank_holder_mismatch", **{**CCCD, "bank_account_holder": "NGUYEN AN"})   # no middle name
+    _refused_name(env, 400, "signature_mismatch", **{**CCCD, "signature_name": "Nguyen Van An"})      # accents dropped
+    _create(env, **{**CCCD, "bank_account_holder": "AN VAN NGUYEN", "signature_name": "Ân Văn Nguyễn",
+                    "full_name": "Nguyễn Văn Ân"})
+
+
+def test_tc12_old_client_first_last_is_joined(env):
+    over = {k: v for k, v in _body().items() if k != "full_name"}
+    res = env["client"].post("/onboarding/applications", json={**over, "first_name": " Ân ", "last_name": "Nguyễn  Văn",
+                                                                 "bank_account_holder": "NGUYEN VAN AN",
+                                                                 "signature_name": "Nguyễn Văn Ân"})
+    assert res.status_code == 200, res.text
+    assert FakeDAO.apps[res.json()["id"]]["full_name"] == "Ân Nguyễn Văn"
+
+
+def test_tc12_full_name_wins_over_first_last(env):
+    app_id, _ = _create(env, full_name="Maria Cruz Santos", first_name="X", last_name="Y",
+                        signature_name="Maria Cruz Santos", bank_account_holder="MARIA CRUZ SANTOS")
+    assert FakeDAO.apps[app_id]["full_name"] == "Maria Cruz Santos"
+
+
+@pytest.mark.parametrize("name", ["An2", "<script>", "=1+1", "An@", "Nguyễn, An", "..."])
+def test_tc15_other_characters_refused(env, name):
+    res = _refused_name(env, 422, "invalid_full_name", full_name=name)
+    assert res.json()["detail"]["field"] == "full_name"
+
+
+@pytest.mark.parametrize("name", ["An", "Anne-Marie O'Brien Jr."])
+def test_tc15_one_word_and_punctuation_pass(env, name):
+    app_id, _ = _create(env, full_name=name, signature_name=name, bank_account_holder=name.upper())
+    assert FakeDAO.apps[app_id]["full_name"] == name
+
+
+def test_tc15_301_characters_refused(env):
+    res = env["client"].post("/onboarding/applications", json=_body(full_name="A" * 301))
+    assert res.status_code == 422 and FakeDAO.apps == {}
+    assert [e["loc"][-1] for e in res.json()["detail"]] == ["full_name"]
+
+
+def test_tc22_name_not_in_logs_or_422(env, caplog, monkeypatch, tmp_path):
+    caplog.set_level(logging.DEBUG)
+    monkeypatch.chdir(tmp_path)   # main makes ./logs on import; tests are read-only in CI
+    import main
+    env["client"].app.add_exception_handler(main.RequestValidationError, main.validation_exception_handler)
+    env["client"].app.add_exception_handler(main.HTTPException, main.http_exception_handler)
+    secret = "Zyxwvu Qponml"
+    for over in ({"full_name": secret + "x" * 300}, {"full_name": secret + "1"},
+                 {"full_name": secret, "bank_account_holder": "OTHER PERSON"}, {"full_name": secret, "signature_name": "x"}):
+        res = env["client"].post("/onboarding/applications", json=_body(**over))
+        assert res.status_code in (400, 422) and "Zyxwvu" not in res.text
+    assert "Zyxwvu" not in caplog.text
+
+
+def test_tc21_two_posts_two_drafts_each_with_its_own_name(env):
+    a, _ = _create(env)
+    b, _ = _create(env, full_name="Maria Cruz Santos", signature_name="Maria Cruz Santos", bank_account_holder="MARIA CRUZ SANTOS")
+    assert (FakeDAO.apps[a]["full_name"], FakeDAO.apps[b]["full_name"]) == ("Maria Santos", "Maria Cruz Santos")
