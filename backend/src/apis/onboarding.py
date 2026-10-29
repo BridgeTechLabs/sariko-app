@@ -24,7 +24,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 
 from core.client_ip import client_ip
 from core.phone import to_e164_vn
-from core.seller_kyc import age, bank_holder_matches, id_error, same_name, valid_bank_account
+from core.seller_kyc import age, bank_holder_matches, clean_full_name, id_error, name_matches, valid_bank_account
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_onboarding import DAOOnboarding
 from dao.dao_seller_profiles import DAOSellerProfiles
@@ -71,6 +71,17 @@ _rate_hits = defaultdict(deque)
 
 def _error(status: int, code: str, message: str, **params):
     return HTTPException(status_code=status, detail={"code": code, "message": message, **params})
+
+
+def full_name(full: str, first: str = "", last: str = "") -> str:
+    """The checked full name. An older client (cached app, old draft) sends first + last: joined, same rules."""
+    text = full if _squash(full) else f"{first} {last}"
+    if not _squash(text):
+        raise _error(422, "missing_field", "Required field is empty", field="full_name")
+    name = clean_full_name(text)
+    if name is None:
+        raise _error(422, "invalid_full_name", "Use letters, spaces and - ' . only", field="full_name")
+    return name
 
 
 def _percent(rate) -> int:
@@ -268,10 +279,11 @@ def create_application(body: Schema.RequestCreateOnboardingApplication, request:
         raise _error(400, "consent_required", "Please accept the processing of your personal data")
     if body.agreement_version != settings["seller_agreement_version"]:
         raise _error(409, "agreement_outdated", "The Seller Agreement was updated, please reload the page")
-    if not same_name(body.signature_name, body.first_name, body.last_name):
+    name = full_name(body.full_name, body.first_name, body.last_name)
+    if not name_matches(body.signature_name, name):
         raise _error(400, "signature_mismatch", "Type your full name exactly as above")
 
-    required = ("first_name", "last_name", "nationality", "id_number", "residential_address",
+    required = ("nationality", "id_number", "residential_address",
                 "store_name", "pickup_address", "bank_name", "bank_account_number", "bank_account_holder")
     for field in required:
         if not _squash(getattr(body, field)):
@@ -284,7 +296,7 @@ def create_application(body: Schema.RequestCreateOnboardingApplication, request:
         raise _error(400, code, "Check the ID document", months=settings["onboarding_min_id_validity_months"])
     if not valid_bank_account(body.bank_account_number):
         raise _error(400, "invalid_bank_account", "Account number must be 6 to 20 digits")
-    if not bank_holder_matches(body.bank_account_holder, body.first_name, body.last_name):
+    if not bank_holder_matches(body.bank_account_holder, name):
         raise _error(400, "bank_holder_mismatch", "The bank account must be in your own name")
     if body.tier not in TIERS:
         raise _error(400, "invalid_tier", "Invalid plan")
@@ -313,8 +325,7 @@ def create_application(body: Schema.RequestCreateOnboardingApplication, request:
     upload_token = secrets.token_urlsafe(32)
     row = dao.create_application({
         "status": "draft",
-        "first_name": _squash(body.first_name),
-        "last_name": _squash(body.last_name),
+        "full_name": name,
         "date_of_birth": body.date_of_birth.isoformat(),
         "nationality": _squash(body.nationality),
         "id_type": body.id_type,

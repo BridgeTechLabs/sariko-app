@@ -51,11 +51,12 @@ app = FastAPI(lifespan=lifespan)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # Without "input": a bad field echoes the request body, which can hold ID / bank numbers.
-    logger.warning(f"Validation error: {[{k: v for k, v in e.items() if k != 'input'} for e in exc.errors()]}")
+    # Without "input": a bad field echoes the request body, which can hold ID / bank numbers or names.
+    errors = [{k: v for k, v in e.items() if k != 'input'} for e in exc.errors()]
+    logger.warning(f"Validation error: {errors}")
     return JSONResponse(
         status_code=422,
-        content={"detail": "Invalid request data", "errors": exc.errors()}
+        content={"detail": "Invalid request data", "errors": errors}
     )
 
 @app.exception_handler(HTTPException)

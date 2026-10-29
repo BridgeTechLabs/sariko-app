@@ -31,7 +31,7 @@ export default {
             const resident = { true: t('resident_yes'), false: t('resident_no') }[p.tax_resident] ?? t('resident_unsure')
             return [
                 { step: 2, title: t('step_about'), rows: [
-                    [t('label_full_name'), `${p.first_name} ${p.last_name}`],
+                    [t('label_full_name'), p.full_name],
                     [t('label_date_of_birth'), p.date_of_birth],
                     [t('label_nationality'), p.nationality],
                     [t(`id_type_${p.id_type}`), p.id_number],
