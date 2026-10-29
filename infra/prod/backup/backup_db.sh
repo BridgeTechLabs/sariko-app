@@ -4,13 +4,13 @@
 #   15 19 * * * $HOME/backup/backup_db.sh >> $HOME/backup/backup.log 2>&1   (02:15 VN)
 #
 # - ~/backup/.env.database (chmod 600) holds PROD_DB_URL = the Session pooler URI
-#   (port 5432; the direct host is IPv6-only).
+#   (port 5432; the direct host is IPv6-only) and SUPABASE_SERVICE_KEY (service role key).
 # - pg_dump and aws run in containers: nothing to install on the server.
 # - The instance role (sariko-prod-ec2) may only PutObject under daily/, so this
 #   box can neither read nor delete backups. The bucket's lifecycle rule
 #   expire-daily-7d deletes them after 7 days.
 # - Storage files (images): every object listed in storage.objects is fetched
-#   from its public URL (all buckets are public, so no extra key) and uploaded
+#   with the service role key (two buckets are private) and uploaded
 #   as one tar next to the dump. A file that fails to download is logged and
 #   skipped; the run still uploads the rest, then reports /fail.
 # - Healthchecks.io check `prod-db-backup` (TODO T5): /start, then success or
@@ -56,13 +56,15 @@ echo "[$STAMP] uploaded daily/sariko_prod_$STAMP.dump ($SIZE bytes)"
 # Project ref = the pooler user name "postgres.<ref>".
 REF=$(sed -E 's#^[a-z]+://postgres\.([a-z0-9]+):.*#\1#' <<<"$PROD_DB_URL")
 [[ $REF =~ ^[a-z0-9]{20}$ ]] || { echo "cannot read project ref from PROD_DB_URL"; false; }
-BASE="https://$REF.supabase.co/storage/v1/object/public"
+# Private buckets (onboarding-files, complaints) need the service role key; it reads public ones too.
+: "${SUPABASE_SERVICE_KEY:?SUPABASE_SERVICE_KEY missing in ~/backup/.env.database}"
+BASE="https://$REF.supabase.co/storage/v1/object/authenticated"
 
 FAILED=0
 mkdir "$TMP/storage"
 while IFS= read -r path; do
   url="$BASE/$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$path")"
-  curl -fsS -m 60 --retry 2 --create-dirs -o "$TMP/storage/$path" "$url" \
+  curl -fsS -m 60 --retry 2 --create-dirs -o "$TMP/storage/$path" -H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" "$url" \
     || { echo "[$STAMP] storage: failed $path"; FAILED=$((FAILED + 1)); }
 done < "$TMP/objects.txt"
 
