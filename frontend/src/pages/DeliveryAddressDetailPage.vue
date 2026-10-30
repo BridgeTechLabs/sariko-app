@@ -15,7 +15,7 @@ export default {
 </script>
 
 <template>
-    <LayoutBaseSettings :title="$t(id === 'new' ? 'breadcrumbs.address_new_page' : 'breadcrumbs.address_detail_page')" back-to="/account/address">
+    <LayoutBaseSettings :title="$t(id === 'new' ? 'breadcrumbs.address_new_page' : 'breadcrumbs.address_detail_page')" :back-to="$route.query.from === 'cart' ? '/cart' : '/account/address'">
         <template #Content>
             <AddressForm :key="id" :address-id="id" />
         </template>

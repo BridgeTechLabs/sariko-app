@@ -13,6 +13,7 @@ import { useMenuStore } from "@/stores/seller/menuStore";
 import { useProfileCompletionStore } from "@/stores/seller/profileCompletionStore";
 import { useReviewStore } from "@/stores/review/reviewStore";
 import { useComplaintStore } from "@/stores/complaint/complaintStore";
+import { useAddressStore } from "@/stores/address/addressStore";
 import { i18n } from "@/plugins/i18n";
 import { disablePush } from "@/composables/pushNotifications";
 
@@ -38,6 +39,7 @@ function resetAccountStores() {
     useProfileCompletionStore().$reset();
     useReviewStore().$reset();
     useComplaintStore().$reset();
+    useAddressStore().$reset();
 }
 
 // The axios interceptor reads the token via supabase.auth.getSession() (storage),
@@ -117,6 +119,10 @@ export const useAuthStore = defineStore("authStore", {
             inputAddressDetails: null,
             inputLat: null,
             inputLon: null,
+            // delivery address of the next order (default one, or picked in the cart): addressStore.useForOrder
+            inputReceiverName: null,
+            inputReceiverPhone: null,
+            inputDeliveryNote: null,   // street_name · note, for the driver
             selectedPreferedLanguage: 'English',
 
             // user & session
@@ -196,13 +202,7 @@ export const useAuthStore = defineStore("authStore", {
                     }
 
                     try {
-                        const addrRes = await apiUsers.getDefaultAddress()
-                        if (addrRes?.address) {
-                            this.inputAddress = addrRes.address.address || null
-                            this.inputAddressDetails = addrRes.address.label || null
-                            this.inputLat = addrRes.address.lat || null
-                            this.inputLon = addrRes.address.lon || null
-                        }
+                        await useAddressStore().fetch()   // fills input* from the default address
                     } catch (e) {
                         console.error(`authStore - bootstrap - address fetch failed: ${e}`);
                     }
@@ -343,13 +343,7 @@ export const useAuthStore = defineStore("authStore", {
                 }
 
                 try {
-                    const addrRes = await apiUsers.getDefaultAddress()
-                    if (addrRes?.address) {
-                        this.inputAddress = addrRes.address.address || null
-                        this.inputAddressDetails = addrRes.address.label || null
-                        this.inputLat = addrRes.address.lat || null
-                        this.inputLon = addrRes.address.lon || null
-                    }
+                    await useAddressStore().fetch()   // fills input* from the default address
                 } catch (e) {
                     console.error(`authStore - onClickedSignin - address fetch failed: ${e}`);
                 }

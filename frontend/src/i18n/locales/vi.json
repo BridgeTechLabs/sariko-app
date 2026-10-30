@@ -294,7 +294,8 @@
         "section_delivery_address": {
             "title": "GIAO ĐẾN {name}",
             "button_label_text_edit": "Thay đổi",
-            "no_address": "Nhấn để thêm địa chỉ giao hàng"
+            "no_address": "Nhấn để thêm địa chỉ giao hàng",
+            "sheet_title": "Giao tới"
         },
         "section_total_amount": {
             "title_subtotal": "Tạm tính",
@@ -416,7 +417,12 @@
         "label_note": "Ghi chú cho tài xế",
         "placeholder_note": "Cổng, mốc gần đó...",
         "label_label": "Nhãn",
-        "placeholder_label": "Nhà, Công ty...",
+        "placeholder_label": "Tên gợi nhớ, ví dụ Nhà mẹ",
+        "group_address": "Địa chỉ",
+        "group_contact": "Liên hệ",
+        "label_home": "Nhà",
+        "label_office": "Công ty",
+        "label_other": "Khác",
         "card_title": "Địa chỉ",
         "chip_default": "Mặc định",
         "button_add": "Thêm địa chỉ",

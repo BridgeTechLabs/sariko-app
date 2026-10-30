@@ -294,7 +294,8 @@
         "section_delivery_address": {
             "title": "DELIVERY TO {name}",
             "button_label_text_edit": "Change",
-            "no_address": "Tap to add delivery address"
+            "no_address": "Tap to add delivery address",
+            "sheet_title": "Deliver to"
         },
         "section_total_amount": {
             "title_subtotal": "Subtotal",
@@ -416,7 +417,12 @@
         "label_note": "Note for the driver",
         "placeholder_note": "Gate, landmark...",
         "label_label": "Label",
-        "placeholder_label": "Home, Office...",
+        "placeholder_label": "A name you will recognise, e.g. Mum's place",
+        "group_address": "Address",
+        "group_contact": "Contact",
+        "label_home": "Home",
+        "label_office": "Office",
+        "label_other": "Other",
         "card_title": "Address",
         "chip_default": "Default",
         "button_add": "Add address",

@@ -4,6 +4,15 @@ import apiUserAddresses from '@/apis/users/apiUserAddresses'
 import apiUsers from '@/apis/users/apiUsers'
 import { useAuthStore } from '@/stores/auth/authStore'
 
+// Label chips: Home / Office are stored as these words (older rows too), anything else is "Other".
+export const LABEL_VALUES = { home: 'Home', office: 'Office' }
+const LABEL_WORDS = { home: ['home', 'nhà'], office: ['office', 'work', 'công ty'] }
+
+export function labelKind(label) {
+    const word = (label || '').trim().toLowerCase()
+    return Object.keys(LABEL_WORDS).find(k => LABEL_WORDS[k].includes(word)) || 'other'
+}
+
 // The buyer's delivery addresses (user_addresses) and the Goong lookups the address form uses.
 // The default one is also kept in authStore.input*, which the cart and checkout read.
 export const useAddressStore = defineStore('address', {
@@ -24,16 +33,11 @@ export const useAddressStore = defineStore('address', {
             this.syncDefault()
         },
 
-        // id null = a new address. Throws the API error for the form to show.
+        // id null = a new address. Returns the saved row; throws the API error for the form to show.
         async save(id, data) {
-            await (id ? apiUserAddresses.update(id, data) : apiUserAddresses.create(data))
+            const res = await (id ? apiUserAddresses.update(id, data) : apiUserAddresses.create(data))
             await this.fetch()
-        },
-
-        // PATCH needs the location with any change (backend rule), so it goes along.
-        async setDefault(address) {
-            await apiUserAddresses.update(address.id, { address: address.address, lat: address.lat, lon: address.lon, is_default: true })
-            await this.fetch()
+            return res.address
         },
 
         async remove(id) {
@@ -42,12 +46,20 @@ export const useAddressStore = defineStore('address', {
         },
 
         syncDefault() {
-            const d = this.addresses.find(a => a.is_default)
+            this.useForOrder(this.addresses.find(a => a.is_default))
+        },
+
+        // The address the next order goes to (cart / checkout read authStore.input*). Picking one in
+        // the cart does not change the default.
+        useForOrder(a) {
             const auth = useAuthStore()
-            auth.inputAddress = d?.address || null
-            auth.inputAddressDetails = d?.label || null
-            auth.inputLat = d?.lat ?? null
-            auth.inputLon = d?.lon ?? null
+            auth.inputAddress = a?.address || null
+            auth.inputAddressDetails = a?.label || null
+            auth.inputLat = a?.lat ?? null
+            auth.inputLon = a?.lon ?? null
+            auth.inputReceiverName = a?.receiver_name || null
+            auth.inputReceiverPhone = a?.phone_number || null
+            auth.inputDeliveryNote = [a?.street_name, a?.note].filter(Boolean).join(' · ') || null
         },
 
         // Seller: the store's pickup address lives in seller_profiles.
