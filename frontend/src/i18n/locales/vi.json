@@ -47,6 +47,7 @@
         "store_address_missing": "Thiếu địa chỉ lấy hoặc giao hàng. Vui lòng cập nhật địa chỉ quán trong cài đặt.",
         "seller_phone_invalid": "Số điện thoại quán không hợp lệ. Vui lòng cập nhật trong cài đặt.",
         "buyer_phone_invalid": "Số điện thoại người mua không hợp lệ nên chưa đặt được tài xế.",
+        "receiver_phone_invalid": "Số điện thoại người nhận của địa chỉ này không hợp lệ. Vui lòng sửa lại địa chỉ.",
         "dish_name_taken": "Bạn đã có món trùng tên trong danh mục này.",
         "cannot_unset_default_address": "Không thể bỏ địa chỉ mặc định; hãy chọn địa chỉ khác làm mặc định.",
         "invalid_phone": "Số điện thoại không hợp lệ.",
@@ -88,6 +89,8 @@
         "language_page": "Ngôn ngữ",
         "delivery_address_page": "Địa chỉ giao hàng",
         "store_address_page": "Địa chỉ cửa hàng",
+        "address_detail_page": "Địa chỉ",
+        "address_new_page": "Thêm địa chỉ",
         "terms_page": "Điều khoản dịch vụ",
         "privacy_page": "Chính sách bảo mật",
         "change_password_page": "Đổi mật khẩu",
@@ -292,7 +295,8 @@
         "section_delivery_address": {
             "title": "GIAO ĐẾN {name}",
             "button_label_text_edit": "Thay đổi",
-            "no_address": "Nhấn để thêm địa chỉ giao hàng"
+            "no_address": "Nhấn để thêm địa chỉ giao hàng",
+            "sheet_title": "Giao tới"
         },
         "section_total_amount": {
             "title_subtotal": "Tạm tính",
@@ -402,13 +406,33 @@
     "delivery_address_page": {
         "title": "Địa chỉ giao hàng",
         "subtitle": "Thả ghim tại vị trí của bạn, sau đó nhập chi tiết bên dưới",
-        "label_address_details": "Chi tiết địa chỉ",
-        "placeholder_address_details": "Tòa nhà, tầng, mốc...",
         "button_use_current_location": "Dùng vị trí hiện tại",
         "button_locating": "Đang xác định vị trí...",
         "button_save": "Lưu địa chỉ",
         "empty_address": "Chưa có địa chỉ. Hãy thả ghim trên bản đồ phía trên.",
-        "search_placeholder": "Tìm địa chỉ..."
+        "search_placeholder": "Tìm địa chỉ...",
+        "label_receiver": "Người nhận",
+        "label_phone": "Số điện thoại",
+        "label_street": "Số nhà, tên đường",
+        "placeholder_street": "Tòa nhà, tầng, số nhà...",
+        "label_note": "Ghi chú cho tài xế",
+        "placeholder_note": "Cổng, mốc gần đó...",
+        "label_label": "Nhãn",
+        "placeholder_label": "Tên gợi nhớ, ví dụ Nhà mẹ",
+        "group_address": "Địa chỉ",
+        "group_contact": "Liên hệ",
+        "label_home": "Nhà",
+        "label_office": "Công ty",
+        "label_other": "Khác",
+        "card_title": "Địa chỉ",
+        "chip_default": "Mặc định",
+        "button_add": "Thêm địa chỉ",
+        "button_set_default": "Đặt làm mặc định",
+        "button_delete": "Xoá địa chỉ",
+        "delete_title": "Xoá địa chỉ này?",
+        "delete_message": "Đơn đã đặt vẫn giữ địa chỉ cũ.",
+        "empty_list": "Chưa có địa chỉ giao hàng",
+        "error_phone": "Kiểm tra lại số điện thoại"
     },
     "terms_page": {
         "title": "Điều khoản dịch vụ",

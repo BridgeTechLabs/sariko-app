@@ -1,0 +1,12 @@
+{
+    "name": "sariko-e2e",
+    "private": true,
+    "type": "module",
+    "description": "Playwright smoke tests of the app and admin on DEV (docs/dev/e2e-smoke). Kept apart from frontend/package.json.",
+    "scripts": {
+        "test": "playwright test"
+    },
+    "devDependencies": {
+        "@playwright/test": "1.61.1"
+    }
+}

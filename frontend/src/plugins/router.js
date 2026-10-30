@@ -202,6 +202,12 @@ const routes = [
         meta: { requiresAuth: true }
     },
     {
+        path: '/account/address/:id',
+        name: 'account-address-detail',
+        component: () => import('@/pages/DeliveryAddressDetailPage.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
         path: '/account/language',
         name: 'account-language',
         component: () => import('@/pages/LanguagePage.vue'),

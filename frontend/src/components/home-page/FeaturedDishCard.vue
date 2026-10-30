@@ -1,9 +1,11 @@
 <script>
 import { useCartStore } from '@/stores/cart/cartStore';
 import { useAuthStore } from '@/stores/auth/authStore';
+import { CirclePlus } from 'lucide-vue-next';
 
 export default {
     name: 'FeaturedDishCard',
+    components: { CirclePlus },
     props: {
         hasVariants: {
             type: Boolean,
@@ -94,7 +96,7 @@ export default {
             <div class="price-row">
                 <div class="food-price">{{ price }}</div>
                 <q-btn flat dense no-caps :loading="loading" @click="handleAddToCart">
-                    <q-icon name="fa-solid fa-circle-plus" style="color: #f5A623" />
+                    <CirclePlus :size="22" style="color: #f5A623" />
                     <template #loading>
                         <q-spinner-dots color="orange" size="16px" />
                     </template>

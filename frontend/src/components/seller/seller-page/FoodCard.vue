@@ -1,6 +1,6 @@
 <script>
 import { blockedByClosedStore } from '@/utils/storeOpen';
-import { Star } from 'lucide-vue-next';
+import { Star, CirclePlus } from 'lucide-vue-next';
 import { mapState } from 'pinia';
 import { useSellerStore } from '@/stores/seller/sellerStore';
 import { useCartStore } from '@/stores/cart/cartStore';
@@ -57,7 +57,8 @@ export default {
     },
 
     components: {
-        Star
+        Star,
+        CirclePlus
     },
 
     data() {
@@ -159,7 +160,7 @@ export default {
                     <div v-if="unitLabel" class="unit-label">/ {{ unitLabel }}</div>
                 </div>
                 <q-btn flat dense no-caps :loading="loading" :disable="storeClosed || !canOrder" @click="handleAddToCart">
-                    <q-icon name="fa-solid fa-circle-plus" size="26px" style="color: #f5A623" />
+                    <CirclePlus :size="26" style="color: #f5A623" />
                     <template #loading>
                         <q-spinner-dots color="orange" size="20px" />
                     </template>

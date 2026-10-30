@@ -4,13 +4,14 @@ from pydantic import BaseModel, Field, model_validator
 
 class RequestUpdateUserAddress(BaseModel):
     address: str = Field(min_length=1)
-    receiver_name: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    phone_number: Optional[str] = Field(default=None, min_length=1)
+    receiver_name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    phone_number: Optional[str] = Field(default=None, min_length=1, max_length=20)
     label: Optional[str] = None
     lat: float
     lon: float
-    note: Optional[str] = None
-    street_name: Optional[str] = None
+    # street_name + " · " + note goes on the order as delivery_note (<= 500, delivery-recipient)
+    note: Optional[str] = Field(default=None, max_length=250)
+    street_name: Optional[str] = Field(default=None, max_length=200)
     is_default: Optional[bool] = None
 
     @model_validator(mode="after")

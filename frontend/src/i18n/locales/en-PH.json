@@ -47,6 +47,7 @@
         "store_address_missing": "Missing pickup or drop-off address. Please update your store address in settings.",
         "seller_phone_invalid": "Store phone number is invalid. Please update it in settings.",
         "buyer_phone_invalid": "The buyer's phone number is invalid, so a driver can't be booked.",
+        "receiver_phone_invalid": "The receiver's phone number in this address isn't a valid Vietnamese number. Please fix the address.",
         "dish_name_taken": "You already have a dish with this name in this category.",
         "cannot_unset_default_address": "You can't unset the default address; set another address as default instead.",
         "invalid_phone": "Invalid phone number.",
@@ -88,6 +89,8 @@
         "language_page": "Language",
         "delivery_address_page": "Delivery Address",
         "store_address_page": "Store Address",
+        "address_detail_page": "Address",
+        "address_new_page": "New Address",
         "terms_page": "Terms of Service",
         "privacy_page": "Privacy Policy",
         "change_password_page": "Change Password",
@@ -292,7 +295,8 @@
         "section_delivery_address": {
             "title": "DELIVERY TO {name}",
             "button_label_text_edit": "Change",
-            "no_address": "Tap to add delivery address"
+            "no_address": "Tap to add delivery address",
+            "sheet_title": "Deliver to"
         },
         "section_total_amount": {
             "title_subtotal": "Subtotal",
@@ -402,13 +406,33 @@
     "delivery_address_page": {
         "title": "Delivery Address",
         "subtitle": "Drop the pin at your location, then add building details below",
-        "label_address_details": "Address details",
-        "placeholder_address_details": "Building, floor, landmark...",
         "button_use_current_location": "Use current location",
         "button_locating": "Getting location...",
         "button_save": "Save address",
         "empty_address": "No address set yet. Drop a pin on the map above.",
-        "search_placeholder": "Search address..."
+        "search_placeholder": "Search address...",
+        "label_receiver": "Receiver",
+        "label_phone": "Phone number",
+        "label_street": "House number, street",
+        "placeholder_street": "Building, floor, house number...",
+        "label_note": "Note for the driver",
+        "placeholder_note": "Gate, landmark...",
+        "label_label": "Label",
+        "placeholder_label": "A name you will recognise, e.g. Mum's place",
+        "group_address": "Address",
+        "group_contact": "Contact",
+        "label_home": "Home",
+        "label_office": "Office",
+        "label_other": "Other",
+        "card_title": "Address",
+        "chip_default": "Default",
+        "button_add": "Add address",
+        "button_set_default": "Set as default",
+        "button_delete": "Delete address",
+        "delete_title": "Delete this address?",
+        "delete_message": "Orders already placed keep their address.",
+        "empty_list": "No delivery address yet",
+        "error_phone": "Check the phone number"
     },
     "terms_page": {
         "title": "Terms of Service",
