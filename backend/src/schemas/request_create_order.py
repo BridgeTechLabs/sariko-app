@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class RequestCreateOrder(BaseModel):
@@ -12,6 +12,11 @@ class RequestCreateOrder(BaseModel):
     quotation_id: Optional[str] = None
     note: Optional[str] = None
     delivery_appointment: Optional[datetime] = None
+    # The chosen address's receiver (docs/dev/delivery-recipient R2); an app without them still orders.
+    # Lalamove publishes no length limit: these match the address form, so an oversized note never reaches it
+    receiver_name: Optional[str] = Field(default=None, max_length=100)
+    receiver_phone: Optional[str] = Field(default=None, max_length=20)
+    delivery_note: Optional[str] = Field(default=None, max_length=500)
 
     @model_validator(mode="after")
     def validate_delivery_fields(self):

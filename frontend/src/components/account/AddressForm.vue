@@ -5,14 +5,18 @@ import { addOsmTiles } from '@/utils/mapTiles';
 import { MapPin, LocateFixed, Search, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth/authStore';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
-import apiUsers from '@/apis/users/apiUsers';
-import { apiClient } from '@/lib/axiosPolicy.js';
+import { LABEL_VALUES, labelKind, useAddressStore } from '@/stores/address/addressStore';
+import { displayPhone } from '@/utils/phone';
 
 export default {
     components: { MapPin, LocateFixed, Search, X },
 
+    // Seller: the store's pickup address. Buyer: one delivery address (addressId 'new' = add one).
     // embedded: inside another page (seller profile form): emit "saved" instead of leaving.
-    props: { embedded: { type: Boolean, default: false } },
+    props: {
+        embedded: { type: Boolean, default: false },
+        addressId: { type: String, default: 'new' },
+    },
     emits: ['saved'],
 
     data() {
@@ -27,6 +31,14 @@ export default {
             addressDetails: '',
             lat: null,
             lon: null,
+            // buyer only
+            receiverName: '',
+            phone: '',
+            labelKind: 'home',  // home | office | other (label = the typed text)
+            label: '',
+            note: '',
+            isDefault: false,
+            makeDefault: false,
             _debounceTimer: null,
             _map: null,
             _marker: null,
@@ -41,8 +53,15 @@ export default {
         isSeller() {
             return !!this.authStore.user?.isSeller
         },
+        addressStore() {
+            return useAddressStore()
+        },
+        isNew() {
+            return this.addressId === 'new'
+        },
         canSave() {
-            return !!this.address && !this.saving
+            const buyerFields = this.isSeller || (this.lat !== null && this.receiverName.trim() && this.phone.trim())
+            return !!this.address && !!buyerFields && !this.saving
         }
     },
 
@@ -55,10 +74,20 @@ export default {
             this.lat = info.lat || null
             this.lon = info.lon || null
         } else {
-            this.address = this.authStore.inputAddress || ''
-            this.addressDetails = this.authStore.inputAddressDetails || ''
-            this.lat = this.authStore.inputLat || null
-            this.lon = this.authStore.inputLon || null
+            if (!this.addressStore.loaded) await this.addressStore.fetch()
+            const row = this.isNew ? null : this.addressStore.byId(this.addressId)
+            if (!this.isNew && !row) return this.$router.replace('/account/address')
+            this.address = row?.address || ''
+            this.addressDetails = row?.street_name || ''
+            this.lat = row?.lat ?? null
+            this.lon = row?.lon ?? null
+            this.receiverName = row?.receiver_name || this.authStore.user?.fullName || ''
+            this.phone = displayPhone(row?.phone_number || this.authStore.user?.phone)
+            if (row) this.labelKind = labelKind(row.label)
+            this.label = this.labelKind === 'other' ? row?.label || '' : ''
+            this.note = row?.note || ''
+            this.isDefault = !!row?.is_default
+            this.makeDefault = this.isDefault || !this.addressStore.addresses.length   // the first one always is
         }
         if (this.address) this.query = this.address
         if (this.lat && this.lon) {
@@ -84,11 +113,8 @@ export default {
         async fetchSuggestions() {
             this.isSearching = true
             try {
-                const res = await apiClient.get('/v1/address/search', { params: { q: this.query } })
-                if (res.data?.success) {
-                    this.suggestions = res.data.results || []
-                    this.showDropdown = this.suggestions.length > 0
-                }
+                this.suggestions = await this.addressStore.search(this.query)
+                this.showDropdown = this.suggestions.length > 0
             } catch (e) {
                 console.error('Address search failed:', e)
             } finally {
@@ -103,12 +129,12 @@ export default {
 
             // Fetch lat/lon from place detail
             try {
-                const res = await apiClient.get('/v1/address/detail', { params: { place_id: item.place_id } })
-                if (res.data?.success) {
-                    this.address = res.data.address || item.label
-                    this.lat = res.data.lat
-                    this.lon = res.data.lon
-                    this.$nextTick(() => this.showMapAt(res.data.lat, res.data.lon))
+                const place = await this.addressStore.placeDetail(item.place_id)
+                if (place) {
+                    this.address = place.address || item.label
+                    this.lat = place.lat
+                    this.lon = place.lon
+                    this.$nextTick(() => this.showMapAt(place.lat, place.lon))
                 }
             } catch (e) {
                 console.error('Place detail failed:', e)
@@ -162,10 +188,10 @@ export default {
                     this.lat = lat
                     this.lon = lon
                     try {
-                        const res = await apiClient.get('/v1/address/reverse', { params: { lat, lon } })
-                        if (res.data?.success && res.data.address) {
-                            this.address = res.data.address
-                            this.query = res.data.address
+                        const found = await this.addressStore.reverse(lat, lon)
+                        if (found) {
+                            this.address = found
+                            this.query = found
                         }
                     } catch (e) {
                         console.error('Reverse geocode failed:', e)
@@ -185,19 +211,18 @@ export default {
             if (!this.canSave) return
             this.saving = true
             try {
-                await apiUsers.updateProfile({
-                    address: this.address,
-                    address_details: this.addressDetails || null,
-                    lat: this.lat,
-                    lon: this.lon,
-                })
+                let saved = null
                 if (this.isSeller) {
+                    await this.addressStore.saveStoreAddress({ address: this.address, lat: this.lat, lon: this.lon })
                     await useDashboardStore().fetchSellerInfo()
                 } else {
-                    this.authStore.inputAddress = this.address
-                    this.authStore.inputAddressDetails = this.addressDetails
-                    this.authStore.inputLat = this.lat
-                    this.authStore.inputLon = this.lon
+                    saved = await this.addressStore.save(this.isNew ? null : this.addressId, {
+                        address: this.address, lat: this.lat, lon: this.lon,
+                        street_name: this.addressDetails.trim() || null,
+                        receiver_name: this.receiverName.trim(), phone_number: this.phone.trim(),
+                        label: LABEL_VALUES[this.labelKind] || this.label.trim() || null, note: this.note.trim() || null,
+                        ...(this.makeDefault && !this.isDefault ? { is_default: true } : {}),
+                    })
                 }
                 this.$q.notify({
                     classes: 'quasar-notify-positive',
@@ -205,25 +230,48 @@ export default {
                     position: 'bottom',
                     timeout: 1500,
                 })
+                const fromCart = this.$route.query.from === 'cart'
+                if (fromCart) this.addressStore.useForOrder(saved)   // added from the cart: this order goes there
                 if (this.embedded) this.$emit('saved')
-                else this.$router.push('/account')
+                else this.$router.push(this.isSeller ? '/account' : fromCart ? '/cart' : '/account/address')
             } catch (e) {
-                this.$q.notify({
-                    classes: 'quasar-notify-negative',
-                    message: this.$t('common.toast_update_failed'),
-                    position: 'bottom',
-                    timeout: 2000,
-                })
+                this.notifyFailed(e?.response?.data?.detail === 'Invalid phone number' ? 'delivery_address_page.error_phone' : 'common.toast_update_failed')
             } finally {
                 this.saving = false
             }
-        }
+        },
+
+        notifyFailed(key) {
+            this.$q.notify({ classes: 'quasar-notify-negative', message: this.$t(key), position: 'bottom', timeout: 2000 })
+        },
+
+        onDelete() {
+            this.$q.dialog({
+                title: this.$t('delivery_address_page.delete_title'),
+                message: this.$t('delivery_address_page.delete_message'),
+                ok: { label: this.$t('delivery_address_page.button_delete'), color: 'negative', noCaps: true, unelevated: true },
+                cancel: { label: this.$t('common.button_label_cancel'), flat: true, noCaps: true },
+                dark: true,
+            }).onOk(async () => {
+                this.saving = true
+                try {
+                    await this.addressStore.remove(this.addressId)
+                    this.$router.push('/account/address')
+                } catch (e) {
+                    this.notifyFailed('common.toast_update_failed')
+                } finally {
+                    this.saving = false
+                }
+            })
+        },
     }
 }
 </script>
 
 <template>
     <div class="address-form">
+
+        <div v-if="!isSeller" class="group-title">{{ $t('delivery_address_page.group_address') }}</div>
 
         <!-- Search input -->
         <div class="search-wrap">
@@ -280,15 +328,38 @@ export default {
             <div class="address-text">{{ address }}</div>
         </div>
 
-        <!-- Address details (buyers only: seller_profiles has no column for it) -->
-        <div v-if="!isSeller" class="form-field">
-            <label class="field-label">{{ $t('delivery_address_page.label_address_details') }}</label>
-            <q-input
-                v-model="addressDetails"
-                dense outlined dark
-                :placeholder="$t('delivery_address_page.placeholder_address_details')"
-            />
-        </div>
+        <!-- Street, note, contact, label, default (buyers only: seller_profiles has no column for them) -->
+        <template v-if="!isSeller">
+            <div class="form-field">
+                <label class="field-label">{{ $t('delivery_address_page.label_street') }}</label>
+                <q-input v-model="addressDetails" dense outlined dark maxlength="200" :placeholder="$t('delivery_address_page.placeholder_street')" />
+            </div>
+            <div class="form-field">
+                <label class="field-label">{{ $t('delivery_address_page.label_note') }}</label>
+                <q-input v-model="note" dense outlined dark maxlength="250" :placeholder="$t('delivery_address_page.placeholder_note')" />
+            </div>
+
+            <div class="group-title">{{ $t('delivery_address_page.group_contact') }}</div>
+            <div class="form-field">
+                <label class="field-label">{{ $t('delivery_address_page.label_receiver') }}</label>
+                <q-input v-model="receiverName" dense outlined dark maxlength="100" />
+            </div>
+            <div class="form-field">
+                <label class="field-label">{{ $t('delivery_address_page.label_phone') }}</label>
+                <q-input v-model="phone" dense outlined dark type="tel" maxlength="20" />
+            </div>
+
+            <div class="form-field">
+                <label class="field-label">{{ $t('delivery_address_page.label_label') }}</label>
+                <div class="label-chips">
+                    <button v-for="k in ['home', 'office', 'other']" :key="k" type="button" class="label-chip" :class="{ active: labelKind === k }" @click="labelKind = k">
+                        {{ $t(`delivery_address_page.label_${k}`) }}
+                    </button>
+                </div>
+                <q-input v-if="labelKind === 'other'" v-model="label" dense outlined dark maxlength="50" :placeholder="$t('delivery_address_page.placeholder_label')" />
+            </div>
+            <q-toggle v-model="makeDefault" :disable="isDefault || !addressStore.addresses.length" dark color="amber" :label="$t('delivery_address_page.button_set_default')" />
+        </template>
 
         <!-- Save -->
         <q-btn
@@ -300,6 +371,8 @@ export default {
         >
             {{ saving ? $t('common.button_label_saving') : $t('delivery_address_page.button_save') }}
         </q-btn>
+
+        <q-btn v-if="!isSeller && !isNew" class="btn-delete" no-caps flat :disable="saving" :label="$t('delivery_address_page.button_delete')" @click="onDelete" />
 
     </div>
 </template>
@@ -495,6 +568,38 @@ export default {
     font-weight: 700;
     font-size: 15px;
     border-radius: 12px;
+}
+
+.group-title {
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.label-chips {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.label-chip {
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.label-chip.active {
+    border-color: var(--color-accent, #f5A623);
+    color: var(--color-accent, #f5A623);
+}
+
+.btn-delete {
+    padding: 12px;
+    color: var(--color-error, #ef4444);
+    font-weight: 600;
 }
 </style>
 

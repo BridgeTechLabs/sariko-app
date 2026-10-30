@@ -106,7 +106,7 @@ export default {
                     displayStatus: this.$t(liveDeliveryKey(order) || STATUS_DISPLAY_KEY[order.status] || order.status),
                     statusClass:   STATUS_CLASS[order.status] || '',
                     code:          orderCode(order.id),
-                    customerName:  order.users?.name || order.users?.email || this.$t('seller_orders.customer_fallback'),
+                    customerName:  order.receiver_name || order.users?.name || order.users?.email || this.$t('seller_orders.customer_fallback'),
                     itemCount:     (order.order_items || []).length,
                     totalText:     new Intl.NumberFormat('vi-VN').format(order.total_amount || 0) + ' ₫',
                     timeText:      formatVnTime(order.created_at, { hour: '2-digit', minute: '2-digit' }),

@@ -1,5 +1,5 @@
 <script>
-import { Store } from 'lucide-vue-next'
+import { Store, ChevronUp, ChevronDown } from 'lucide-vue-next'
 import { mapActions, mapState } from 'pinia';
 import { useCartStore } from '@/stores/cart/cartStore.js';
 import ItemCard from '@/components/order-cart/ItemCard.vue';
@@ -8,6 +8,8 @@ export default {
 
     components: {
         Store,
+        ChevronUp,
+        ChevronDown,
         ItemCard
     },
 
@@ -46,7 +48,7 @@ export default {
                     <span class="item-count">{{ cartItems.length }}</span>
                 </div>
                 <div v-on:click="isExpanded=!isExpanded">
-                    <q-icon :name="isExpanded ? 'expand_less' : 'expand_more'" />
+                    <component :is="isExpanded ? 'ChevronUp' : 'ChevronDown'" :size="20" />
                 </div>
             </div>
             <div v-if="isExpanded" class="items">

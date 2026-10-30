@@ -1,5 +1,5 @@
 <script>
-import { ScanBarcode, AlertCircle, Calendar } from 'lucide-vue-next';
+import { ScanBarcode, AlertCircle, Calendar, Clock } from 'lucide-vue-next';
 import { mapGetters, mapState } from 'pinia';
 import { useCartStore } from '@/stores/cart/cartStore.js';
 import { useOrderStore } from '@/stores/order/orderStore.js';
@@ -9,7 +9,7 @@ import apiPayments from '@/apis/payments/apiPayments.js';
 
 export default {
     components: {
-        ScanBarcode, AlertCircle, Calendar
+        ScanBarcode, AlertCircle, Calendar, Clock
     },
 
     data() {
@@ -120,6 +120,10 @@ export default {
                 if (this.deliveryStore.quotation?.quotation_id) {
                     deliveryOpts.quotation_id = this.deliveryStore.quotation.quotation_id
                 }
+                // The chosen address's receiver: the driver calls them, not the buyer's profile
+                if (authStore.inputReceiverName) deliveryOpts.receiver_name = authStore.inputReceiverName
+                if (authStore.inputReceiverPhone) deliveryOpts.receiver_phone = authStore.inputReceiverPhone
+                if (authStore.inputDeliveryNote) deliveryOpts.delivery_note = authStore.inputDeliveryNote
 
                 const orderStore = useOrderStore()
                 const appt = this.isPreorder && this.deliveryDate && this.deliveryTime
@@ -227,7 +231,8 @@ export default {
                     class="appointment-input"
                 >
                     <template #append>
-                        <q-icon name="event" class="cursor-pointer">
+                        <span class="picker-icon cursor-pointer">
+                            <Calendar :size="18" />
                             <q-popup-proxy transition-show="scale" transition-hide="scale">
                                 <q-date
                                     v-model="deliveryDate"
@@ -239,7 +244,7 @@ export default {
                                     </div>
                                 </q-date>
                             </q-popup-proxy>
-                        </q-icon>
+                        </span>
                     </template>
                 </q-input>
                 <q-input
@@ -250,7 +255,8 @@ export default {
                     class="appointment-input"
                 >
                     <template #append>
-                        <q-icon name="access_time" class="cursor-pointer">
+                        <span class="picker-icon cursor-pointer">
+                            <Clock :size="18" />
                             <q-popup-proxy transition-show="scale" transition-hide="scale">
                                 <q-time
                                     v-model="deliveryTime"
@@ -262,7 +268,7 @@ export default {
                                     </div>
                                 </q-time>
                             </q-popup-proxy>
-                        </q-icon>
+                        </span>
                     </template>
                 </q-input>
             </div>
@@ -451,5 +457,10 @@ export default {
 }
 .icon {
     margin-right: 12px;
+}
+
+.picker-icon {
+    display: flex;
+    color: var(--color-accent, #f5A623);
 }
 </style>

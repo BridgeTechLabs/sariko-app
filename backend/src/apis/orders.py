@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -11,6 +12,7 @@ from fastapi import (
 
 from apis.complaints import complaints_for_order
 from core.auth import verify_token
+from core.phone import to_e164_vn
 from core.store_hours import VN_TZ
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_carts import DAOCarts
@@ -26,6 +28,11 @@ from utils.pricing import order_amounts
 
 router = APIRouter(prefix="/orders")
 logger = logging.getLogger(__name__)
+
+
+def one_line(text):
+    """None for blank; newlines, tabs and other control characters become one space (TC-14, TC-15)."""
+    return " ".join(re.sub(r"[\x00-\x1f\x7f]", " ", text or "").split()) or None
 
 
 def unavailable_names(cart_items: list) -> list:
@@ -129,6 +136,19 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
     if bad_appointment:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=bad_appointment)
 
+    # The driver calls this number (delivery-recipient R2): checked now, not when the seller books the trip
+    receiver = {}
+    if request.delivery_method == "delivery":
+        receiver = {key: one_line(getattr(request, key)) for key in ("receiver_name", "receiver_phone", "delivery_note")}
+    if receiver.get("receiver_phone"):
+        try:
+            receiver["receiver_phone"] = to_e164_vn(receiver["receiver_phone"])
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
+                "code": "receiver_phone_invalid",
+                "message": "The receiver's phone number is not a valid Vietnamese number. Please fix it in your address.",
+            })
+
     sold_out = unavailable_names(cart_items)
     if sold_out:
         raise HTTPException(
@@ -207,6 +227,7 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
         delivery_fee=delivery_fee,
         quotation_id=quotation_id,
         delivery_appointment=appointment,
+        **receiver,
     )
 
     if not order:

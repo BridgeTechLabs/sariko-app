@@ -119,3 +119,21 @@ class DAOUserAddresses(DAOBase):
             raise Exception(f"Supabase error - update_address: {e}")
         except Exception as e:
             raise Exception(f"error update_address: {e}")
+
+    def delete_address(self, user_id: str, address_id: int):
+        """The deleted row, or None when this user has no such address."""
+        try:
+            result = (
+                self._supabase_client
+                .table(self._table_name)
+                .delete()
+                .eq("user_id", user_id)
+                .eq("id", address_id)
+                .execute()
+            )
+            return result.data[0] if result and result.data else None
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - delete_address: {e}")
+        except Exception as e:
+            raise Exception(f"error delete_address: {e}")

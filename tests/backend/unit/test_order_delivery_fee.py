@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError
 from fastapi import HTTPException
 
 import apis.orders as orders
@@ -76,13 +77,13 @@ def fakes(monkeypatch):
         monkeypatch.setattr(orders, name, fake)
 
 
-def place(monkeypatch, server_fee, client_fee):
+def place(monkeypatch, server_fee, client_fee, **extra):
     monkeypatch.setattr(orders, "get_lalamove_service", lambda: FakeLalamove(server_fee))
     req = Schema.RequestCreateOrder(delivery_method="delivery", delivery_address="D7",
                                     delivery_lat=10.73, delivery_lon=106.72,
                                     delivery_fee=client_fee, quotation_id="client-q",
                                     # the cart's dish is a 1-day pre-order (T127)
-                                    delivery_appointment=datetime.now(timezone.utc) + timedelta(days=2))
+                                    delivery_appointment=datetime.now(timezone.utc) + timedelta(days=2), **extra)
     return orders.create_order(req, user={"id": "buyer"})
 
 
@@ -118,3 +119,58 @@ def test_r1_4_quote_failure_creates_nothing(monkeypatch):
     assert e.value.status_code == 502
     assert "delivery fee" in e.value.detail
     assert created == []  # no order → nothing to pay
+
+
+# docs/dev/delivery-recipient R2: the chosen address's receiver is saved with the order
+def test_tc2_receiver_saved_with_order(monkeypatch):
+    place(monkeypatch, server_fee=25000, client_fee=25000,
+          receiver_name="Maria", receiver_phone="0901 234 567", delivery_note="Tầng 3 · gate B")
+    [order] = created
+    assert (order["receiver_name"], order["receiver_phone"], order["delivery_note"]) == ("Maria", "+84901234567", "Tầng 3 · gate B")
+
+
+def test_tc3_old_app_without_receiver_still_orders(monkeypatch):
+    assert place(monkeypatch, server_fee=25000, client_fee=25000)["success"]
+    [order] = created
+    assert (order["receiver_name"], order["receiver_phone"], order["delivery_note"]) == (None, None, None)
+
+
+@pytest.mark.parametrize("field, size", [("receiver_name", 101), ("receiver_phone", 21), ("delivery_note", 501)])
+def test_tc4_oversized_receiver_field_is_refused(monkeypatch, field, size):
+    with pytest.raises(ValidationError):  # FastAPI answers 422 before create_order runs
+        place(monkeypatch, server_fee=25000, client_fee=25000, **{field: "x" * size})
+    assert created == []
+
+
+def test_tc4_bad_receiver_phone_creates_nothing(monkeypatch):
+    with pytest.raises(HTTPException) as e:
+        place(monkeypatch, server_fee=25000, client_fee=25000, receiver_phone="abc")
+    assert e.value.status_code == 400
+    assert e.value.detail["code"] == "receiver_phone_invalid"
+    assert created == []
+
+
+def test_tc14_blank_receiver_fields_are_not_sent(monkeypatch):
+    place(monkeypatch, server_fee=25000, client_fee=25000, receiver_name="   ", receiver_phone="  ", delivery_note="\t")
+    [order] = created
+    assert (order["receiver_name"], order["receiver_phone"], order["delivery_note"]) == (None, None, None)
+
+
+def test_tc15_control_characters_become_one_space(monkeypatch):
+    place(monkeypatch, server_fee=25000, client_fee=25000, receiver_name="Ma\nria", delivery_note=" Tầng 3\r\n\tcổng\x00B ")
+    [order] = created
+    assert (order["receiver_name"], order["delivery_note"]) == ("Ma ria", "Tầng 3 cổng B")
+
+
+def test_tc16_pickup_keeps_no_receiver(monkeypatch):
+    req = Schema.RequestCreateOrder(delivery_method="pickup", receiver_name="Maria", receiver_phone="abc", delivery_note="gate B",
+                                    delivery_appointment=datetime.now(timezone.utc) + timedelta(days=2))
+    assert orders.create_order(req, user={"id": "buyer"})["success"]
+    [order] = created
+    assert "receiver_name" not in order and "receiver_phone" not in order and "delivery_note" not in order
+
+
+def test_tc24_phone_error_does_not_echo_the_number(monkeypatch):
+    with pytest.raises(HTTPException) as e:
+        place(monkeypatch, server_fee=25000, client_fee=25000, receiver_phone="0999 12345")
+    assert "12345" not in str(e.value.detail)
