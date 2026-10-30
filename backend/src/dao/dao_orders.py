@@ -49,7 +49,8 @@ class DAOOrders(DAOBase):
         delivery_method: str, delivery_address: Optional[str] = None, note: Optional[str] = None,
         delivery_lat: Optional[float] = None, delivery_lon: Optional[float] = None,
         delivery_fee: Optional[int] = None, quotation_id: Optional[str] = None,
-        delivery_appointment=None
+        delivery_appointment=None, receiver_name: Optional[str] = None,
+        receiver_phone: Optional[str] = None, delivery_note: Optional[str] = None
     ):
         try:
             data = {
@@ -67,6 +68,9 @@ class DAOOrders(DAOBase):
                 "delivery_method": delivery_method,
                 "delivery_address": delivery_address,
                 "note": note,
+                "receiver_name": receiver_name,
+                "receiver_phone": receiver_phone,
+                "delivery_note": delivery_note,
                 "status": "pending",
                 "payment_status": "pending",
             }
@@ -140,7 +144,7 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_order_by_id: {e}")
 
-    _SELLER_LIST_SELECT = "id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, created_at, paid_at, status_changed_at, users{join}(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status)"
+    _SELLER_LIST_SELECT = "id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, created_at, paid_at, status_changed_at, users{join}(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status)"
 
     def read_orders_by_seller_id(self, seller_id: str, finished_since: datetime):
         """Running orders of any age + done / cancelled orders created since `finished_since` (UTC)."""
@@ -241,7 +245,7 @@ class DAOOrders(DAOBase):
     def read_order_by_id_for_seller(self, order_id: str, seller_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, created_at, paid_at, status_changed_at, users(name, email, phone), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), payments(method, type)") \
+                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, cancellation_reason, created_at, paid_at, status_changed_at, users(name, email, phone), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), payments(method, type)") \
                 .eq("id", order_id) \
                 .eq("seller_id", seller_id) \
                 .maybe_single() \
@@ -343,7 +347,7 @@ class DAOOrders(DAOBase):
         """Read order with seller profile coords for delivery booking."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, user_id, seller_id, seller_user_id, status, delivery_method, delivery_address, delivery_lat, delivery_lon, quotation_id, delivery_fee, seller_profiles(store_name, address, lat, lon, phone), users(name, phone, email)") \
+                .select("id, user_id, seller_id, seller_user_id, status, delivery_method, delivery_address, delivery_lat, delivery_lon, receiver_name, receiver_phone, delivery_note, quotation_id, delivery_fee, seller_profiles(store_name, address, lat, lon, phone), users(name, phone, email)") \
                 .eq("id", order_id) \
                 .maybe_single() \
                 .execute()

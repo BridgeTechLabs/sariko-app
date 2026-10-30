@@ -47,6 +47,7 @@
         "store_address_missing": "Missing pickup or drop-off address. Please update your store address in settings.",
         "seller_phone_invalid": "Store phone number is invalid. Please update it in settings.",
         "buyer_phone_invalid": "The buyer's phone number is invalid, so a driver can't be booked.",
+        "receiver_phone_invalid": "The receiver's phone number in this address isn't a valid Vietnamese number. Please fix the address.",
         "dish_name_taken": "You already have a dish with this name in this category.",
         "cannot_unset_default_address": "You can't unset the default address; set another address as default instead.",
         "invalid_phone": "Invalid phone number.",

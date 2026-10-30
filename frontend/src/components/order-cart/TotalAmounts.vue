@@ -120,6 +120,10 @@ export default {
                 if (this.deliveryStore.quotation?.quotation_id) {
                     deliveryOpts.quotation_id = this.deliveryStore.quotation.quotation_id
                 }
+                // The chosen address's receiver: the driver calls them, not the buyer's profile
+                if (authStore.inputReceiverName) deliveryOpts.receiver_name = authStore.inputReceiverName
+                if (authStore.inputReceiverPhone) deliveryOpts.receiver_phone = authStore.inputReceiverPhone
+                if (authStore.inputDeliveryNote) deliveryOpts.delivery_note = authStore.inputDeliveryNote
 
                 const orderStore = useOrderStore()
                 const appt = this.isPreorder && this.deliveryDate && this.deliveryTime

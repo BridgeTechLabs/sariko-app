@@ -58,11 +58,11 @@ export default {
         },
 
         customerName() {
-            return this.order.users?.name || this.order.users?.email || this.$t('seller_orders.customer_fallback')
+            return this.order.receiver_name || this.order.users?.name || this.order.users?.email || this.$t('seller_orders.customer_fallback')
         },
 
         customerPhone() {
-            return this.order.users?.phone || null
+            return this.order.receiver_phone || this.order.users?.phone || null
         },
 
         // From the charge row in payments; force-paid DEV orders have none, so the row hides.

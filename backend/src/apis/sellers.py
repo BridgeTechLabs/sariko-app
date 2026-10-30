@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 
 from apis.complaints import complaints_for_order
+from apis.deliveries import lalamove_recipient
 from apis.orders import cancel_after
 from core.store_hours import confirm_deadline, is_open_now
 from services.order_expiry import confirm_window
@@ -309,7 +310,6 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                 raise HTTPException(status_code=500, detail="Could not load order details for delivery")
 
             seller  = full_order.get("seller_profiles") or {}
-            buyer   = full_order.get("users") or {}
 
             # Same check as the Ready buttons (P1-4): no pickup point or phone, no quote.
             missing = [field for field, ok in (
@@ -348,12 +348,9 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                 sender_phone = to_e164_vn(seller.get("phone") or "")
             except ValueError as e:
                 raise HTTPException(status_code=400, detail={"code": "seller_phone_invalid", "message": f"Seller phone invalid: {e}. Update store phone in settings."})
-            try:
-                recipient_phone = to_e164_vn(buyer.get("phone") or "")
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail={"code": "buyer_phone_invalid", "message": f"Buyer phone invalid: {e}. Buyer must update phone before delivery."})
+            recipient = lalamove_recipient(full_order)
 
-            logger.warning(f"[Delivery] order={order_id} sender_phone={sender_phone} recipient_phone={recipient_phone}")
+            logger.warning(f"[Delivery] order={order_id} sender_phone={sender_phone} recipient_phone=…{recipient['recipient_phone'][-4:]}")
 
             booking_result = None
             last_booking_error = None
@@ -366,9 +363,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                         stop_id_1=quotation.stop_id_1,
                         sender_name=seller.get("store_name", "Seller"),
                         sender_phone=sender_phone,
-                        recipient_name=buyer.get("name") or buyer.get("email") or "Customer",
-                        recipient_phone=recipient_phone,
-                        recipient_remarks=full_order.get("delivery_address") or "",
+                        **recipient,
                     )
                     break
                 except Exception as e:

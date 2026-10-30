@@ -98,7 +98,7 @@ export default {
                     ...order,
                     displayStatus: STATUS_DISPLAY_KEY[order.status] ? this.$t(STATUS_DISPLAY_KEY[order.status]) : order.status,
                     code: orderCode(order.id),
-                    customerName: order.users?.name || order.users?.email || this.$t('seller_orders.customer_fallback'),
+                    customerName: order.receiver_name || order.users?.name || order.users?.email || this.$t('seller_orders.customer_fallback'),
                     items: order.order_items || [],
                     totalText: new Intl.NumberFormat('vi-VN').format(order.total_amount || 0) + ' ₫',
                     time: formatVnTime(order.created_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -397,9 +397,9 @@ export default {
                                 </div>
                                 <div class="buyer-info-row">
                                     <span class="buyer-info-label"><Phone :size="11" /> {{ $t('seller_home.buyer_phone') }}</span>
-                                    <div v-if="order.users?.phone" class="buyer-info-value">
-                                        <span>{{ order.users.phone }}</span>
-                                        <button class="btn-copy" @click.stop="copyToClipboard(order.users.phone, order.id + '_phone')">
+                                    <div v-if="order.receiver_phone || order.users?.phone" class="buyer-info-value">
+                                        <span>{{ order.receiver_phone || order.users.phone }}</span>
+                                        <button class="btn-copy" @click.stop="copyToClipboard(order.receiver_phone || order.users.phone, order.id + '_phone')">
                                             <Check v-if="copiedKey === order.id + '_phone'" :size="12" style="color:#4ade80" />
                                             <Copy v-else :size="12" />
                                         </button>
