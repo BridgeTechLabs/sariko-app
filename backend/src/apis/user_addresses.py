@@ -101,3 +101,24 @@ def update_user_address(address_id: int, body: Schema.RequestUpdateUserAddress, 
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"{repr(e)}",
         )
+
+
+@router.delete("/{address_id}")
+def delete_user_address(address_id: int, user=Depends(verify_token)):
+    """Another user's address answers 404 like a missing one. Deleting the default hands it to the
+    newest address left, so there is never zero defaults while addresses remain."""
+    user_id = user["id"]
+    dao = DAOUserAddresses()
+    try:
+        deleted = dao.delete_address(user_id, address_id)
+        if deleted and deleted["is_default"]:
+            left = dao.read_addresses(user_id)   # newest first once no default is left
+            if left:
+                dao.update_address(user_id, left[0]["id"], {"is_default": True})
+    except Exception as e:
+        logger.exception(f"Exception in DELETE /user_addresses/{address_id}: {repr(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"{repr(e)}")
+
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Address not found")
+    return {"success": True}

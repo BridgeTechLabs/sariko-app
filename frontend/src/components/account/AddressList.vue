@@ -1,0 +1,144 @@
+<script>
+import { MapPin, Plus } from 'lucide-vue-next';
+import { useAddressStore } from '@/stores/address/addressStore';
+
+// The buyer's delivery addresses as cards: default first, then newest. A card opens its detail page.
+export default {
+    name: 'AddressList',
+    components: { MapPin, Plus },
+
+    computed: {
+        store() {
+            return useAddressStore()
+        },
+    },
+
+    async mounted() {
+        try {
+            await this.store.fetch()
+        } catch (e) {
+            console.error('AddressList - fetch -', e)
+        }
+    },
+}
+</script>
+
+<template>
+    <div class="address-list">
+        <q-skeleton v-if="!store.loaded" type="rect" height="96px" animation="pulse" class="card-skeleton" />
+
+        <template v-else>
+            <div v-if="!store.addresses.length" class="empty">
+                <MapPin :size="28" class="empty-icon" />
+                <div>{{ $t('delivery_address_page.empty_list') }}</div>
+            </div>
+
+            <button v-for="a in store.addresses" :key="a.id" class="card" @click="$router.push(`/account/address/${a.id}`)">
+                <div class="card-head">
+                    <span class="card-title">{{ a.label || $t('delivery_address_page.card_title') }}</span>
+                    <span v-if="a.is_default" class="chip">{{ $t('delivery_address_page.chip_default') }}</span>
+                </div>
+                <div class="card-receiver">{{ a.receiver_name }} · {{ a.phone_number }}</div>
+                <div class="card-address">{{ a.address }}</div>
+            </button>
+
+            <q-btn class="btn-add" no-caps outline @click="$router.push('/account/address/new')">
+                <Plus :size="16" />
+                <span>{{ $t('delivery_address_page.button_add') }}</span>
+            </q-btn>
+        </template>
+    </div>
+</template>
+
+<style scoped>
+.address-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.card-skeleton {
+    border-radius: 12px;
+}
+
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 32px 16px;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.empty-icon {
+    color: var(--color-accent, #f5A623);
+}
+
+.card {
+    width: 100%;
+    text-align: left;
+    padding: 14px;
+    background: var(--bg-surface);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.card-title {
+    font-weight: 700;
+    font-size: 15px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chip {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #121b2f;
+    background: var(--color-accent, #f5A623);
+}
+
+.card-receiver {
+    font-size: 13px;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.card-address {
+    font-size: 14px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.btn-add {
+    padding: 12px;
+    color: var(--color-accent, #f5A623);
+    font-weight: 600;
+    border-radius: 12px;
+}
+
+.btn-add span {
+    margin-left: 6px;
+}
+</style>
