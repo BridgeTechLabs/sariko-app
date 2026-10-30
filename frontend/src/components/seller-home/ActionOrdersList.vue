@@ -387,7 +387,7 @@ export default {
                 <!-- Contact buyer — always visible -->
                 <div class="order-actions">
                     <q-btn flat dense no-caps class="btn-contact">
-                        <q-icon name="person" size="14px" style="margin-right:4px;" />
+                        <User :size="14" style="margin-right:4px;" />
                         {{ $t('seller_home.action_contact_buyer') }}
                         <q-popup-proxy>
                             <div class="buyer-info-popup">

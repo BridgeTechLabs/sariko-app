@@ -332,11 +332,11 @@ export default {
         <template v-if="!isSeller">
             <div class="form-field">
                 <label class="field-label">{{ $t('delivery_address_page.label_street') }}</label>
-                <q-input v-model="addressDetails" dense outlined dark :placeholder="$t('delivery_address_page.placeholder_street')" />
+                <q-input v-model="addressDetails" dense outlined dark maxlength="200" :placeholder="$t('delivery_address_page.placeholder_street')" />
             </div>
             <div class="form-field">
                 <label class="field-label">{{ $t('delivery_address_page.label_note') }}</label>
-                <q-input v-model="note" dense outlined dark :placeholder="$t('delivery_address_page.placeholder_note')" />
+                <q-input v-model="note" dense outlined dark maxlength="250" :placeholder="$t('delivery_address_page.placeholder_note')" />
             </div>
 
             <div class="group-title">{{ $t('delivery_address_page.group_contact') }}</div>

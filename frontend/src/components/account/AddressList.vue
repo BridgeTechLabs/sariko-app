@@ -1,6 +1,7 @@
 <script>
-import { Briefcase, ChevronRight, House, MapPin, Plus } from 'lucide-vue-next';
+import { Briefcase, Check, ChevronRight, House, MapPin, Plus } from 'lucide-vue-next';
 import { labelKind, useAddressStore } from '@/stores/address/addressStore';
+import { useAuthStore } from '@/stores/auth/authStore';
 import { displayPhone } from '@/utils/phone';
 
 const ICONS = { home: House, office: Briefcase, other: MapPin }
@@ -9,7 +10,7 @@ const ICONS = { home: House, office: Briefcase, other: MapPin }
 // or with `picker` (cart) emits "pick" to use that address for this order.
 export default {
     name: 'AddressList',
-    components: { ChevronRight, MapPin, Plus },
+    components: { Check, ChevronRight, MapPin, Plus },
     props: { picker: { type: Boolean, default: false } },
     emits: ['pick'],
 
@@ -27,6 +28,12 @@ export default {
         title(a) {
             const kind = labelKind(a.label)
             return kind === 'other' ? a.label || this.$t('delivery_address_page.card_title') : this.$t(`delivery_address_page.label_${kind}`)
+        },
+        // Picker: the address the cart is using for this order (authStore.input*)
+        inUse(a) {
+            const auth = useAuthStore()
+            return this.picker && a.address === auth.inputAddress && a.lat === auth.inputLat && a.lon === auth.inputLon
+                && a.receiver_name === auth.inputReceiverName && a.phone_number === auth.inputReceiverPhone
         },
         open(a) {
             if (this.picker) this.$emit('pick', a)
@@ -66,7 +73,8 @@ export default {
                     <div class="card-receiver">{{ a.receiver_name }} · {{ displayPhone(a.phone_number) }}</div>
                     <div class="card-address">{{ a.address }}</div>
                 </div>
-                <ChevronRight :size="18" class="card-arrow" />
+                <Check v-if="inUse(a)" :size="20" class="card-check" />
+                <ChevronRight v-else :size="18" class="card-arrow" />
             </button>
 
             <q-btn class="btn-add" no-caps outline @click="$router.push(picker ? '/account/address/new?from=cart' : '/account/address/new')">
@@ -135,6 +143,11 @@ export default {
 .card-arrow {
     flex-shrink: 0;
     color: var(--text-secondary);
+}
+
+.card-check {
+    flex-shrink: 0;
+    color: var(--color-accent, #f5A623);
 }
 
 .card-head {
