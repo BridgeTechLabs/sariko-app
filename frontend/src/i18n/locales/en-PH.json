@@ -215,6 +215,9 @@
             "pill_cta": "Book now →",
             "dismiss_aria": "Dismiss Zen promotion"
         },
+        "section_promo": {
+            "dismiss_aria": "Dismiss promotions"
+        },
         "section_footer": {
             "label_tax_code": "Tax code",
             "label_address": "Address",

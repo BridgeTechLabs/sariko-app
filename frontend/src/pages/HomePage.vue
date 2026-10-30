@@ -6,7 +6,7 @@ import Categories from '@/components/home-page/Categories.vue'
 import FoundingSellers from '@/components/home-page/FoundingSellers.vue';
 import FeaturedDishes from '@/components/home-page/FeaturedDishes.vue';
 import Banner from '@/components/home-page/Banner.vue'
-import ZenPromoBanner from '@/components/home-page/ZenPromoBanner.vue'
+import PromoCarousel from '@/components/home-page/PromoCarousel.vue'
 import ZenPromoFloating from '@/components/home-page/ZenPromoFloating.vue'
 import HomeFooter from '@/components/home-page/HomeFooter.vue'
 import BuyerMissingBanner from '@/components/home-page/BuyerMissingBanner.vue'
@@ -23,7 +23,7 @@ export default {
         FoundingSellers,
         FeaturedDishes,
         Banner,
-        ZenPromoBanner,
+        PromoCarousel,
         ZenPromoFloating,
         HomeFooter,
         BuyerMissingBanner
@@ -49,8 +49,8 @@ export default {
             <BuyerMissingBanner />
         </template>
 
-        <template v-if="showZenBanner" #ZenPromo>
-            <ZenPromoBanner />
+        <template #ZenPromo>
+            <PromoCarousel :show-zen="showZenBanner" />
         </template>
 
         <template #SearchBar>
