@@ -35,6 +35,12 @@ jobs:
           cd backend
           supabase db push --db-url "$SUPABASE_DB_URL" --include-all --yes
 
+      # The money / portions / purge SQL functions on the migrated DEV database; rolls back, never on PROD
+      - name: SQL tests
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: tests/sql/run.sh "$SUPABASE_DB_URL"
+
       - name: Push the tested image
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
