@@ -14,6 +14,7 @@ tests/
 │   ├── requirements.txt
 │   ├── unit/           Pure logic, no DB/HTTP
 │   └── integration/    FastAPI TestClient + mocked DAOs
+├── e2e/                Playwright smoke trên DEV (package riêng): cd tests/e2e && npm ci && npx playwright test
 ├── manual/             Scripts chạy tay (cần real API creds, không auto)
 │   ├── test_lalamove_live.py
 │   └── check_dev_history.py   DEV: bảng history_* + mật khẩu tối thiểu
@@ -26,6 +27,7 @@ tests/
 | Trường hợp | Tool |
 |---|---|
 | **Trước mỗi deploy** | `tests/smoke/DEPLOY_SMOKE_TEST.md` (5-10 phút manual) |
+| **Sau mỗi deploy DEV** | `tests/e2e` (Playwright, ~1 phút, cần DEV_* trong env) |
 | **Code change cho payment / order / webhook** | Chạy `pytest tests/backend/` (vài giây) |
 | **Refactor backend logic** | Add unit test ở `tests/backend/unit/` |
 | **Add/change API endpoint** | Add integration test ở `tests/backend/integration/` |

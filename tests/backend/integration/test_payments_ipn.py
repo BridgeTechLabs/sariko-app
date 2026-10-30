@@ -172,6 +172,22 @@ def test_ipn_idempotent_already_paid(fastapi_client, vnp_secret, monkeypatch):
         "Must NOT create duplicate payment record for already-paid order"
 
 
+def test_ipn_late_failure_keeps_paid_order_paid(fastapi_client, vnp_secret, monkeypatch):
+    """A failed IPN arriving after the order was paid → 02, payment_status stays paid
+    (update_order_payment_status itself would overwrite it: the guard is here, docs/dev/test-sql TC-34)."""
+    order_id = "abc12345-678a-4bcd-9012-345678901234"
+    fake_orders = _FakeOrderDAO({"id": order_id, "total_amount": 100000, "payment_status": "paid"})
+    monkeypatch.setattr("apis.payments.DAOOrders", lambda: fake_orders)
+    monkeypatch.setattr("apis.payments.DAOPayments", lambda: _FakePaymentsDAO())
+
+    params = _make_ipn_params(vnp_secret, order_id, amount_vnd=100000, response_code="24")
+    res = fastapi_client.get("/payments/vnpay/ipn", params=params)
+
+    assert res.json()["RspCode"] == "02"
+    assert fake_orders.update_payment_status_called is False
+    assert fake_orders._order["payment_status"] == "paid"
+
+
 def test_ipn_order_not_found(fastapi_client, vnp_secret, monkeypatch):
     """Unknown order_id → return RspCode 01."""
     fake_orders = _FakeOrderDAO(None)
