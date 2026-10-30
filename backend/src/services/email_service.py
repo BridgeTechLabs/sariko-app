@@ -16,6 +16,27 @@ def complaint_recipient():
     return os.getenv("COMPLAINT_EMAIL_TO") or None
 
 
+def configured() -> bool:
+    return bool(os.getenv("SMTP_PASSWORD"))
+
+
+def support_inbox() -> str:
+    return os.getenv("SMTP_USER") or "support@sariko.store"
+
+
+def env_tag() -> str:
+    """'' on PROD (ENV=prd), else "[TEST DEV] " / "[TEST LOCAL] "."""
+    env = os.getenv("ENV", "local")
+    return "" if env == "prd" else f"[TEST {env.upper()}] "
+
+
+def seller_recipient(to: str, subject: str) -> tuple:
+    """(to, subject) of an email for a seller: PROD sends it to the seller; elsewhere it goes to the support inbox,
+    tagged, so a test application never emails a real person (join-review T1)."""
+    prefix = env_tag()
+    return (to, subject) if not prefix else (support_inbox(), prefix + subject)
+
+
 def send(to: str, subject: str, body: str, reply_to: str = None) -> None:
     """Plain-text UTF-8 email from SMTP_USER. Raises on any SMTP / network error (callers run it in the background)."""
     user = os.getenv("SMTP_USER") or "support@sariko.store"

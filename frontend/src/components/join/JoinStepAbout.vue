@@ -57,7 +57,8 @@ export default {
 
         <div class="join-section-title">{{ $t('join_page.section_contact') }}</div>
         <div class="join-grid">
-            <q-input v-model="form.email" dark outlined dense color="amber" type="email" :label="$t('join_page.label_email')" :error="!!err('email')" :error-message="err('email')" maxlength="300" />
+            <!-- hide-bottom-space: the "already has an account" message takes two lines on a phone -->
+            <q-input v-model="form.email" dark outlined dense color="amber" type="email" :label="$t('join_page.label_email')" :error="!!err('email')" :error-message="err('email')" maxlength="300" hide-bottom-space />
             <q-input v-model="form.phone" dark outlined dense color="amber" type="tel" :label="$t('join_page.label_phone')" :hint="$t('join_page.hint_phone')" :error="!!err('phone')" :error-message="err('phone')" maxlength="20" />
         </div>
         <q-input v-model="form.residential_address" dark outlined dense color="amber" :label="$t('join_page.label_residential_address')" :hint="$t('join_page.hint_residential_address')" :error="!!err('residential_address')" :error-message="err('residential_address')" maxlength="300" />

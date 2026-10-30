@@ -1,28 +1,13 @@
 <script>
-import { ChevronRight, X } from 'lucide-vue-next'
+import { ChevronRight } from 'lucide-vue-next'
 
-const DISMISS_KEY = 'sariko.zen_promo_dismissed_version'
-// Bump VITE_ZEN_BANNER_VERSION (and rebuild) to re-show the banner to users who dismissed it.
-const BANNER_VERSION = import.meta.env.VITE_ZEN_BANNER_VERSION || '1'
-
+// A slide of PromoCarousel, which owns the dismiss button.
 export default {
     name: 'ZenPromoBanner',
-    components: { ChevronRight, X },
-    data() {
-        return {
-            dismissed: false
-        }
-    },
-    mounted() {
-        this.dismissed = localStorage.getItem(DISMISS_KEY) === BANNER_VERSION
-    },
+    components: { ChevronRight },
     methods: {
         openZen() {
             window.open(import.meta.env.VITE_ZEN_URL || 'https://zenapp.expo.app/', '_blank', 'noopener,noreferrer')
-        },
-        dismiss() {
-            this.dismissed = true
-            localStorage.setItem(DISMISS_KEY, BANNER_VERSION)
         }
     }
 }
@@ -30,7 +15,6 @@ export default {
 
 <template>
     <div
-        v-if="!dismissed"
         class="zen-banner"
         role="button"
         tabindex="0"
@@ -40,6 +24,7 @@ export default {
         <img
             src="/logo/zen/zen-logo-blue-bg.jpg"
             alt="Zen"
+            draggable="false"
             class="zen-logo"
         />
 
@@ -47,15 +32,6 @@ export default {
             <span class="zen-title">{{ $t('home_page.section_zen_promo.title') }}</span>
             <span class="zen-subtitle">{{ $t('home_page.section_zen_promo.subtitle') }}</span>
         </div>
-
-        <button
-            class="zen-dismiss"
-            type="button"
-            :aria-label="$t('home_page.section_zen_promo.dismiss_aria')"
-            @click.stop="dismiss"
-        >
-            <X :size="14" />
-        </button>
 
         <ChevronRight :size="20" class="zen-chevron" />
     </div>
@@ -65,6 +41,7 @@ export default {
 .zen-banner {
     position: relative;
     width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -120,27 +97,5 @@ export default {
     bottom: 8px;
     right: 8px;
     color: rgba(255, 255, 255, 0.85);
-}
-
-.zen-dismiss {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.25);
-    color: rgba(255, 255, 255, 0.85);
-    cursor: pointer;
-
-    &:hover {
-        background: rgba(0, 0, 0, 0.4);
-        color: #fff;
-    }
 }
 </style>

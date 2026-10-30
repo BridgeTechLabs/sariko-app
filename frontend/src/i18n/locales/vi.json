@@ -215,6 +215,9 @@
             "pill_cta": "Đặt ngay →",
             "dismiss_aria": "Đóng quảng cáo Zen"
         },
+        "section_promo": {
+            "dismiss_aria": "Đóng quảng cáo"
+        },
         "section_footer": {
             "label_tax_code": "MST",
             "label_address": "Địa chỉ",
@@ -1172,12 +1175,13 @@
         "uploading": "Đang tải lên {done} / {total}...",
         "done_title": "Đã nhận hồ sơ",
         "done_reference": "Mã hồ sơ",
-        "done_text": "SariKo xét duyệt hồ sơ trong {days} ngày làm việc và liên hệ bạn qua email hoặc điện thoại.",
+        "done_text": "Đã gửi email xác nhận tới {email}. Kết quả sẽ được gửi qua email trong {days} ngày làm việc.",
         "done_contact": "Có câu hỏi? Email",
         "done_home": "Về trang SariKo",
         "error_required": "Bắt buộc",
         "error_age": "Bạn phải đủ {minAge} tuổi",
         "error_email": "Email không hợp lệ",
+        "error_email_taken": "Email này đã có tài khoản Sariko. Hãy dùng email khác cho quán.",
         "error_phone": "Số điện thoại Việt Nam không hợp lệ",
         "error_maps_link": "Dán link Google Maps",
         "error_hours": "Giờ đóng cửa phải sau giờ mở cửa",
