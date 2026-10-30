@@ -46,7 +46,8 @@ class DAOOnboarding(DAOBase):
         try:
             result = (
                 self._supabase_client.table("onboarding_applications")
-                .select("id, status, created_at, upload_token, menu, id_type")
+                .select("id, status, created_at, upload_token, menu, id_type, email, full_name, store_name, "
+                        "pickup_address, tier, bank_name, bank_account_number")
                 .eq("id", application_id)
                 .maybe_single()
                 .execute()
@@ -56,6 +57,12 @@ class DAOOnboarding(DAOBase):
                 return None
             raise
         return result.data if result else None
+
+    def email_has_account(self, email: str) -> bool:
+        """A Sariko account (public.users) already uses this email (join-review T2). Exact match on the lower-case
+        address: users.email is copied from auth.users, which Supabase Auth stores in lower case."""
+        result = self._supabase_client.table("users").select("id").eq("email", email.strip().lower()).limit(1).execute()
+        return bool(result.data)
 
     def list_files(self, application_id: str) -> list:
         result = (

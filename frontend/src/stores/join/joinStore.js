@@ -120,6 +120,7 @@ export const useJoinStore = defineStore('joinStore', {
             application: null,         // { id, upload_token, payload } once created
             uploaded: {},              // upload job id -> true
             reference: null,
+            takenEmail: null,          // lower-case email the server said already has a Sariko account (T2)
         }
     },
 
@@ -209,6 +210,7 @@ export const useJoinStore = defineStore('joinStore', {
                     else if (ageOn(f.date_of_birth, new Date()) < s.min_age) e.date_of_birth = 'join_page.error_age'
                     if (f.nationality === 'Other') need('nationality_other')
                     if (!EMAIL_RE.test(f.email.trim())) e.email = 'join_page.error_email'
+                    else if (f.email.trim().toLowerCase() === state.takenEmail) e.email = 'join_page.error_email_taken'
                     if (!isVnPhone(f.phone)) e.phone = 'join_page.error_phone'
                     if (!f.tax_resident) e.tax_resident = 'join_page.error_required'
                     // Same rules as core/seller_kyc.py id_error (NĐ 248/2026 Đ18.1.b)
@@ -463,7 +465,13 @@ export const useJoinStore = defineStore('joinStore', {
             } catch (e) {
                 const data = e?.response?.data
                 const code = data?.detail?.code
-                if (code === 'application_not_found') {
+                if (code === 'email_has_account') {
+                    // shown on the email field (step 2) until the seller types another email
+                    this.takenEmail = this.form.email.trim().toLowerCase()
+                    this.touched = { ...this.touched, 2: true }
+                    this.step = 2
+                    this.submitError = i18n.global.t('join_page.error_email_taken')
+                } else if (code === 'application_not_found') {
                     // Over 3 hours since create (or already submitted): start over with a new captcha.
                     this.application = null
                     this.submitError = i18n.global.t('join_page.error_expired')

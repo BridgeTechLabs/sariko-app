@@ -37,6 +37,10 @@ class FakeConfig:
 class FakeDAO:
     apps = {}
     files = {}
+    taken = set()   # emails of existing Sariko accounts, lower case
+
+    def email_has_account(self, email):
+        return email.strip().lower() in self.taken
 
     def get_tier_limits(self, tier):
         return TIER_LIMITS.get(tier)
@@ -92,7 +96,7 @@ class FakeResponse:
 
 @pytest.fixture
 def env(monkeypatch):
-    FakeDAO.apps, FakeDAO.files = {}, {}
+    FakeDAO.apps, FakeDAO.files, FakeDAO.taken = {}, {}, set()
     FakeConfig.raw = {}
     FakeProfiles.enterprise = 0
     monkeypatch.setattr(onboarding, "DAOAdminConfig", FakeConfig)
@@ -515,3 +519,122 @@ def test_tc21_two_posts_two_drafts_each_with_its_own_name(env):
     a, _ = _create(env)
     b, _ = _create(env, full_name="Maria Cruz Santos", signature_name="Maria Cruz Santos", bank_account_holder="MARIA CRUZ SANTOS")
     assert (FakeDAO.apps[a]["full_name"], FakeDAO.apps[b]["full_name"]) == ("Maria Santos", "Maria Cruz Santos")
+
+
+# ── join-review T2: an email that already has a Sariko account ──────────────
+
+def test_t2_email_with_an_account_is_refused_at_create(env):
+    FakeDAO.taken = {"maria@example.com"}
+    res = env["client"].post("/onboarding/applications", json=_body(email="  Maria@Example.COM "))
+    assert res.status_code == 409 and res.json()["detail"]["code"] == "email_has_account"
+    assert res.json()["detail"]["field"] == "email" and FakeDAO.apps == {}
+    assert sum(len(hits) for hits in onboarding._rate_hits.values()) == 1   # the refused try counts toward the limit
+
+
+def test_t2_lookup_is_an_exact_lower_case_match():
+    """No pattern: a '*' or '_' in an address matches only itself (users.email is lower case, from Supabase Auth)."""
+    from dao.dao_onboarding import DAOOnboarding
+    calls = []
+
+    class Query:
+        def __getattr__(self, name):
+            return lambda *a: calls.append((name, a)) or self
+
+        def execute(self):
+            return type("R", (), {"data": []})()
+    dao = DAOOnboarding.__new__(DAOOnboarding)
+    dao._supabase_client = type("C", (), {"table": lambda self, t: calls.append(("table", (t,))) or Query()})()
+    assert dao.email_has_account("  A*B_c@Example.com ") is False
+    assert ("eq", ("email", "a*b_c@example.com")) in calls and not any(n in ("ilike", "like") for n, _ in calls)
+
+
+def _ready(env, **over):
+    app_id, token = _create(env, **over)
+    _upload(env, app_id, token, "id_document", _jpeg())
+    _upload(env, app_id, token, "food_safety", PDF)
+    for key in ("a", "b"):
+        _upload(env, app_id, token, "dish_photo", _jpeg(), item_key=key)
+    return app_id, token
+
+
+def test_t2_account_made_after_create_is_refused_at_submit(env, mail):
+    app_id, token = _ready(env)
+    FakeDAO.taken = {"maria@example.com"}
+    assert _code(_submit(env, app_id, token)) == "email_has_account"
+    assert FakeDAO.apps[app_id]["status"] == "draft" and mail["sent"] == [] and mail["zalo"] == []
+
+
+# ── join-review E1 / E2: emails and the ops message on submit ───────────────
+
+class Inline:
+    """threading.Thread that runs at once, so the background email is checked in the test."""
+    def __init__(self, target, args=(), daemon=None):
+        self.run = lambda: target(*args)
+
+    def start(self):
+        self.run()
+
+
+@pytest.fixture
+def mail(monkeypatch):
+    out = {"sent": [], "zalo": [], "fail": False}
+
+    def send(to, subject, body, reply_to=None):
+        if out["fail"]:
+            raise OSError("smtp down")
+        out["sent"].append({"to": to, "subject": subject, "body": body, "reply_to": reply_to})
+    monkeypatch.setenv("SMTP_PASSWORD", "x")
+    monkeypatch.delenv("SMTP_USER", raising=False)
+    monkeypatch.setenv("ENV", "prd")
+    monkeypatch.setattr(onboarding.email_service, "send", send)
+    monkeypatch.setattr(onboarding.zalo, "send", lambda kind, text: out["zalo"].append((kind, text)))
+    monkeypatch.setattr(onboarding, "threading", type("T", (), {"Thread": Inline}))
+    return out
+
+
+def test_e1_e2_on_submit_prod(env, mail):
+    app_id, token = _ready(env)
+    assert _submit(env, app_id, token).status_code == 200
+    seller, ops = mail["sent"]
+    code = app_id[:8].upper()
+    assert seller["to"] == "maria@example.com" and seller["subject"] == "We received your Sariko seller application"
+    assert seller["reply_to"] == "support@sariko.store"
+    for text in (f"Application code: {code}", "Full name: Maria Santos", "Store: Maria's Kitchen",
+                 "Pickup address: 12 Nguyen Hue, District 1", "Plan: Tindahan", "Menu: 2 dishes in 1 category",
+                 "Payout account: Vietcombank, account ending 6789", "(Vietnam time)",
+                 "Documents received: Passport photo page (1), Food safety certificate (1), Dish photos (2)"):
+        assert text in seller["body"], text
+    assert ops["to"] == "support@sariko.store" and code in ops["subject"] and ops["reply_to"] == "maria@example.com"
+    assert f"/seller-applications?open={app_id}" in ops["body"]
+    [(kind, text)] = mail["zalo"]
+    assert kind == "ops" and code in text and "Maria's Kitchen" in text
+    for m in mail["sent"]:   # never the ID number or the whole account number
+        assert "P1234567" not in m["body"] and "0123456789" not in m["body"]
+
+
+def test_t1_not_prod_sends_the_seller_email_to_support_tagged(env, mail, monkeypatch):
+    monkeypatch.setenv("ENV", "dev")
+    app_id, token = _ready(env)
+    _submit(env, app_id, token)
+    seller, ops = mail["sent"]
+    assert seller["to"] == "support@sariko.store" and seller["subject"] == "[TEST DEV] We received your Sariko seller application"
+    assert ops["subject"].startswith("[TEST DEV] New seller application")
+
+
+def test_submit_succeeds_when_smtp_or_zalo_fail(env, mail, monkeypatch):
+    mail["fail"] = True
+    app_id, token = _ready(env)
+    assert _submit(env, app_id, token).status_code == 200 and FakeDAO.apps[app_id]["status"] == "submitted"
+
+    def down(kind, text):
+        raise RuntimeError("zalo down")
+    monkeypatch.setattr(onboarding.zalo, "send", down)
+    app_id, token = _ready(env, email="other@example.com")
+    assert _submit(env, app_id, token).status_code == 200 and FakeDAO.apps[app_id]["status"] == "submitted"
+
+
+def test_no_email_when_smtp_not_configured(env, mail, monkeypatch):
+    monkeypatch.delenv("SMTP_PASSWORD")
+    app_id, token = _ready(env)
+    assert _submit(env, app_id, token).status_code == 200
+    assert mail["sent"] == [] and len(mail["zalo"]) == 1
