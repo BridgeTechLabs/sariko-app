@@ -17,7 +17,7 @@ function menuItems(menu, found = []) {
 async function dish(page, preorder) {
     const { body: { seller } } = await api(page, 'GET', `/sellers/${SELLER_SLUG}`)
     const { body } = await api(page, 'GET', `/sellers/${SELLER_SLUG}/menu`)
-    const item = menuItems(body.menus).find((i) => i.is_available !== false && !(i.variants || []).length && (i.preorder_day > 0) === preorder)
+    const item = menuItems(body.menus).find((i) => i.is_available !== false && !(i.food_item_variants || []).length && (i.preorder_day > 0) === preorder)
     expect(item, `a ${preorder ? 'pre-order' : 'same-day'} dish at ${SELLER_SLUG}`).toBeTruthy()
     return { seller_id: seller.id, food_item_id: item.id }
 }
