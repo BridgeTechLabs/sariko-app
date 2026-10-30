@@ -14,7 +14,7 @@ import secrets
 import threading
 import time
 import uuid
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from urllib.parse import urlparse
@@ -25,10 +25,12 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from core.client_ip import client_ip
 from core.phone import to_e164_vn
 from core.seller_kyc import age, bank_holder_matches, clean_full_name, id_error, name_matches, valid_bank_account
+from core.store_hours import VN_TZ
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_onboarding import DAOOnboarding
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
+from services import email_service, zalo
 from utils.storage import compress_to_jpeg, remove_private, upload_private
 
 router = APIRouter(prefix="/onboarding")
@@ -317,6 +319,9 @@ def create_application(body: Schema.RequestCreateOnboardingApplication, request:
         raise _error(400, "invalid_hours", "Opening time must be before closing time")
 
     dao = DAOOnboarding()
+    if dao.email_has_account(body.email):
+        _record_hit(ip)   # a refused try counts toward the hourly limit too: no free probing for accounts
+        raise _email_has_account()
     limits = dao.get_tier_limits(body.tier)
     if limits is None:
         raise _error(400, "invalid_tier", "Invalid plan")
@@ -436,7 +441,78 @@ def submit_application(application_id: str, x_upload_token: str = Header(default
     missing = [m["key"] for m in app["menu"] if m["key"] not in photos]
     if missing:
         raise _error(400, "dish_photo_missing", "Some dishes have no photo", keys=missing)
+    if dao.email_has_account(app["email"]):   # an account made with this email since the application was created
+        raise _email_has_account()
 
     if not dao.submit(application_id):
         raise _error(404, "application_not_found", "Application not found or expired")
+    try:
+        _notify_submitted(app, files)
+    except Exception as e:   # the application is saved: a message problem never fails the submit
+        logger.error(f"[Onboarding] {application_id[:8]} not announced: {type(e).__name__}")
     return {"success": True, "reference": application_id[:8].upper()}
+
+
+def _email_has_account():
+    return _error(409, "email_has_account", "This email already has a Sariko account", field="email")
+
+
+# Emails after submit (join-review E1, E2): English, plain text; never the ID number, only the bank account's last 4.
+DOCUMENT_LABELS = {"id_document": "Passport photo page", "residence_card": "Residence card",
+                   "food_safety": "Food safety certificate", "business_registration": "Business registration",
+                   "dish_photo": "Dish photos"}
+
+
+def plural(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"
+
+
+def submitted_email(app: dict, files: list, now: datetime) -> dict:
+    """E1, to the seller: what we received and what happens next."""
+    kinds = Counter(f["kind"] for f in files)
+    documents = ", ".join(f"{DOCUMENT_LABELS[k]} ({kinds[k]})" for k in DOCUMENT_LABELS if kinds[k])
+    body = "\n".join([
+        "Hello,",
+        "",
+        "We received your application to sell on Sariko.",
+        "",
+        f"Application code: {app['id'][:8].upper()}",
+        f"Submitted: {now.astimezone(VN_TZ):%H:%M %d/%m/%Y} (Vietnam time)",
+        f"Full name: {app['full_name']}",
+        f"Store: {app['store_name']}",
+        f"Pickup address: {app['pickup_address']}",
+        f"Plan: {app['tier'].title()}",
+        f"Menu: {plural(len(app['menu']), 'dish', 'dishes')} in "
+        f"{plural(len({m['category'] for m in app['menu']}), 'category', 'categories')}",
+        f"Payout account: {app['bank_name']}, account ending {app['bank_account_number'][-4:]}",
+        f"Documents received: {documents or 'none'}",
+        "",
+        "What happens next: our team reviews your application and contacts you.",
+        "To correct anything, reply to this email.",
+        "",
+        "Sariko",
+    ])
+    return {"subject": "We received your Sariko seller application", "body": body}
+
+
+def _notify_submitted(app: dict, files: list) -> None:
+    """E2 to the ops Zalo chat, then E1 to the seller and E2 to the support inbox, in the background."""
+    summary = f"{app['id'][:8].upper()} · {app['store_name']} · {app['tier'].title()} · {plural(len(app['menu']), 'dish', 'dishes')}"
+    url = zalo.link(f"/seller-applications?open={app['id']}")
+    zalo.send("ops", f"📝 New seller application {summary}\n{url}")
+    if email_service.configured():
+        threading.Thread(target=_send_submitted_emails, args=(app, files, summary, url), daemon=True).start()
+
+
+def _send_submitted_emails(app: dict, files: list, summary: str, url: str) -> None:
+    seller = submitted_email(app, files, datetime.now(timezone.utc))
+    support = email_service.support_inbox()
+    for to, subject, body, reply_to in (
+        (*email_service.seller_recipient(app["email"], seller["subject"]), seller["body"], support),
+        (support, f"{email_service.env_tag()}New seller application {summary}",
+         f"New seller application {summary}\n\nReview it in the admin: {url}", app["email"]),
+    ):
+        try:
+            email_service.send(to, subject, body, reply_to)
+        except Exception as e:   # error type only: never the address or the body
+            logger.error(f"[Onboarding] {app['id'][:8]} email not sent: {type(e).__name__}")

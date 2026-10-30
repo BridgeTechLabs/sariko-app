@@ -5,7 +5,6 @@ export default {
         const heightHeaderContent = this.$refs.headerContent?.offsetHeight || 0
         // const heightSearchBarContent = this.$refs.searchBarContent?.offsetHeight || 0
         const heightCategoriesContent = this.$refs.categoriesContent?.offsetHeight || 0
-        const heightBannerContent = this.$refs.bannerContent?.offsetHeight || 0
         const foundingSellerContent = this.$refs.foundingSellerContent?.offsetHeight || 0
     }
 }
@@ -40,10 +39,6 @@ export default {
 
             <div class="featured-dishes-section">
                 <slot name="FeaturedDishes" />
-            </div>
-
-            <div ref="bannerContent" class="banner">
-                <slot name="Banner" />
             </div>
 
             <div class="footer-section">

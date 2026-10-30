@@ -203,17 +203,15 @@
             "title": "Món nổi bật",
             "button_label_view_store": "Xem cửa hàng"
         },
-        "section_banner": {
-            "banner_text_line_1": "TRỞ THÀNH NGƯỜI BÁN SÁNG LẬP",
-            "banner_text_line_2": "MIỄN PHÍ 4 tháng, sau đó 750.000 ₫/tháng",
-            "banner_text_line_3": "50 suất · Hoa hồng 17%"
-        },
         "section_zen_promo": {
             "title": "Massage tận nơi",
             "subtitle": "Chuyên viên đã chứng nhận — phục vụ tại nhà, văn phòng, khách sạn",
             "pill_title": "Massage tại nhà",
             "pill_cta": "Đặt ngay →",
             "dismiss_aria": "Đóng quảng cáo Zen"
+        },
+        "section_promo": {
+            "dismiss_aria": "Đóng quảng cáo"
         },
         "section_footer": {
             "label_tax_code": "MST",
@@ -1172,12 +1170,13 @@
         "uploading": "Đang tải lên {done} / {total}...",
         "done_title": "Đã nhận hồ sơ",
         "done_reference": "Mã hồ sơ",
-        "done_text": "SariKo xét duyệt hồ sơ trong {days} ngày làm việc và liên hệ bạn qua email hoặc điện thoại.",
+        "done_text": "Đã gửi email xác nhận tới {email}. Kết quả sẽ được gửi qua email trong {days} ngày làm việc.",
         "done_contact": "Có câu hỏi? Email",
         "done_home": "Về trang SariKo",
         "error_required": "Bắt buộc",
         "error_age": "Bạn phải đủ {minAge} tuổi",
         "error_email": "Email không hợp lệ",
+        "error_email_taken": "Email này đã có tài khoản Sariko. Hãy dùng email khác cho quán.",
         "error_phone": "Số điện thoại Việt Nam không hợp lệ",
         "error_maps_link": "Dán link Google Maps",
         "error_hours": "Giờ đóng cửa phải sau giờ mở cửa",

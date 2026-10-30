@@ -23,7 +23,7 @@ export default {
         <div class="title">{{ $t('join_page.done_title') }}</div>
         <div class="ref-label">{{ $t('join_page.done_reference') }}</div>
         <div class="ref">{{ store.reference }}</div>
-        <div class="text">{{ $t('join_page.done_text', store.limits) }}</div>
+        <div class="text">{{ $t('join_page.done_text', { ...store.limits, email: store.form.email.trim() }) }}</div>
         <div class="text">
             {{ $t('join_page.done_contact') }}
             <a :href="`mailto:${supportEmail}`" class="join-link">{{ supportEmail }}</a>
