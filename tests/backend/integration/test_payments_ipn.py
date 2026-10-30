@@ -7,6 +7,8 @@ Tests use FastAPI TestClient + monkeypatched DAOs (no DB).
 """
 import urllib.parse
 
+import pytest
+
 
 def _build_hash_data(params: dict) -> str:
     filtered = {k: v for k, v in params.items() if v is not None and v != ''}
@@ -228,3 +230,22 @@ def test_ipn_payment_row_amount_is_order_total_decimal(fastapi_client, vnp_secre
         assert fastapi_client.get("/payments/vnpay/ipn", params=params).json()["RspCode"] == "00"
         assert sent["status"] == status
         assert sent["amount"] == Decimal("65000.00") and type(sent["amount"]) is Decimal
+
+
+# ─── Regression baseline R1: unsigned / signed with another secret ──────────
+
+
+@pytest.mark.parametrize("tamper", ["drop_hash", "other_secret", "empty_query"])
+def test_ipn_unsigned_or_foreign_signature_rejected(fastapi_client, vnp_secret, monkeypatch, tamper):
+    """No vnp_SecureHash, or a hash made with another merchant's secret → 97, nothing written."""
+    order_id = "abc12345-678a-4bcd-9012-345678901234"
+    fake_orders = _FakeOrderDAO({"id": order_id, "total_amount": 100000, "payment_status": "pending", "status": "pending"})
+    fake_payments = _FakePaymentsDAO()
+    monkeypatch.setattr("apis.payments.DAOOrders", lambda: fake_orders)
+    monkeypatch.setattr("apis.payments.DAOPayments", lambda: fake_payments)
+    params = _make_ipn_params("another-merchant-secret" if tamper == "other_secret" else vnp_secret, order_id, amount_vnd=100000)
+    if tamper == "drop_hash":
+        params.pop("vnp_SecureHash")
+    res = fastapi_client.get("/payments/vnpay/ipn", params={} if tamper == "empty_query" else params)
+    assert res.status_code == 200 and res.json() == {"RspCode": "97", "Message": "Invalid Checksum"}
+    assert not fake_orders.update_payment_status_called and not fake_payments.create_called
