@@ -5,7 +5,6 @@ import SearchBar from '@/components/home-page/SearchBar.vue'
 import Categories from '@/components/home-page/Categories.vue'
 import FoundingSellers from '@/components/home-page/FoundingSellers.vue';
 import FeaturedDishes from '@/components/home-page/FeaturedDishes.vue';
-import Banner from '@/components/home-page/Banner.vue'
 import PromoCarousel from '@/components/home-page/PromoCarousel.vue'
 import ZenPromoFloating from '@/components/home-page/ZenPromoFloating.vue'
 import HomeFooter from '@/components/home-page/HomeFooter.vue'
@@ -22,7 +21,6 @@ export default {
         SearchBar,
         FoundingSellers,
         FeaturedDishes,
-        Banner,
         PromoCarousel,
         ZenPromoFloating,
         HomeFooter,
@@ -67,10 +65,6 @@ export default {
 
         <template #FeaturedDishes>
             <FeaturedDishes />
-        </template>
-
-        <template #Banner>
-            <Banner />
         </template>
 
         <template #Footer>
