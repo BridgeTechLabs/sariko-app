@@ -1,11 +1,8 @@
 <script>
-import { Mail } from 'lucide-vue-next';
 import { mapState, mapActions } from 'pinia';
 import { useAuthStore } from '@/stores/auth/authStore';
 
 export default {
-    components: { Mail },
-
     computed: {
         ...mapState(useAuthStore, ["isResendingVerification"]),
 
@@ -26,10 +23,6 @@ export default {
 
 <template>
     <div class="form">
-
-        <div class="icon-circle">
-            <Mail :size="28" />
-        </div>
 
         <div class="greeting">
             <div class="text-greeting">{{ $t('verify_email_page.title') }}</div>
@@ -66,18 +59,6 @@ export default {
     flex-direction: column;
     gap: 20px;
     font-family: $sariko-font-family-secondary;
-}
-
-.icon-circle {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    align-self: center;
-    background: rgba(245, 166, 35, 0.12);
-    color: var(--color-accent, #f5A623);
 }
 
 .greeting {

@@ -90,10 +90,6 @@ export default {
         </template>
 
         <template v-else>
-            <div class="icon-circle">
-                <Mail :size="28" />
-            </div>
-
             <div class="greeting">
                 <div class="text-greeting">{{ $t('forgot_password_page.success_title') }}</div>
                 <div class="subtext-greeting">{{ $t('forgot_password_page.success_text') }}</div>
@@ -161,18 +157,6 @@ export default {
     font-weight: 700;
     font-size: 15px;
     border-radius: 12px;
-}
-
-.icon-circle {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    align-self: center;
-    background: rgba(245, 166, 35, 0.12);
-    color: var(--color-accent, #f5A623);
 }
 
 .email-box {
