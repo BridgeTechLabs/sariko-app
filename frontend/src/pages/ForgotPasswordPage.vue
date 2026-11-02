@@ -9,9 +9,12 @@ export default {
 
 <template>
     <div class="background">
+        <q-img class="logo" ratio="1" src="/logo/sariko/sariko_logo_dark_bg-removebg.png" />
+        <div class="spacer-top"></div>
         <div class="container">
             <ForgotPasswordForm />
         </div>
+        <div class="spacer-bottom"></div>
     </div>
 </template>
 
@@ -23,7 +26,21 @@ export default {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 50px 0 100px;
+    padding: 24px 0;
+}
+
+.logo {
+    width: 100px;
+    flex-shrink: 0;
+}
+
+/* Content sits around the upper quarter of the screen, not dead center (Jack 02/11). */
+.spacer-top {
+    flex: 1;
+}
+
+.spacer-bottom {
+    flex: 3;
 }
 
 .container {
