@@ -22,7 +22,7 @@ EXPECTED = {"recipient_name": "Maria", "recipient_phone": "+84902222222",
 
 
 def full_order(**receiver):
-    return {"id": "order-1", "status": "confirmed", "delivery_method": "delivery", "delivery_address": "12 Nguyen Hue, Q1",
+    return {"id": "order-1", "status": "confirmed", "payment_status": "paid", "delivery_method": "delivery", "delivery_address": "12 Nguyen Hue, Q1",
             "delivery_lat": 10.77, "delivery_lon": 106.70, "seller_profiles": SELLER, "users": BUYER, **receiver}
 
 
@@ -143,3 +143,23 @@ def test_tc7_rebook_books_the_receiver(monkeypatch):
     assert deliveries.rebook_delivery("order-1", user={"id": "u"}) == {"success": True}
     [placed] = lalamove.placed
     assert {k: placed[k] for k in EXPECTED} == EXPECTED
+
+
+def test_rebook_refuses_an_unpaid_order(monkeypatch):
+    """02/11 PROD: unpaid orders reached ready; a rebook must not book a real trip for one."""
+    lalamove = FakeLalamove()
+
+    class FakeSellerProfiles:
+        def read_seller_profile_by_user_id(self, user_id):
+            return {"id": "seller-1"}
+
+    monkeypatch.setattr(deliveries, "DAOSellerProfiles", FakeSellerProfiles)
+    monkeypatch.setattr(deliveries, "DAOOrders",
+                        fake_orders({**full_order(**WITH_RECEIVER), "status": "ready", "payment_status": "pending"}))
+    monkeypatch.setattr(deliveries, "DAODeliveries", FakeDeliveries)
+    monkeypatch.setattr(deliveries, "rebook_max", lambda: 3)
+    monkeypatch.setattr(deliveries, "get_lalamove_service", lambda: lalamove)
+
+    with pytest.raises(HTTPException) as e:
+        deliveries.rebook_delivery("order-1", user={"id": "u"})
+    assert e.value.status_code == 409 and lalamove.placed == []
