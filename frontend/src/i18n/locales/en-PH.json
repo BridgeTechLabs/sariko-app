@@ -26,6 +26,7 @@
         "store_closed": "This store is closed now. Same-day dishes can't be ordered; pre-order dishes still can.",
         "dish_sold_out": "This dish is sold out.",
         "portions_left": "Only {remaining} left of {name}.",
+        "quantity_max": "You can order up to {max} of each dish.",
         "option_sold_out": "This price option is sold out.",
         "choose_option": "Please choose a price option.",
         "another_seller": "Your cart has dishes from another store.",

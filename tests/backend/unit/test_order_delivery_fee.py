@@ -46,6 +46,9 @@ class FakeVat:
     def get_tax_rate(self, _):
         return Decimal("0.1")
 
+    def get_positive_int(self, key, default):
+        return default
+
 
 class FakeOrderItems:
     def create_order_items_from_cart(self, **kw):

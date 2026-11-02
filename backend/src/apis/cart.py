@@ -9,7 +9,7 @@ from dao.dao_cart_items import DAOCartItems
 from dao.dao_carts import DAOCarts
 from dao.dao_food_item_variants import DAOFoodItemVariants
 from dao.dao_food_items import DAOFoodItems
-from apis.orders import STORE_CLOSED_DETAIL, is_same_day, portions_error
+from apis.orders import STORE_CLOSED_DETAIL, check_quantities, is_same_day, portions_error
 from core.store_hours import VN_TZ, is_open_now
 from core.seller_status import with_buyer_status
 from schemas import Schema
@@ -65,6 +65,7 @@ def _validate_variant(food_item_id: str, variant_id: Optional[str]):
 def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_token)):
     
     user_id = user["id"]
+    check_quantities([request.quantity])
     _validate_variant(request.food_item_id, request.variant_id)
 
     gate = DAOFoodItems().read_order_gate(request.food_item_id)
@@ -111,6 +112,7 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
     existing_item = dao_cart_items.find_item(cart_id=cart_id, food_item_id=request.food_item_id, variant_id=request.variant_id)
 
     if existing_item:
+        check_quantities([existing_item["quantity"] + request.quantity])
         dao_cart_items.update_quantity(cart_id=cart_id, food_item_id=request.food_item_id, quantity=existing_item["quantity"] + request.quantity, variant_id=request.variant_id)
     else:
         dao_cart_items.update_food_item_by_cart_id(cart_id=cart_id, food_item_id=request.food_item_id, quantity=request.quantity, variant_id=request.variant_id)
@@ -120,6 +122,7 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
 @router.patch("/update")
 def update_food_item_quantity(request: Schema.RequestUpdateCartItem, user=Depends(verify_token)):
 
+    check_quantities([request.quantity])
     dao_cart = DAOCarts()
     cart = dao_cart.read_cart_by_user_id_seller_id(user_id=user["id"])
     if not cart:

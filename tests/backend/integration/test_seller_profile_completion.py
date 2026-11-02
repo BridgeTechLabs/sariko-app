@@ -494,6 +494,7 @@ class FakeFoodItems:
 def test_tc30_cart_refuses_coming_soon(monkeypatch):
     monkeypatch.setattr(cart, "_validate_variant", lambda *a: None)
     monkeypatch.setattr(cart, "DAOFoodItems", FakeFoodItems)
+    monkeypatch.setattr("apis.orders.DAOAdminConfig", lambda: type("S", (), {"get_positive_int": lambda self, k, d: d})())
     app = FastAPI()
     app.include_router(cart.router)
     app.dependency_overrides[verify_token] = lambda: {"id": "user-c"}
