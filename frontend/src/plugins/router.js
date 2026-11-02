@@ -44,6 +44,12 @@ const routes = [
         component: () => import('@/pages/ResetPasswordPage.vue'),
     },
     {
+        path: '/verify-email',
+        name: 'verify-email',
+        component: () => import('@/pages/VerifyEmailPage.vue'),
+        meta: { guestOnly: true }
+    },
+    {
         path: '/onboarding',
         name: 'onboarding',
         component: () => import('@/pages/Onboarding.vue'),

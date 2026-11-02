@@ -135,6 +135,7 @@ export const useAuthStore = defineStore("authStore", {
             // auth subscription
             _authSub: null,
             isPasswordRecovery: false,
+            isResendingVerification: false,
         }
     },
 
@@ -375,6 +376,10 @@ export const useAuthStore = defineStore("authStore", {
 
             } catch (error) {
                 console.error(`authStore - onClickedSignin - ${error}`);
+                if (error?.code === "email_not_confirmed") {
+                    router.push({ name: "verify-email", query: { email: this.inputSignInEmail } });
+                    return;
+                }
                 let errorMessage = null;
                 if (error?.code === "invalid_credentials") {
                     errorMessage = "Incorrect email or password. Please try again.";
@@ -418,6 +423,9 @@ export const useAuthStore = defineStore("authStore", {
                         position: "bottom",
                     });
                     router.push({ name: "onboarding" });
+                } else if (res?.user) {
+                    // Confirm email is on: Supabase returns a user but no session until the link is clicked.
+                    router.push({ name: "verify-email", query: { email: this.inputSignUpEmail } });
                 }
             } catch (error) {
                 console.error(`authStore - onClickedSignup - ${error}`);
@@ -458,6 +466,32 @@ export const useAuthStore = defineStore("authStore", {
                 router.push('/home');
             } catch (error) {
                 console.error(`authStore - onClickedSignout - ${error}`);
+            }
+        },
+
+        async onClickedResendVerification(email) {
+            this.isResendingVerification = true;
+            try {
+                await apiAuth.authResend(email);
+                Notify.create({
+                    classes: 'quasar-notify-positive',
+                    message: i18n.global.t("verify_email_page.toast_resent"),
+                    progress: true,
+                    icon: 'fa-regular fa-circle-check',
+                    position: "bottom",
+                });
+            } catch (error) {
+                console.error(`authStore - onClickedResendVerification - ${error}`);
+                const isRateLimited = error?.status === 429 || error?.code === "over_email_send_rate_limit";
+                Notify.create({
+                    classes: 'quasar-notify-negative',
+                    message: i18n.global.t(isRateLimited ? "verify_email_page.toast_rate_limited" : "verify_email_page.toast_failed"),
+                    progress: true,
+                    icon: 'fa-regular fa-circle-xmark',
+                    position: "bottom",
+                });
+            } finally {
+                this.isResendingVerification = false;
             }
         },
 
