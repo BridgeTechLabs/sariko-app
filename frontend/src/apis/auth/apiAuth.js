@@ -29,6 +29,12 @@ export const apiAuth = {
         return data
     },
  
+    authResend: async(email) => {
+        const { data, error } = await supabase.auth.resend({ type: 'signup', email })
+        if (error) throw error
+        return data
+    },
+
     authSignout: async() => {
         const { data, error } = await supabase.auth.signOut()
         if (error) throw error

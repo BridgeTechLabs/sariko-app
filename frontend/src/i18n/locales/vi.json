@@ -897,6 +897,16 @@
         "success": "Đặt lại mật khẩu thành công",
         "invalid_link": "Link không hợp lệ hoặc đã hết hạn"
     },
+    "verify_email_page": {
+        "title": "Kiểm tra email của bạn",
+        "text_sent": "Chúng tôi đã gửi link xác nhận tới {email}. Mở link đó để hoàn tất tài khoản.",
+        "hint": "Không thấy? Xem thư mục Spam hoặc Quảng cáo.",
+        "button_resend": "Gửi lại email",
+        "link_back_to_signin": "Quay lại đăng nhập",
+        "toast_resent": "Đã gửi lại email",
+        "toast_rate_limited": "Vui lòng đợi một phút rồi thử lại",
+        "toast_failed": "Có lỗi xảy ra, vui lòng thử lại"
+    },
     "account_v2": {
         "section_ordering": "Đặt hàng",
         "section_preferences": "Tuỳ chỉnh",

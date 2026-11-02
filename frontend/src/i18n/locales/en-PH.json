@@ -894,6 +894,16 @@
         "success": "Password updated successfully",
         "invalid_link": "This link is invalid or has expired"
     },
+    "verify_email_page": {
+        "title": "Check your email",
+        "text_sent": "We sent a confirmation link to {email}. Open it to finish setting up your account.",
+        "hint": "Can't find it? Check Spam or Promotions.",
+        "button_resend": "Resend email",
+        "link_back_to_signin": "Back to sign in",
+        "toast_resent": "Email sent",
+        "toast_rate_limited": "Please wait a minute before trying again",
+        "toast_failed": "Something went wrong, please try again"
+    },
     "account_v2": {
         "section_ordering": "Ordering",
         "section_preferences": "Preferences",
