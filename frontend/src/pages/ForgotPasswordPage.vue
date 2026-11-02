@@ -10,7 +10,6 @@ export default {
 <template>
     <div class="background">
         <q-img class="logo" ratio="1" src="/logo/sariko/sariko_logo_dark_bg-removebg.png" />
-        <div class="spacer-top"></div>
         <div class="container">
             <ForgotPasswordForm />
         </div>
@@ -32,15 +31,13 @@ export default {
 .logo {
     width: 40%;
     flex-shrink: 0;
+    margin-bottom: 20px;
 }
 
-/* Content sits around the upper quarter of the screen, not dead center (Jack 02/11). */
-.spacer-top {
-    flex: 1;
-}
-
+/* Logo + content sit together near the top; this pushes the rest of the
+   screen's empty space below them instead of centering (Jack 02/11). */
 .spacer-bottom {
-    flex: 3;
+    flex: 1;
 }
 
 .container {
