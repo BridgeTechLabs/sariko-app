@@ -320,6 +320,8 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
             raise HTTPException(status_code=404, detail="Order not found")
         if order["status"] not in ("ready", "delivery_failed") or order.get("delivery_method") != "delivery":
             raise HTTPException(status_code=400, detail="Order must be ready or delivery_failed with delivery method")
+        if order.get("payment_status") != "paid":   # never book a real trip for an unpaid order
+            raise HTTPException(status_code=409, detail={"code": "order_not_paid", "message": "This order is not paid yet."})
 
         dao_deliveries = DAODeliveries()
         delivery = dao_deliveries.read_delivery_by_order_id(order_id)
