@@ -30,7 +30,7 @@ export default {
 }
 
 .logo {
-    width: 100px;
+    width: 40%;
     flex-shrink: 0;
 }
 
