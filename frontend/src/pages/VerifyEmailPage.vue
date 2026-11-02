@@ -9,6 +9,7 @@ export default {
 
 <template>
     <div class="background">
+        <q-img class="logo" ratio="1" src="/logo/sariko/sariko_logo_dark_bg-removebg.png" />
         <div class="spacer-top"></div>
         <div class="container">
             <VerifyEmailForm />
@@ -26,6 +27,11 @@ export default {
     flex-direction: column;
     align-items: center;
     padding: 24px 0;
+}
+
+.logo {
+    width: 100px;
+    flex-shrink: 0;
 }
 
 /* Content sits around the upper quarter of the screen, not dead center (Jack 02/11). */
