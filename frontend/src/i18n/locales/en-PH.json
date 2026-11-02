@@ -237,10 +237,6 @@
             "banner_card_status_text_open": "Open",
             "banner_card_status_text_close": "Closed"
         },
-        "section_banner_featured": {
-            "banner_text_line_1": "4 months FREE · then 750.000 ₫/mo",
-            "banner_text_line_2": "· 17% commission · Founding Seller"
-        },
         "section_food_cards": {
             "label_sold_out": "Sold out",
             "label_sold_out_today": "Sold out today",

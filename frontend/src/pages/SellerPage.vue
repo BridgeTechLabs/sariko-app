@@ -3,7 +3,6 @@ import { mapState } from 'pinia';
 import { useSellerStore } from '@/stores/seller/sellerStore';
 import LayoutBaseSellerPage from '@/layouts/seller/LayoutBaseSellerPage.vue';
 import SellerInfo from '@/components/seller/seller-page/SellerInfo.vue';
-import BannerFeatured from '@/components/seller/seller-page/BannerFeatured.vue'
 import Categories from '@/components/seller/seller-page/Categories.vue';
 import Menu from '@/components/seller/seller-page/Menu.vue';
 import SellerComingSoon from '@/components/seller/seller-page/SellerComingSoon.vue';
@@ -14,7 +13,6 @@ export default {
     components: {
         LayoutBaseSellerPage,
         SellerInfo,
-        BannerFeatured,
         Categories,
         Menu,
         SellerComingSoon,
@@ -49,10 +47,6 @@ export default {
 
         <template #SellerInfo>
             <SellerInfo />
-        </template>
-
-        <template #BannerFeatured>
-            <BannerFeatured v-if="!isComingSoon" />
         </template>
 
         <template #Categories>

@@ -237,10 +237,6 @@
             "banner_card_status_text_open": "Mở",
             "banner_card_status_text_close": "Đóng"
         },
-        "section_banner_featured": {
-            "banner_text_line_1": "MIỄN PHÍ 4 tháng · sau đó 750.000 ₫/tháng",
-            "banner_text_line_2": "· Hoa hồng 17% · Người bán sáng lập"
-        },
         "section_food_cards": {
             "label_sold_out": "Bán hết",
             "label_sold_out_today": "Bán hết hôm nay",
