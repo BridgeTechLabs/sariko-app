@@ -94,7 +94,7 @@ export const useCartStore = defineStore("cartStore", {
                     this.pendingVariantId = variantId
                     this.pendingSellerName = newSellerName
                     this.showConflictModal(e.currentSellerName || '', newSellerName || '')
-                } else if (e.detail?.code === 'portions_left') {
+                } else if (['portions_left', 'quantity_max'].includes(e.detail?.code)) {
                     Notify.create({ classes: 'quasar-notify-negative', message: apiErrorMessage({ detail: e.detail }), position: 'bottom', timeout: 3000 })
                 } else if (e.message.includes('sold out')) {
                     Notify.create({ classes: 'quasar-notify-negative', message: i18n.global.t('cart_page.dish_sold_out'), position: 'bottom', timeout: 3000 })

@@ -26,6 +26,7 @@
         "store_closed": "Quán đang đóng cửa. Món trong ngày không đặt được; món đặt trước vẫn đặt được.",
         "dish_sold_out": "Món này đã hết.",
         "portions_left": "{name} chỉ còn {remaining} suất.",
+        "quantity_max": "Mỗi món đặt tối đa {max} phần.",
         "option_sold_out": "Lựa chọn này đã hết.",
         "choose_option": "Vui lòng chọn một mức giá.",
         "another_seller": "Giỏ hàng đang có món của quán khác.",
@@ -235,10 +236,6 @@
             "banner_card_status_subtitle": "Trạng thái",
             "banner_card_status_text_open": "Mở",
             "banner_card_status_text_close": "Đóng"
-        },
-        "section_banner_featured": {
-            "banner_text_line_1": "MIỄN PHÍ 4 tháng · sau đó 750.000 ₫/tháng",
-            "banner_text_line_2": "· Hoa hồng 17% · Người bán sáng lập"
         },
         "section_food_cards": {
             "label_sold_out": "Bán hết",

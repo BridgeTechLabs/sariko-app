@@ -11,10 +11,6 @@
                 <slot name="SellerInfo" />
             </div>
 
-            <div class="banner-featured">
-                <slot name="BannerFeatured" />
-            </div>
-
             <q-separator class="seperator"/>
 
             <div class="categories-section">
@@ -47,10 +43,6 @@
 .seller-info-section {
     margin-bottom: 10px;
     padding: 0px 10px;
-}
-
-.banner-featured {
-    margin-bottom: 10px;
 }
 
 .categories-section {

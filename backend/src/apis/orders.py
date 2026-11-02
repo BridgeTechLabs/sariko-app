@@ -67,6 +67,15 @@ def portions_error(wanted: dict, names: dict, sale_date):
     return None
 
 
+def check_quantities(quantities) -> None:
+    """400 when one cart row (dish + price option) asks more than cart_max_quantity_per_item.
+    A bot put ~22 billion ₫ orders through with no cap (docs/dev/20261102-security-fixes S1)."""
+    most = DAOAdminConfig().get_positive_int("cart_max_quantity_per_item", 50)
+    if max(quantities, default=0) > most:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
+            "code": "quantity_max", "message": f"At most {most} of each dish", "max": most})
+
+
 # Shared with POST /cart/add. A closed store still takes pre-orders (delivered on a later
 # day); only same-day dishes (preorder_day 0) are blocked.
 STORE_CLOSED_DETAIL = "This store is closed now. Same-day dishes can't be ordered; pre-order dishes still can."
@@ -128,6 +137,7 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
 
     # 2. Check the cart is still sellable
     cart_items = cart["cart_items"]
+    check_quantities(item["quantity"] for item in cart_items)   # a cart filled before the cap existed
 
     appointment = request.delivery_appointment
     if appointment is not None and appointment.tzinfo is None:
