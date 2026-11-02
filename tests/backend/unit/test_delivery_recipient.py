@@ -103,6 +103,11 @@ def fake_orders(order):
     return FakeOrders
 
 
+class FakeSellerProfiles:
+    def read_seller_profile_by_user_id(self, user_id):
+        return {"id": "seller-1"}
+
+
 class FakeConfig:
     def get_positive_int(self, key, default):
         return default
@@ -130,10 +135,6 @@ def test_tc5_tc6_seller_ready_books_the_receiver(monkeypatch, caplog, receiver, 
 def test_tc7_rebook_books_the_receiver(monkeypatch):
     lalamove = FakeLalamove()
 
-    class FakeSellerProfiles:
-        def read_seller_profile_by_user_id(self, user_id):
-            return {"id": "seller-1"}
-
     monkeypatch.setattr(deliveries, "DAOSellerProfiles", FakeSellerProfiles)
     monkeypatch.setattr(deliveries, "DAOOrders", fake_orders({**full_order(**WITH_RECEIVER), "status": "ready"}))
     monkeypatch.setattr(deliveries, "DAODeliveries", FakeDeliveries)
@@ -148,10 +149,6 @@ def test_tc7_rebook_books_the_receiver(monkeypatch):
 def test_rebook_refuses_an_unpaid_order(monkeypatch):
     """02/11 PROD: unpaid orders reached ready; a rebook must not book a real trip for one."""
     lalamove = FakeLalamove()
-
-    class FakeSellerProfiles:
-        def read_seller_profile_by_user_id(self, user_id):
-            return {"id": "seller-1"}
 
     monkeypatch.setattr(deliveries, "DAOSellerProfiles", FakeSellerProfiles)
     monkeypatch.setattr(deliveries, "DAOOrders",
