@@ -9,9 +9,11 @@ export default {
 
 <template>
     <div class="background">
+        <div class="spacer-top"></div>
         <div class="container">
             <VerifyEmailForm />
         </div>
+        <div class="spacer-bottom"></div>
     </div>
 </template>
 
@@ -23,8 +25,16 @@ export default {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
     padding: 24px 0;
+}
+
+/* Content sits around the upper quarter of the screen, not dead center (Jack 02/11). */
+.spacer-top {
+    flex: 1;
+}
+
+.spacer-bottom {
+    flex: 3;
 }
 
 .container {
