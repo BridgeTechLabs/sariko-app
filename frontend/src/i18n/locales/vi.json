@@ -899,7 +899,8 @@
     },
     "verify_email_page": {
         "title": "Kiểm tra email của bạn",
-        "text_sent": "Chúng tôi đã gửi link xác nhận tới {email}. Mở link đó để hoàn tất tài khoản.",
+        "text_sent": "Chúng tôi đã gửi link xác nhận tới:",
+        "instruction": "Mở link đó để hoàn tất tài khoản.",
         "hint": "Không thấy? Xem thư mục Spam hoặc Quảng cáo.",
         "button_resend": "Gửi lại email",
         "link_back_to_signin": "Quay lại đăng nhập",

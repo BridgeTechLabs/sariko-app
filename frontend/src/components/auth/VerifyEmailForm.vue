@@ -1,8 +1,11 @@
 <script>
+import { Mail } from 'lucide-vue-next';
 import { mapState, mapActions } from 'pinia';
 import { useAuthStore } from '@/stores/auth/authStore';
 
 export default {
+    components: { Mail },
+
     computed: {
         ...mapState(useAuthStore, ["isResendingVerification"]),
 
@@ -24,9 +27,19 @@ export default {
 <template>
     <div class="form">
 
+        <div class="icon-circle">
+            <Mail :size="28" />
+        </div>
+
         <div class="greeting">
             <div class="text-greeting">{{ $t('verify_email_page.title') }}</div>
-            <div class="subtext-greeting">{{ $t('verify_email_page.text_sent', { email }) }}</div>
+            <div class="subtext-greeting">{{ $t('verify_email_page.text_sent') }}</div>
+        </div>
+
+        <div class="email-box">{{ email }}</div>
+
+        <div class="greeting">
+            <div class="subtext-greeting">{{ $t('verify_email_page.instruction') }}</div>
             <div class="hint-text">{{ $t('verify_email_page.hint') }}</div>
         </div>
 
@@ -55,6 +68,18 @@ export default {
     font-family: $sariko-font-family-secondary;
 }
 
+.icon-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    background: rgba(245, 166, 35, 0.12);
+    color: var(--color-accent, #f5A623);
+}
+
 .greeting {
     display: flex;
     flex-direction: column;
@@ -77,6 +102,20 @@ export default {
 .hint-text {
     font-size: 12px;
     color: var(--text-secondary);
+}
+
+.email-box {
+    align-self: center;
+    max-width: 100%;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--color-accent, #f5A623);
+    background: rgba(245, 166, 35, 0.1);
+    border: 1px solid rgba(245, 166, 35, 0.3);
+    border-radius: 10px;
+    padding: 10px 16px;
+    word-break: break-all;
+    text-align: center;
 }
 
 .btn-submit {

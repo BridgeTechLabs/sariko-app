@@ -23,7 +23,8 @@ export default {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 50px 0 100px;
+    justify-content: center;
+    padding: 24px 0;
 }
 
 .container {

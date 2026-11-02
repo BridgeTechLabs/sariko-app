@@ -896,7 +896,8 @@
     },
     "verify_email_page": {
         "title": "Check your email",
-        "text_sent": "We sent a confirmation link to {email}. Open it to finish setting up your account.",
+        "text_sent": "We sent a confirmation link to:",
+        "instruction": "Open it to finish setting up your account.",
         "hint": "Can't find it? Check Spam or Promotions.",
         "button_resend": "Resend email",
         "link_back_to_signin": "Back to sign in",
