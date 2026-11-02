@@ -33,6 +33,7 @@ def add_to_cart(monkeypatch):
     monkeypatch.setattr("apis.cart._validate_variant", lambda *a: None)
     monkeypatch.setattr("apis.cart.DAOCarts", _FakeCarts)
     monkeypatch.setattr("apis.cart.DAOCartItems", _FakeCartItems)
+    monkeypatch.setattr("apis.orders.DAOAdminConfig", lambda: type("S", (), {"get_positive_int": lambda self, k, d: d})())
 
     def call(preorder_day, is_open, opening_time=None, closing_time=None, is_available=True):
         _FakeCartItems.added = []

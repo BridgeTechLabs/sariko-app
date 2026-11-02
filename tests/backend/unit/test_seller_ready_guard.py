@@ -23,7 +23,7 @@ def mark_ready(client, monkeypatch):
     """PATCH status=ready on a confirmed delivery order; returns (response, statuses written, Lalamove calls)."""
     def call(profile):
         written, lalamove = [], []
-        order = {"id": "order-1", "status": "confirmed", "delivery_method": "delivery"}
+        order = {"id": "order-1", "status": "confirmed", "payment_status": "paid", "delivery_method": "delivery"}
         monkeypatch.setattr("apis.sellers._get_seller_id", lambda user: "seller-1")
         monkeypatch.setattr("services.lalamove_service.get_lalamove_service", lambda: lalamove.append("lalamove"))
 

@@ -39,6 +39,7 @@ def carts(monkeypatch):
     Carts.log = []
     monkeypatch.setattr(cart, "DAOCarts", Carts)
     monkeypatch.setattr(cart, "DAOCartItems", Items)
+    monkeypatch.setattr(orders, "DAOAdminConfig", lambda: SimpleNamespace(get_positive_int=lambda key, default: default))
     return Carts
 
 

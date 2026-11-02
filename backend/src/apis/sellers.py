@@ -287,6 +287,13 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                 detail=f"Cannot transition from '{order['status']}' to '{body.status}'"
             )
 
+        # Only a paid order moves forward: an unpaid one marked ready would book a real Lalamove trip.
+        if body.status != "cancelled" and order.get("payment_status") != "paid":
+            raise HTTPException(status_code=409, detail={
+                "code": "order_not_paid",
+                "message": "This order is not paid yet.",
+            })
+
         if order["status"] == "ready" and body.status == "done" and order.get("delivery_method") == "delivery":
             from dao.dao_deliveries import DAODeliveries
             delivery = DAODeliveries().read_delivery_by_order_id(order_id)
