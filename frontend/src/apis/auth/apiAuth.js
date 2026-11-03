@@ -23,14 +23,19 @@ export const apiAuth = {
                     fullname: fullname,
                     is_seller: isSeller
                 },
+                emailRedirectTo: window.location.origin + '/signin',
             },
         });
         if (error) throw error
         return data
     },
- 
+
     authResend: async(email) => {
-        const { data, error } = await supabase.auth.resend({ type: 'signup', email })
+        const { data, error } = await supabase.auth.resend({
+            type: 'signup',
+            email,
+            options: { emailRedirectTo: window.location.origin + '/signin' },
+        })
         if (error) throw error
         return data
     },
