@@ -9,8 +9,9 @@ from dao.dao_cart_items import DAOCartItems
 from dao.dao_carts import DAOCarts
 from dao.dao_food_item_variants import DAOFoodItemVariants
 from dao.dao_food_items import DAOFoodItems
-from apis.orders import STORE_CLOSED_DETAIL, is_same_day
-from core.store_hours import is_open_now
+from apis.orders import STORE_CLOSED_DETAIL, check_quantities, is_same_day, portions_error
+from core.store_hours import VN_TZ, is_open_now
+from core.seller_status import with_buyer_status
 from schemas import Schema
 
 from fastapi import (
@@ -64,6 +65,7 @@ def _validate_variant(food_item_id: str, variant_id: Optional[str]):
 def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_token)):
     
     user_id = user["id"]
+    check_quantities([request.quantity])
     _validate_variant(request.food_item_id, request.variant_id)
 
     gate = DAOFoodItems().read_order_gate(request.food_item_id)
@@ -71,8 +73,20 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
     if gate and gate.get("is_available") is False:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This dish is sold out")
     seller = (gate or {}).get("seller_profiles") or {}
+    # Coming soon (or active without pickup coordinates): no menu to order from yet
+    if gate and with_buyer_status(dict(seller)).get("status") != "active":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This store is not taking orders yet")
     if gate and is_same_day(gate.get("preorder_day")) and not is_open_now(seller.get("is_open"), seller.get("opening_time"), seller.get("closing_time")):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=STORE_CLOSED_DETAIL)
+    # T134: today's portions of a same-day dish (a pre-order dish is checked for its delivery day at POST /orders)
+    if gate and gate.get("daily_portions") and is_same_day(gate.get("preorder_day")):
+        cart_now = DAOCartItems().read_cart_items_by_user_id(user_id=user_id) or {}
+        in_cart = sum(i["quantity"] for i in cart_now.get("cart_items") or []
+                      if (i.get("food_items") or {}).get("id") == request.food_item_id)
+        short = portions_error({request.food_item_id: in_cart + request.quantity}, {request.food_item_id: gate.get("name")},
+                               datetime.datetime.now(VN_TZ).date())
+        if short:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=short)
 
     dao_cart = DAOCarts()    
     cart = dao_cart.read_cart_by_user_id_seller_id(user_id=user_id)
@@ -98,6 +112,7 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
     existing_item = dao_cart_items.find_item(cart_id=cart_id, food_item_id=request.food_item_id, variant_id=request.variant_id)
 
     if existing_item:
+        check_quantities([existing_item["quantity"] + request.quantity])
         dao_cart_items.update_quantity(cart_id=cart_id, food_item_id=request.food_item_id, quantity=existing_item["quantity"] + request.quantity, variant_id=request.variant_id)
     else:
         dao_cart_items.update_food_item_by_cart_id(cart_id=cart_id, food_item_id=request.food_item_id, quantity=request.quantity, variant_id=request.variant_id)
@@ -107,6 +122,7 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
 @router.patch("/update")
 def update_food_item_quantity(request: Schema.RequestUpdateCartItem, user=Depends(verify_token)):
 
+    check_quantities([request.quantity])
     dao_cart = DAOCarts()
     cart = dao_cart.read_cart_by_user_id_seller_id(user_id=user["id"])
     if not cart:

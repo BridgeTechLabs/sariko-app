@@ -86,6 +86,25 @@
     .fee-table { font-size: 12px; }
     .fee-table thead th, .fee-table tbody td { padding: 8px 10px; }
   }
+  /* Phones (docs-mobile, BUGS #36): 16px margins, a short header and hero, tables scroll in their own box.
+     .table-scroll keeps the table's 20px margin outside the box, so desktop spacing is unchanged. */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 20px 0; }
+  .table-scroll > table { margin: 0; }
+  @media (max-width: 600px) {
+    .site-header { padding: 12px 16px; }
+    .site-header .wordmark { font-size: 22px; }
+    .hero { padding: 24px 16px 20px; }
+    .hero h1 { font-size: 30px; margin-bottom: 10px; }
+    .hero-meta { gap: 2px 16px; }
+    .layout { padding: 28px 16px 48px; }
+    .section { margin-bottom: 28px; padding-bottom: 28px; }
+    .section h2 { font-size: 24px; margin-bottom: 12px; }
+    .fee-table, .data-table { font-size: 14px; }
+    .fee-table th, .fee-table td, .data-table th, .data-table td { padding: 8px 10px; }
+    .fee-table th, .data-table th { font-size: 13px; }
+    .page-footer { padding: 20px 16px; }
+    .method-card p, .payout-card p, .provider-card p, .node-card p, .team-card p, .parent-note, .fee-table .mono { font-size: 14px; }
+  }
 </style>
 </head>
 <body>
@@ -139,7 +158,7 @@
     <h2>Estimated Delivery Times</h2>
     <p>Delivery times are estimates based on distance between seller and buyer within Ho Chi Minh City, and are subject to traffic conditions, driver availability, and order preparation time.</p>
 
-    <table class="fee-table">
+    <div class="table-scroll"><table class="fee-table">
       <thead>
         <tr>
           <th>Distance / Scenario</th>
@@ -169,7 +188,7 @@
           <td>Subject to driver availability</td>
         </tr>
       </tbody>
-    </table>
+    </table></div>
 
     <div class="warn-box"><strong>Peak hours:</strong> Orders placed during peak lunch (11:00–13:00) and dinner (17:00–20:00) periods may experience longer wait times due to higher demand for delivery drivers across HCMC.</div>
   </div>
@@ -181,7 +200,7 @@
     <p>The delivery fee is quoted by Lalamove for the distance between the seller's address and the buyer's delivery address when the order is placed, and is shown at checkout before payment. SariKo does not mark up delivery fees — the fee is passed to Lalamove in full.</p>
     <p><strong>SariKo charges zero platform fee on delivery.</strong> The delivery fee and the goods total are the only amounts the buyer pays.</p>
 
-    <table class="fee-table">
+    <div class="table-scroll"><table class="fee-table">
       <thead>
         <tr>
           <th>Distance Range</th>
@@ -211,7 +230,7 @@
           <td class="mono">~$0.80 – $2.00</td>
         </tr>
       </tbody>
-    </table>
+    </table></div>
 
     <p>The delivery fee shown at checkout is the only delivery charge the buyer pays; the buyer is never asked to pay more after placing the order. The table above is a guide only.</p>
     <p>When an order is cancelled and refunded in full, the refund includes the delivery fee (see Section 06).</p>
@@ -272,7 +291,7 @@
       <p><strong>Email:</strong> <a href="mailto:support@sariko.store">support@sariko.store</a></p>
       <p><strong>Phone:</strong> <a href="tel:+84909074793">+84 909 074 793</a></p>
       <p><strong>Operator:</strong> Zen Tech Asia Co., Ltd. (MST 0316852554)</p>
-      <p><strong>Address:</strong> 195/3 Dien Bien Phu, Binh Thanh District, Ho Chi Minh City, Vietnam</p>
+      <p><strong>Address:</strong> 6th Floor, Rosana Building, 60 Nguyen Dinh Chieu, Tan Dinh Ward, Ho Chi Minh City, Vietnam</p>
       <p style="margin-top:10px; font-size:13px; color:var(--muted);">We aim to respond to all delivery support requests within 24 hours. For urgent issues (driver cannot find address, damaged goods on arrival), please call directly.</p>
     </div>
   </div>
@@ -283,7 +302,7 @@
   <div class="divider"></div>
   <p>
     SariKo Shipping &amp; Delivery Policy · Version 2.0 · Effective October 16, 2026<br>
-    Operated by Zen Tech Asia Co., Ltd. (MST 0316852554) · 195/3 Dien Bien Phu, Binh Thanh District, Ho Chi Minh City, Vietnam<br>
+    Operated by Zen Tech Asia Co., Ltd. (MST 0316852554) · 6th Floor, Rosana Building, 60 Nguyen Dinh Chieu, Tan Dinh Ward, Ho Chi Minh City, Vietnam<br>
     Issued under Law 122/2025/QH15 and Decree 248/2026/NĐ-CP on E-Commerce<br>
     © 2026 Zen Tech Asia Co., Ltd. All rights reserved.
   </p>

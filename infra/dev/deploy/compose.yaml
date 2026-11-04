@@ -1,0 +1,42 @@
+services:
+    backend:
+        image: sariko/sariko-backend:$IMAGE_TAG
+        container_name: sariko-dev-backend
+        ports:
+            - "127.0.0.1:5000:5000"
+        volumes:
+        - ../apps/logs:/www/logs
+        env_file: ".env.dev"
+        environment:
+            IMAGE_TAG: ${IMAGE_TAG}
+        healthcheck:
+            test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        restart: unless-stopped
+
+
+    nginx:
+        image: nginx:alpine
+        container_name: nginx
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+            - ./nginx/certbot/conf:/etc/letsencrypt
+            - ./nginx/certbot/www:/var/www/certbot
+        depends_on:
+            - backend
+        restart: unless-stopped
+
+    certbot:
+        image: certbot/certbot
+        container_name: certbot
+        volumes:
+            - ./nginx/certbot/conf:/etc/letsencrypt
+            - ./nginx/certbot/www:/var/www/certbot
+        entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"  # Renew certificates every 12 hours
+        restart: unless-stopped

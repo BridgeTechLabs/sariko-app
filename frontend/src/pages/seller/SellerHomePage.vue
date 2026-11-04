@@ -7,11 +7,12 @@ import LayoutSellerHome from '@/layouts/seller/LayoutSellerHome.vue';
 import SellerGreeting from '@/components/seller-home/SellerGreeting.vue';
 import SellerStatsGrid from '@/components/seller-home/SellerStatsGrid.vue';
 import ActionOrdersList from '@/components/seller-home/ActionOrdersList.vue';
+import ProfileCompletionBanner from '@/components/seller-profile/ProfileCompletionBanner.vue';
 
 export default {
     name: 'SellerHomePage',
 
-    components: { LayoutSellerHome, SellerGreeting, SellerStatsGrid, ActionOrdersList, BellRing },
+    components: { LayoutSellerHome, SellerGreeting, SellerStatsGrid, ActionOrdersList, BellRing, ProfileCompletionBanner },
 
     data() {
         return {
@@ -82,6 +83,7 @@ export default {
     <LayoutSellerHome>
 
         <template #Header>
+            <ProfileCompletionBanner />
             <SellerGreeting />
         </template>
 

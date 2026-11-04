@@ -13,6 +13,7 @@ import hmac
 import hashlib
 import logging
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 import requests
@@ -145,7 +146,7 @@ class LalamoveService:
             quotation_id=data["quotationId"],
             stop_id_0=data["stops"][0]["stopId"],
             stop_id_1=data["stops"][1]["stopId"],
-            total_fee=int(float(breakdown.get("total", 0))),
+            total_fee=int(Decimal(str(breakdown.get("total", 0)))),
             currency=breakdown.get("currency", "VND"),
             distance_km=float(distance.get("value", 0)),
         )

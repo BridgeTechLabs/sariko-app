@@ -1,11 +1,20 @@
 <script>
 import { MapPin, Phone, Pen } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth/authStore';
+import { useAddressStore } from '@/stores/address/addressStore';
+import { useCartStore } from '@/stores/cart/cartStore';
+import { useDeliveryStore } from '@/stores/delivery/deliveryStore';
 import { mapState } from 'pinia';
+import AddressList from '@/components/account/AddressList.vue';
+import { displayPhone } from '@/utils/phone';
 
 export default {
     components: {
-        MapPin, Phone, Pen
+        MapPin, Phone, Pen, AddressList
+    },
+
+    data() {
+        return { picking: false }
     },
 
     computed: {
@@ -15,13 +24,13 @@ export default {
             return useAuthStore()
         },
         displayName() {
-            return this.user?.fullName || 'Guest'
+            return this.authStore.inputReceiverName || this.user?.fullName || 'Guest'
         },
         displayAddress() {
             return this.authStore.inputAddress || null
         },
         displayPhone() {
-            return this.user?.phone || null
+            return displayPhone(this.authStore.inputReceiverPhone || this.user?.phone) || null
         },
         hasAddress() {
             return !!this.displayAddress
@@ -29,9 +38,13 @@ export default {
     },
 
     methods: {
-        goEditAddress() {
-            this.$router.push('/account/address')
-        }
+        // For this order only: the default address stays as it is.
+        pick(address) {
+            useAddressStore().useForOrder(address)
+            this.picking = false
+            const sellerId = useCartStore().cart?.seller_id
+            if (sellerId) useDeliveryStore().getQuotation(sellerId, address.lat, address.lon, address.address)
+        },
     },
 
     mounted() {
@@ -49,7 +62,7 @@ export default {
                     {{ $t('cart_page.section_delivery_address.title', { name: displayName }) }}
                 </div>
             </div>
-            <q-btn class="button" no-caps flat dense @click="goEditAddress">
+            <q-btn class="button" no-caps flat dense @click="picking = true">
                 <Pen size="14px" />
             </q-btn>
         </div>
@@ -65,10 +78,17 @@ export default {
             </div>
         </template>
 
-        <div v-else class="no-address" @click="goEditAddress">
+        <div v-else class="no-address" @click="picking = true">
             <MapPin size="16px" class="icon-empty" />
             <span>{{ $t('cart_page.section_delivery_address.no_address') }}</span>
         </div>
+
+        <q-dialog v-model="picking" position="bottom">
+            <div class="sheet">
+                <div class="sheet-title">{{ $t('cart_page.section_delivery_address.sheet_title') }}</div>
+                <AddressList picker @pick="pick" />
+            </div>
+        </q-dialog>
     </div>
 </template>
 
@@ -134,5 +154,20 @@ export default {
 
 .icon-empty {
     color: var(--color-accent);
+}
+
+.sheet {
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0));
+    background: var(--bg-main);
+    border-radius: 16px 16px 0 0;
+}
+
+.sheet-title {
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 12px;
 }
 </style>

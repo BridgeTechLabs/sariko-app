@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import apiCarts from "@/apis/cart/apiCart";
 import { Notify } from "quasar";
 import { i18n } from "@/plugins/i18n";
+import { apiErrorMessage } from "@/lib/axiosPolicy.js";
 
 export const useCartStore = defineStore("cartStore", {
     state() {
@@ -36,6 +37,10 @@ export const useCartStore = defineStore("cartStore", {
         currentSellerSlug(state) {
             return state.cartItems[0]?.sellerSlugName || null
         },
+        // Same wording as the backend's unavailable_names: dish, or dish (level)
+        unavailableNames(state) {
+            return state.cartItems.filter(i => i.unavailable).map(i => i.variantName ? `${i.name} (${i.variantName})` : i.name)
+        },
         maxPreorderDay(state) {
             return Math.max(0, ...state.cartItems.map(i => i.preorder_day ?? 0))
         }
@@ -61,13 +66,14 @@ export const useCartStore = defineStore("cartStore", {
                             "variantName": _variant?.name || null,
                             "name": _cartItems[i]?.food_items?.name,
                             "price": _variant ? _variant.price : _cartItems[i]?.food_items?.price,
-                            "priceText": _variant ? _variant.price_text : _cartItems[i]?.food_items?.price_text,
                             "imgSrc": _cartItems[i]?.food_items?.image_url,
                             "category":  _cartItems[i]?.food_items?.menu_categories?.name,
                             "quantity": _cartItems[i]?.quantity,
                             "sellerStore": this.cart?.seller_profiles?.store_name,
                             "sellerSlugName": this.cart?.seller_profiles?.slug,
                             "preorder_day": _cartItems[i]?.food_items?.preorder_day ?? 0,
+                            // The seller can switch a dish or level off after it went into the cart
+                            "unavailable": _cartItems[i]?.food_items?.is_available === false || _variant?.is_available === false,
                         })
                     }
                 }
@@ -88,6 +94,8 @@ export const useCartStore = defineStore("cartStore", {
                     this.pendingVariantId = variantId
                     this.pendingSellerName = newSellerName
                     this.showConflictModal(e.currentSellerName || '', newSellerName || '')
+                } else if (['portions_left', 'quantity_max'].includes(e.detail?.code)) {
+                    Notify.create({ classes: 'quasar-notify-negative', message: apiErrorMessage({ detail: e.detail }), position: 'bottom', timeout: 3000 })
                 } else if (e.message.includes('sold out')) {
                     Notify.create({ classes: 'quasar-notify-negative', message: i18n.global.t('cart_page.dish_sold_out'), position: 'bottom', timeout: 3000 })
                 } else if (e.message.includes('store is closed')) {

@@ -3,10 +3,11 @@ import { mapState } from 'pinia';
 import { useAuthStore } from '@/stores/auth/authStore';
 import LayoutBaseSettings from '@/layouts/account/LayoutBaseSettings.vue';
 import AddressForm from '@/components/account/AddressForm.vue';
+import AddressList from '@/components/account/AddressList.vue';
 
 export default {
     name: 'DeliveryAddressPage',
-    components: { LayoutBaseSettings, AddressForm },
+    components: { LayoutBaseSettings, AddressForm, AddressList },
     computed: {
         ...mapState(useAuthStore, ['user']),
         pageTitle() {
@@ -21,7 +22,8 @@ export default {
 <template>
     <LayoutBaseSettings :title="pageTitle" back-to="/account">
         <template #Content>
-            <AddressForm />
+            <AddressForm v-if="user?.isSeller" />
+            <AddressList v-else />
         </template>
     </LayoutBaseSettings>
 </template>

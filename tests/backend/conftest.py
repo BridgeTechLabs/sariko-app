@@ -61,3 +61,29 @@ def fastapi_client():
     app.include_router(payments.router)
     app.include_router(deliveries.router)
     return TestClient(app)
+
+
+@pytest.fixture
+def api(monkeypatch, tmp_path):
+    """api(*routers, user="u1") -> TestClient with main.py's error handlers (so the JSON
+    shapes are the production ones) and verify_token answering {"id": user}; user=None
+    keeps the real verify_token. Regression baseline (docs/dev/regression-baseline)."""
+    from fastapi import FastAPI, HTTPException
+    from fastapi.exceptions import RequestValidationError
+    from fastapi.testclient import TestClient
+    from core.auth import verify_token
+
+    monkeypatch.chdir(tmp_path)   # main makes ./logs on import; tests are read-only in CI
+    import main
+
+    def make(*routers, user="u1"):
+        app = FastAPI()
+        for router in routers:
+            app.include_router(router)
+        app.add_exception_handler(RequestValidationError, main.validation_exception_handler)
+        app.add_exception_handler(HTTPException, main.http_exception_handler)
+        app.add_exception_handler(Exception, main.global_exception_handler)
+        if user:
+            app.dependency_overrides[verify_token] = lambda: {"id": user}
+        return TestClient(app, raise_server_exceptions=False)
+    return make

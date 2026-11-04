@@ -2,6 +2,7 @@
 import { Store, Star } from 'lucide-vue-next';
 import { useSellerStore } from '@/stores/seller/sellerStore';
 import { foodPriceDisplay, formatVnd } from '@/utils/priceDisplay';
+import { portionsLeftToday } from '@/utils/portions';
 
 export default {
     components: { Store, Star },
@@ -32,6 +33,9 @@ export default {
         },
         hasRating() {
             return this.food?.rating_count > 0 && this.food?.rating_avg != null
+        },
+        portionsLeft() {
+            return portionsLeftToday(this.food)
         }
     },
 
@@ -66,6 +70,9 @@ export default {
                 </q-badge>
                 <q-badge v-else class="preorder-badge" color="positive">
                     {{ $t('seller_page.section_food_cards.label_item_instant') }}
+                </q-badge>
+                <q-badge v-if="portionsLeft > 0" class="preorder-badge" color="grey-8">
+                    {{ $t('seller_page.section_food_cards.label_portions_left', { n: portionsLeft }) }}
                 </q-badge>
             </div>
             <div v-if="seller" class="seller-chip" @click="goToSeller">

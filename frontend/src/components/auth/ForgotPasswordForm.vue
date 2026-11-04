@@ -56,12 +56,12 @@ export default {
 <template>
     <div class="form">
 
-        <div class="greeting">
-            <div class="text-greeting">{{ $t('forgot_password_page.greeting_text') }}</div>
-            <div class="subtext-greeting">{{ $t('forgot_password_page.greeting_subtext') }}</div>
-        </div>
-
         <template v-if="!sent">
+            <div class="greeting">
+                <div class="text-greeting">{{ $t('forgot_password_page.greeting_text') }}</div>
+                <div class="subtext-greeting">{{ $t('forgot_password_page.greeting_subtext') }}</div>
+            </div>
+
             <div class="form-field">
                 <label class="field-label">
                     <Mail :size="16" /> {{ $t('forgot_password_page.label_email') }}
@@ -89,10 +89,14 @@ export default {
             </q-btn>
         </template>
 
-        <div v-else class="success-box">
-            <div class="success-title">{{ $t('forgot_password_page.success_title') }}</div>
-            <div class="success-text">{{ $t('forgot_password_page.success_text') }} <strong>{{ email }}</strong></div>
-        </div>
+        <template v-else>
+            <div class="greeting">
+                <div class="text-greeting">{{ $t('forgot_password_page.success_title') }}</div>
+                <div class="subtext-greeting">{{ $t('forgot_password_page.success_text') }}</div>
+            </div>
+
+            <div class="email-box">{{ email }}</div>
+        </template>
 
         <router-link to="/signin" class="link-back">
             {{ $t('forgot_password_page.link_back_to_signin') }}
@@ -155,27 +159,18 @@ export default {
     border-radius: 12px;
 }
 
-.success-box {
+.email-box {
+    align-self: center;
+    max-width: 100%;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--color-accent, #f5A623);
     background: rgba(245, 166, 35, 0.1);
     border: 1px solid rgba(245, 166, 35, 0.3);
-    border-radius: 12px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    border-radius: 10px;
+    padding: 10px 16px;
+    word-break: break-all;
     text-align: center;
-}
-
-.success-title {
-    font-weight: 700;
-    font-size: 16px;
-    color: var(--color-accent, #f5A623);
-}
-
-.success-text {
-    font-size: 13px;
-    color: var(--text-secondary);
-    line-height: 1.5;
 }
 
 .link-back {

@@ -37,3 +37,20 @@ def test_founding_slots_follow_the_setting(monkeypatch):
     assert _slots(monkeypatch, {"founding_slots": 60}) == 48   # admin raised it
     assert _slots(monkeypatch, {"founding_slots": 10}) == 0    # never negative
     assert _slots(monkeypatch, {"founding_slots": "abc"}) == 38
+
+
+class FakeSellerBySlug:
+    tier = "founding"
+
+    def read_seller_by_slug_name(self, slug):
+        return {"id": "s1", "slug": slug, "tier": self.tier}
+
+
+def test_tc3_store_page_says_if_founding(monkeypatch):
+    monkeypatch.setattr(sellers, "DAOSellerProfiles", FakeSellerBySlug)
+    app = FastAPI()
+    app.include_router(sellers.router)
+    client = TestClient(app)
+    for tier, expected in (("founding", True), ("tindahan", False), ("enterprise", False)):
+        FakeSellerBySlug.tier = tier
+        assert client.get("/sellers/kusina").json()["seller"]["is_founding"] is expected

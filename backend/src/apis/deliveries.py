@@ -24,6 +24,25 @@ def rebook_max() -> int:
     return DAOAdminConfig().get_positive_int("seller_rebook_max", 3)
 
 
+def lalamove_recipient(order: dict) -> dict:
+    """place_order's recipient for an order read by read_order_with_seller_coords: the receiver saved with
+    the order (docs/dev/delivery-recipient R3), else the buyer's profile (orders placed before it).
+    The note (house number, floor, gate) goes ahead of the address so the driver reads it first."""
+    buyer = order.get("users") or {}
+    phone = order.get("receiver_phone")
+    try:
+        phone = to_e164_vn(phone or buyer.get("phone") or "")
+    except ValueError as e:
+        if phone:
+            raise HTTPException(status_code=400, detail={"code": "receiver_phone_invalid", "message": f"Receiver phone invalid: {e}"})
+        raise HTTPException(status_code=400, detail={"code": "buyer_phone_invalid", "message": f"Buyer phone invalid: {e}. Buyer must update phone before delivery."})
+    return {
+        "recipient_name": order.get("receiver_name") or buyer.get("name") or buyer.get("email") or "Customer",
+        "recipient_phone": phone,
+        "recipient_remarks": " | ".join(filter(None, (order.get("delivery_note"), order.get("delivery_address")))),
+    }
+
+
 # --------------------------------------------------------------------------
 # POST /deliveries/quotation — get delivery fee estimate
 # --------------------------------------------------------------------------
@@ -228,7 +247,8 @@ async def delivery_webhook(request: Request):
         elif new_status in TERMINAL_STATUSES:
             order = dao_orders.read_order_by_id_raw(delivery["order_id"])
             if order and order["status"] == "ready":
-                dao_orders.update_order_status(delivery["order_id"], "delivery_failed")
+                if dao_orders.update_order_status(delivery["order_id"], "delivery_failed"):
+                    push_service.notify_admins("admin_delivery_failed", f"/orders?open={order['id']}", code=order["id"][:8])
                 logger.warning(f"[Webhook] order={delivery['order_id']} → delivery_failed (lalamove={new_status})")
 
         return {"success": True}
@@ -300,6 +320,8 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
             raise HTTPException(status_code=404, detail="Order not found")
         if order["status"] not in ("ready", "delivery_failed") or order.get("delivery_method") != "delivery":
             raise HTTPException(status_code=400, detail="Order must be ready or delivery_failed with delivery method")
+        if order.get("payment_status") != "paid":   # never book a real trip for an unpaid order
+            raise HTTPException(status_code=409, detail={"code": "order_not_paid", "message": "This order is not paid yet."})
 
         dao_deliveries = DAODeliveries()
         delivery = dao_deliveries.read_delivery_by_order_id(order_id)
@@ -315,17 +337,13 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
             raise HTTPException(status_code=500, detail="Could not load order details")
 
         seller  = full_order.get("seller_profiles") or {}
-        buyer   = full_order.get("users") or {}
         service = get_lalamove_service()
 
         try:
             sender_phone = to_e164_vn(seller.get("phone") or "")
         except ValueError as e:
             raise HTTPException(status_code=400, detail={"code": "seller_phone_invalid", "message": f"Seller phone invalid: {e}"})
-        try:
-            recipient_phone = to_e164_vn(buyer.get("phone") or "")
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail={"code": "buyer_phone_invalid", "message": f"Buyer phone invalid: {e}"})
+        recipient = lalamove_recipient(full_order)
 
         quotation = service.get_quotation(
             pickup_lat=float(seller.get("lat") or 0),
@@ -341,9 +359,7 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
             stop_id_1=quotation.stop_id_1,
             sender_name=seller.get("store_name", "Seller"),
             sender_phone=sender_phone,
-            recipient_name=buyer.get("name") or buyer.get("email") or "Customer",
-            recipient_phone=recipient_phone,
-            recipient_remarks=full_order.get("delivery_address") or "",
+            **recipient,
         )
 
         try:

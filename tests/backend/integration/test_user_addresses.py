@@ -1,4 +1,4 @@
-"""Integration tests for /user_addresses (index, create, update).
+"""Integration tests for /user_addresses (index, create, update, delete).
 
 The DAO is replaced by an in-memory fake that mirrors the real one's user_id
 scoping, so these check the route's rules: auth, ownership, single default,
@@ -30,7 +30,8 @@ class _FakeDAO:
         self._next_id = 1
 
     def read_addresses(self, user_id):
-        return [r for r in self.rows if r["user_id"] == user_id]
+        # like the real one: default first, then newest (ids grow with created_at)
+        return sorted((r for r in self.rows if r["user_id"] == user_id), key=lambda r: (not r["is_default"], -r["id"]))
 
     def read_address(self, user_id, address_id):
         return next((r for r in self.rows if r["user_id"] == user_id and r["id"] == address_id), None)
@@ -54,6 +55,15 @@ class _FakeDAO:
         if row:
             row.update(data)
         return row
+
+    def delete_address(self, user_id, address_id):
+        row = self.read_address(user_id, address_id)
+        if row:
+            self.rows.remove(row)
+        return row
+
+    def read_default_address(self, user_id):   # dao.dao_user_addresses (GET /users/me/address)
+        return next((r for r in self.read_addresses(user_id) if r["is_default"]), None)
 
 
 @pytest.fixture
@@ -198,3 +208,81 @@ def test_update_other_users_address_is_404(client, dao):
 
     assert res.status_code == 404
     assert other["receiver_name"] == VALID_BODY["receiver_name"]
+
+
+# ── DELETE (docs/dev/buyer-addresses A4, TC-1..5) ───────────────────────────
+
+def _three(client):
+    """Three addresses, the middle one the default."""
+    ids = [client.post("/user_addresses", json=VALID_BODY).json()["address"]["id"] for _ in range(3)]
+    client.patch(f"/user_addresses/{ids[1]}", json={**LOCATION, "is_default": True})
+    return ids
+
+
+def test_tc1_delete_other_users_address_is_404(client, dao):
+    _three(client)
+    other = dao.create_address(OTHER_USER_ID, {**VALID_BODY, "is_default": True})
+
+    res = client.delete(f"/user_addresses/{other['id']}")
+
+    assert res.status_code == 404 and res.json() == {"detail": "Address not found"}
+    assert other in dao.rows and len(dao.read_addresses(USER_ID)) == 3
+
+
+def test_tc2_delete_default_hands_it_to_the_newest_left(client, dao):
+    first, default, newest = _three(client)
+
+    res = client.delete(f"/user_addresses/{default}")
+
+    assert res.status_code == 200 and res.json() == {"success": True}
+    assert [r["id"] for r in dao.read_addresses(USER_ID)] == [newest, first]
+    assert _defaults(dao) == [newest]
+
+
+def test_delete_other_address_keeps_the_default(client, dao):
+    first, default, newest = _three(client)
+
+    client.delete(f"/user_addresses/{first}")
+
+    assert _defaults(dao) == [default] and len(dao.read_addresses(USER_ID)) == 2
+
+
+def test_tc3_delete_the_last_address(client, dao, monkeypatch):
+    from apis import users
+    only = client.post("/user_addresses", json=VALID_BODY).json()["address"]
+    monkeypatch.setattr(users, "DAOUserAddresses", lambda: dao)
+
+    assert client.delete(f"/user_addresses/{only['id']}").json() == {"success": True}
+    assert client.get("/user_addresses").json() == {"success": True, "addresses": []}
+    app = FastAPI()
+    app.include_router(users.router)
+    app.dependency_overrides[verify_token] = lambda: {"id": USER_ID}
+    assert TestClient(app).get("/users/me/address").json() == {"success": True, "address": None}
+
+
+def test_delete_twice_is_404(client, dao):
+    created = client.post("/user_addresses", json=VALID_BODY).json()["address"]
+    client.delete(f"/user_addresses/{created['id']}")
+
+    assert client.delete(f"/user_addresses/{created['id']}").status_code == 404
+
+
+def test_tc4_set_default_on_two_addresses(client, dao):
+    first = client.post("/user_addresses", json=VALID_BODY).json()["address"]
+    second = client.post("/user_addresses", json=VALID_BODY).json()["address"]
+    assert _defaults(dao) == [first["id"]]
+
+    res = client.patch(f"/user_addresses/{second['id']}", json={**LOCATION, "is_default": True})
+
+    assert res.json()["address"]["is_default"] is True and _defaults(dao) == [second["id"]]
+
+
+def test_tc5_delete_needs_a_token(dao):
+    app = FastAPI()
+    app.include_router(user_addresses.router)
+    res = TestClient(app).delete("/user_addresses/1")
+    assert res.status_code == 403 and dao.rows == []
+
+
+def test_delete_id_must_be_a_number(client, dao):
+    assert client.delete("/user_addresses/abc").status_code == 422

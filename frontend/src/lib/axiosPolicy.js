@@ -52,7 +52,6 @@ const ERROR_KEYS = {
     "Unable to book a delivery driver. Your order has been cancelled.": "booking_failed_cancelled",
     "Missing pickup or dropoff address. Please update your store address in settings.": "store_address_missing",
     "You already have a dish with this name in this category": "dish_name_taken",
-    "This price option is in a customer's cart. Hide it instead of deleting.": "option_in_cart",
     "Cannot unset the default address; set another address as default instead": "cannot_unset_default_address",
     "Invalid phone number": "invalid_phone",
     "Cannot start a conversation with your own store": "own_store_chat",
@@ -67,6 +66,8 @@ export function apiErrorMessage(data, fallbackKey = "generic") {
         if (ERROR_KEYS[detail.message]) return t(`api_errors.${ERROR_KEYS[detail.message]}`);
     }
     if (typeof detail === "string" && ERROR_KEYS[detail]) return t(`api_errors.${ERROR_KEYS[detail]}`);
+    // Pydantic 422 on a dish / price level: price must be whole VND
+    if (Array.isArray(detail) && detail.some((d) => d?.loc?.at(-1) === "price")) return t("seller_menu.price_whole_error");
     if (detail) console.warn("Untranslated API error:", detail);
     return t(`api_errors.${fallbackKey}`);
 }

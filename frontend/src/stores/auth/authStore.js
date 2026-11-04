@@ -6,6 +6,14 @@ import apiAuth from "@/apis/auth/apiAuth";
 import apiUsers from "@/apis/users/apiUsers";
 import { useCartStore } from "@/stores/cart/cartStore";
 import { useOrderStore } from "@/stores/order/orderStore";
+import { useChatStore } from "@/stores/chat/chatStore";
+import { useDeliveryStore } from "@/stores/delivery/deliveryStore";
+import { useDashboardStore } from "@/stores/seller/dashboardStore";
+import { useMenuStore } from "@/stores/seller/menuStore";
+import { useProfileCompletionStore } from "@/stores/seller/profileCompletionStore";
+import { useReviewStore } from "@/stores/review/reviewStore";
+import { useComplaintStore } from "@/stores/complaint/complaintStore";
+import { useAddressStore } from "@/stores/address/addressStore";
 import { i18n } from "@/plugins/i18n";
 import { disablePush } from "@/composables/pushNotifications";
 
@@ -15,6 +23,24 @@ const ROLE_KEY = 'sariko.role';
 const ROLE_USER_KEY = 'sariko.roleUserId';
 
 let _redirectingToSignIn = false;
+
+// Sign-out is a route change, not a reload: drop every store that holds the old account's data.
+// Stores with a poller / channel have their own reset() that stops it first; orderStore keeps its
+// poller handles (a $reset() would drop them while the intervals keep running), so only its data goes.
+function resetAccountStores() {
+    useCartStore().$reset();
+    const orderStore = useOrderStore();
+    orderStore.orders = [];
+    orderStore.currentOrder = null;
+    useChatStore().reset();
+    useDeliveryStore().reset();
+    useDashboardStore().reset();
+    useMenuStore().$reset();
+    useProfileCompletionStore().$reset();
+    useReviewStore().$reset();
+    useComplaintStore().$reset();
+    useAddressStore().$reset();
+}
 
 // The axios interceptor reads the token via supabase.auth.getSession() (storage),
 // so wait until the new session is persisted before anything calls the API.
@@ -61,6 +87,9 @@ function applyLocale(preferredLanguage) {
     localStorage.setItem('lang', locale);
 }
 
+// What a buyer still needs before checkout: the cart blocks Place order on these, the home banner lists them.
+export const BUYER_MISSING_ROUTES = { phone: '/account/profile', address: '/account/address' };
+
 export const useAuthStore = defineStore("authStore", {
     state() {
         return {
@@ -90,6 +119,10 @@ export const useAuthStore = defineStore("authStore", {
             inputAddressDetails: null,
             inputLat: null,
             inputLon: null,
+            // delivery address of the next order (default one, or picked in the cart): addressStore.useForOrder
+            inputReceiverName: null,
+            inputReceiverPhone: null,
+            inputDeliveryNote: null,   // street_name · note, for the driver
             selectedPreferedLanguage: 'English',
 
             // user & session
@@ -97,11 +130,18 @@ export const useAuthStore = defineStore("authStore", {
             user: null,
             isLoading: false,
             sellerId: null,
+            buyerInfoLoaded: false,  // profile + address fetched for this session (no banner flash while loading)
 
             // auth subscription
             _authSub: null,
             isPasswordRecovery: false,
+            isResendingVerification: false,
         }
+    },
+
+    getters: {
+        buyerMissing: (state) => Object.keys(BUYER_MISSING_ROUTES).filter((k) =>
+            k === 'phone' ? !state.user?.phone : !state.inputAddress),
     },
 
     actions: {
@@ -163,16 +203,11 @@ export const useAuthStore = defineStore("authStore", {
                     }
 
                     try {
-                        const addrRes = await apiUsers.getDefaultAddress()
-                        if (addrRes?.address) {
-                            this.inputAddress = addrRes.address.address || null
-                            this.inputAddressDetails = addrRes.address.label || null
-                            this.inputLat = addrRes.address.lat || null
-                            this.inputLon = addrRes.address.lon || null
-                        }
+                        await useAddressStore().fetch()   // fills input* from the default address
                     } catch (e) {
                         console.error(`authStore - bootstrap - address fetch failed: ${e}`);
                     }
+                    this.buyerInfoLoaded = true;
 
                     try {
                         const cartStore = useCartStore();
@@ -289,6 +324,7 @@ export const useAuthStore = defineStore("authStore", {
                 // Setting user triggers App.vue to load conversations — token must be stored first
                 const session = await waitForStoredSession(res.session.access_token);
                 this._setFromSession(session);
+                this.buyerInfoLoaded = false;
 
                 try {
                     const profile = await apiUsers.getProfile()
@@ -308,16 +344,11 @@ export const useAuthStore = defineStore("authStore", {
                 }
 
                 try {
-                    const addrRes = await apiUsers.getDefaultAddress()
-                    if (addrRes?.address) {
-                        this.inputAddress = addrRes.address.address || null
-                        this.inputAddressDetails = addrRes.address.label || null
-                        this.inputLat = addrRes.address.lat || null
-                        this.inputLon = addrRes.address.lon || null
-                    }
+                    await useAddressStore().fetch()   // fills input* from the default address
                 } catch (e) {
                     console.error(`authStore - onClickedSignin - address fetch failed: ${e}`);
                 }
+                this.buyerInfoLoaded = true;
 
                 try {
                     const cartStore = useCartStore();
@@ -345,6 +376,10 @@ export const useAuthStore = defineStore("authStore", {
 
             } catch (error) {
                 console.error(`authStore - onClickedSignin - ${error}`);
+                if (error?.code === "email_not_confirmed") {
+                    router.push({ name: "verify-email", query: { email: this.inputSignInEmail } });
+                    return;
+                }
                 let errorMessage = null;
                 if (error?.code === "invalid_credentials") {
                     errorMessage = "Incorrect email or password. Please try again.";
@@ -388,6 +423,9 @@ export const useAuthStore = defineStore("authStore", {
                         position: "bottom",
                     });
                     router.push({ name: "onboarding" });
+                } else if (res?.user) {
+                    // Confirm email is on: Supabase returns a user but no session until the link is clicked.
+                    router.push({ name: "verify-email", query: { email: this.inputSignUpEmail } });
                 }
             } catch (error) {
                 console.error(`authStore - onClickedSignup - ${error}`);
@@ -412,10 +450,12 @@ export const useAuthStore = defineStore("authStore", {
                 // Shared phone: stop this device getting the old account's order pushes
                 await disablePush().catch((error) => console.warn(`authStore - disablePush - ${error}`));
                 await apiAuth.authSignout();
-                this.session = null;
-                this.user = null;
+                // Sign-out is a route change, not a reload: drop the old account's address, phone, flags
+                const sub = this._authSub;
+                this.$reset();
+                this._authSub = sub;
                 clearStoredRole();
-                useCartStore().$reset();
+                resetAccountStores();
                 Notify.create({
                     classes: 'quasar-notify-positive',
                     message: i18n.global.t("common.toast_signed_out"),
@@ -429,6 +469,32 @@ export const useAuthStore = defineStore("authStore", {
             }
         },
 
+        async onClickedResendVerification(email) {
+            this.isResendingVerification = true;
+            try {
+                await apiAuth.authResend(email);
+                Notify.create({
+                    classes: 'quasar-notify-positive',
+                    message: i18n.global.t("verify_email_page.toast_resent"),
+                    progress: true,
+                    icon: 'fa-regular fa-circle-check',
+                    position: "bottom",
+                });
+            } catch (error) {
+                console.error(`authStore - onClickedResendVerification - ${error}`);
+                const isRateLimited = error?.status === 429 || error?.code === "over_email_send_rate_limit";
+                Notify.create({
+                    classes: 'quasar-notify-negative',
+                    message: i18n.global.t(isRateLimited ? "verify_email_page.toast_rate_limited" : "verify_email_page.toast_failed"),
+                    progress: true,
+                    icon: 'fa-regular fa-circle-xmark',
+                    position: "bottom",
+                });
+            } finally {
+                this.isResendingVerification = false;
+            }
+        },
+
         async signOutRedirectSignIn() {
             // Several requests can 401 at once — redirect only once
             if (_redirectingToSignIn) return;
@@ -438,10 +504,11 @@ export const useAuthStore = defineStore("authStore", {
             } catch (error) {
                 console.error(`authStore - signOutRedirectSignIn - ${error}`);
             }
-            this.session = null;
-            this.user = null;
+            const sub = this._authSub;
+            this.$reset();
+            this._authSub = sub;
             clearStoredRole();
-            useCartStore().$reset();
+            resetAccountStores();
             Notify.create({
                 classes: 'quasar-notify-negative',
                 message: i18n.global.t("common.toast_session_expired"),

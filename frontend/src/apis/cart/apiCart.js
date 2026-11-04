@@ -19,7 +19,9 @@ export const apiCarts = {
                 err.currentSellerName = detail.current_seller_name
                 throw err
             }
-            throw new Error(detail || 'Failed to addItem')
+            const err = new Error(typeof detail === 'string' ? detail : 'Failed to addItem')
+            err.detail = detail   // {code, ...}: e.g. portions_left (409), translated by apiErrorMessage
+            throw err
         }
     },
 

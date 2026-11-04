@@ -134,6 +134,13 @@ export const useChatStore = defineStore("chatStore", {
             }
         },
 
+        // Sign-out: close both realtime channels, then drop the old account's conversations
+        reset() {
+            this.unsubscribeFromConversation()
+            this.unsubscribeGlobalUnread()
+            this.$reset()
+        },
+
         closeConversation() {
             this.unsubscribeFromConversation()
             this.currentConversationId = null

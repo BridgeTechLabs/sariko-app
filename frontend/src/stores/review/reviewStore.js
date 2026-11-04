@@ -6,6 +6,7 @@ export const useReviewStore = defineStore("reviewStore", {
         return {
             // draft being composed on the review screen
             overallRating: 0,
+            overallComment: '',
             itemDrafts: {},     // { [food_item_id]: { rating, comment } }
             submitting: false,
 
@@ -47,6 +48,7 @@ export const useReviewStore = defineStore("reviewStore", {
     actions: {
         resetDraft() {
             this.overallRating = 0
+            this.overallComment = ''
             this.itemDrafts = {}
             this.submitting = false
         },
@@ -101,7 +103,7 @@ export const useReviewStore = defineStore("reviewStore", {
         async submitReview(orderId) {
             try {
                 this.submitting = true
-                const res = await apiReviews.createReview(orderId, this.overallRating, this.ratedItems)
+                const res = await apiReviews.createReview(orderId, this.overallRating, this.overallComment.trim() || null, this.ratedItems)
                 if (res?.data?.success) {
                     this.orderReviewed = true
                     this.orderOverallRating = this.overallRating

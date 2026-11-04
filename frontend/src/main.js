@@ -25,6 +25,10 @@ for (const path in plugins) {
 
 app.mount('#app')
 
+// DEV ONLY: the DEV admin's Test scenarios phone frame signs this app in as a test account (lib/devSessionBridge.js).
+// Vite inlines the flag at build time, so the prod bundle doesn't contain it.
+if (import.meta.env.VITE_DEV_PANEL === 'true') import('@/lib/devSessionBridge.js').then((m) => m.listen())
+
 // Service worker via vite-plugin-pwa (registerType 'autoUpdate'): when a deploy ships a new
 // sw.js it takes over and the open page reloads, so nobody keeps running the old bundle.
 // The /join draft is kept in localStorage, so that reload loses no typed form data.

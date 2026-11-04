@@ -13,6 +13,7 @@ export const apiOrders = {
             if (deliveryOpts.delivery_lon != null) payload.delivery_lon = deliveryOpts.delivery_lon
             if (deliveryOpts.delivery_fee != null) payload.delivery_fee = deliveryOpts.delivery_fee
             if (deliveryOpts.quotation_id) payload.quotation_id = deliveryOpts.quotation_id
+            for (const key of ['receiver_name', 'receiver_phone', 'delivery_note']) if (deliveryOpts[key]) payload[key] = deliveryOpts[key]
             if (deliveryAppointment) payload.delivery_appointment = deliveryAppointment
             const response = await apiClient.post('/v1/orders', payload)
             return response

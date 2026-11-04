@@ -13,7 +13,7 @@
         <div class="company-info">
             <div class="company-name">Công ty TNHH ZEN TECH ASIA</div>
             <div>{{ $t('home_page.section_footer.label_tax_code') }}: 0316852554</div>
-            <div>{{ $t('home_page.section_footer.label_address') }}: 195/3 Điện Biên Phủ, P. 15, Q. Bình Thạnh, Tp. Hồ Chí Minh</div>
+            <div>{{ $t('home_page.section_footer.label_address') }}: Tầng 6, Tòa nhà Rosana, 60 Nguyễn Đình Chiểu, P. Tân Định, Tp. Hồ Chí Minh</div>
             <div>{{ $t('home_page.section_footer.label_email') }}: <a href="mailto:info@sariko.store">info@sariko.store</a></div>
             <div>{{ $t('home_page.section_footer.label_partners') }}</div>
         </div>

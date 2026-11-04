@@ -1,5 +1,5 @@
 <script>
-import { Store } from 'lucide-vue-next'
+import { Store, ChevronUp, ChevronDown } from 'lucide-vue-next'
 import { mapActions, mapState } from 'pinia';
 import { useCartStore } from '@/stores/cart/cartStore.js';
 import ItemCard from '@/components/order-cart/ItemCard.vue';
@@ -8,6 +8,8 @@ export default {
 
     components: {
         Store,
+        ChevronUp,
+        ChevronDown,
         ItemCard
     },
 
@@ -28,10 +30,8 @@ export default {
     },
 
     mounted() {
-        if (!this.cartItems.length) {
-            const cartStore = useCartStore()
-            cartStore.getCurrentCart()
-        }
+        // Always refetch: the seller may have switched a dish off since it went into the cart
+        useCartStore().getCurrentCart()
     }
 }
 
@@ -48,7 +48,7 @@ export default {
                     <span class="item-count">{{ cartItems.length }}</span>
                 </div>
                 <div v-on:click="isExpanded=!isExpanded">
-                    <q-icon :name="isExpanded ? 'expand_less' : 'expand_more'" />
+                    <component :is="isExpanded ? 'ChevronUp' : 'ChevronDown'" :size="20" />
                 </div>
             </div>
             <div v-if="isExpanded" class="items">
@@ -57,7 +57,6 @@ export default {
                 :item-id="item.id"
                 :item-name="item.name"
                 :item-price="item.price"
-                :item-price-text="item.priceText"
                 :item-category="item.category"
                 :item-img-src="item.imgSrc || '/images/default-food-image.webp'"
                 :item-quantity="item.quantity"
@@ -65,6 +64,7 @@ export default {
                 :item-variant-name="item.variantName"
                 :seller-store="item.sellerStore"
                 :seller-slug-name="item.sellerSlugName"
+                :item-unavailable="item.unavailable"
                 />
             </div>
         </div>

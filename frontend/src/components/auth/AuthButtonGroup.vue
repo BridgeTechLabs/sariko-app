@@ -15,7 +15,10 @@ export default {
     methods: {
         onClicked(route) {
             const authStore = useAuthStore()
+            // keep the auth listener handle, as the sign-out actions do
+            const sub = authStore._authSub
             authStore.$reset()
+            authStore._authSub = sub
             this.$router.push(`/${route}`)
         }
     },

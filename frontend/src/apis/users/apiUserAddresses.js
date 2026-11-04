@@ -17,6 +17,11 @@ export const apiUserAddresses = {
         return response.data
     },
 
+    remove: async (id) => {
+        const response = await apiClient.delete(`/v1/user_addresses/${id}`)
+        return response.data
+    },
+
 }
 
 export default apiUserAddresses

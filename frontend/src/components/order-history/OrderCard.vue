@@ -52,13 +52,14 @@ export default {
         showRefundChip() {
             return this.refundStatus === 'pending'
         },
-        // reviews(id) is embedded by the orders query, so this costs no extra request.
-        // Non-empty means the order was reviewed — one submit always writes at least
-        // the overall row.
+        // review_stores(id) is embedded by the orders query, so this costs no extra request.
+        // order_id is unique there, so PostgREST returns an object (null until reviewed);
+        // a PostgREST that doesn't detect one-to-one returns an array instead.
         needsReview() {
+            const review = this.order.review_stores
             return this.order.status === 'done'
                 && this.order.payment_status === 'paid'
-                && !this.order.reviews?.length
+                && !(Array.isArray(review) ? review.length : review)
         }
     },
 

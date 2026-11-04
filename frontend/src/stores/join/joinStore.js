@@ -3,6 +3,7 @@ import apiOnboarding from '@/apis/onboarding/apiOnboarding'
 import { apiErrorMessage } from '@/lib/axiosPolicy.js'
 import { fileToBase64 } from '@/utils/fileToBase64'
 import { i18n } from '@/plugins/i18n'
+import { cleanFullName, nameMatches, squash } from '@/utils/sellerName'
 
 const INVITE_ONLY = ['enterprise']
 
@@ -18,11 +19,11 @@ const MAPS_RE = /^https?:\/\/(maps\.app\.goo\.gl\/|goo\.gl\/maps|maps\.google\.c
 
 function emptyForm() {
     return {
-        first_name: '', last_name: '', date_of_birth: '',
+        full_name: '', date_of_birth: '',
         nationality: 'Philippines', nationality_other: '',
-        id_type: 'passport', id_number: '',
+        id_type: 'passport', id_number: '', id_expiry_date: '',
         email: '', phone: '', residential_address: '',
-        tax_code: '', tax_resident: null,               // 'yes' | 'no' | 'unsure'
+        tax_code: '', tax_resident: null,               // 'yes' | 'no' (required: it sets the PIT rate)
         tier: 'tindahan', founding_invited: false,
         store_name: '', store_description: '', pickup_address: '', maps_link: '',
         opening_time: '', closing_time: '',
@@ -30,15 +31,16 @@ function emptyForm() {
     }
 }
 
-function squash(text) {
-    return (text || '').trim().replace(/\s+/g, ' ')
-}
-
 function isVnPhone(phone) {
     let digits = (phone || '').replace(/\D/g, '')
     if (digits.startsWith('84')) digits = digits.slice(2)
     else if (digits.startsWith('0')) digits = digits.slice(1)
     return /^[1-9]\d{8,9}$/.test(digits)
+}
+
+// Local date as "YYYY-MM-DD", comparable as a string with <input type="date"> values.
+function localIso(date) {
+    return date.toLocaleDateString('sv-SE')
 }
 
 function ageOn(dob, today) {
@@ -118,11 +120,13 @@ export const useJoinStore = defineStore('joinStore', {
             application: null,         // { id, upload_token, payload } once created
             uploaded: {},              // upload job id -> true
             reference: null,
+            takenEmail: null,          // lower-case email the server said already has a Sariko account (T2)
         }
     },
 
     getters: {
         tiers(state) {
+            const ent = state.settings?.enterprise
             return (state.settings?.tiers || []).map(t => ({
                 id: t.tier,
                 monthlyFee: t.monthly_fee_vnd,
@@ -130,6 +134,9 @@ export const useJoinStore = defineStore('joinStore', {
                 maxItems: t.max_items,
                 maxCategories: t.max_categories,
                 invite: INVITE_ONLY.includes(t.tier),
+                // Enterprise places: { left, slots }; full = can't be picked (backend answers 409 enterprise_full)
+                places: t.tier === 'enterprise' && ent ? { left: Math.max(0, ent.slots - ent.taken), slots: ent.slots } : null,
+                full: t.tier === 'enterprise' && !!ent && ent.taken >= ent.slots,
             }))
         },
 
@@ -151,6 +158,7 @@ export const useJoinStore = defineStore('joinStore', {
                 maxPrice: new Intl.NumberFormat('vi-VN').format(s.max_dish_price || 0),
                 maxPreorder: s.max_preorder_days,
                 minAge: s.min_age,
+                months: s.min_id_validity_months,
                 days: s.review_days,
                 items: this.maxItems,
                 categories: this.tier?.maxCategories,
@@ -184,7 +192,7 @@ export const useJoinStore = defineStore('joinStore', {
         },
 
         fullName(state) {
-            return squash(`${state.form.first_name} ${state.form.last_name}`)
+            return squash(state.form.full_name)
         },
 
         // { field: i18n key } for one step. Empty object = step is valid.
@@ -196,13 +204,23 @@ export const useJoinStore = defineStore('joinStore', {
                 const need = (field, value = f[field]) => { if (!squash(value)) e[field] = 'join_page.error_required' }
 
                 if (step === 2) {
-                    need('first_name'); need('last_name'); need('id_number'); need('residential_address')
+                    need('full_name'); need('id_number'); need('residential_address')
+                    if (squash(f.full_name) && !cleanFullName(f.full_name)) e.full_name = 'join_page.error_full_name'
                     if (!f.date_of_birth) e.date_of_birth = 'join_page.error_required'
                     else if (ageOn(f.date_of_birth, new Date()) < s.min_age) e.date_of_birth = 'join_page.error_age'
                     if (f.nationality === 'Other') need('nationality_other')
                     if (!EMAIL_RE.test(f.email.trim())) e.email = 'join_page.error_email'
+                    else if (f.email.trim().toLowerCase() === state.takenEmail) e.email = 'join_page.error_email_taken'
                     if (!isVnPhone(f.phone)) e.phone = 'join_page.error_phone'
                     if (!f.tax_resident) e.tax_resident = 'join_page.error_required'
+                    // Same rules as core/seller_kyc.py id_error (NĐ 248/2026 Đ18.1.b)
+                    if (f.id_type === 'cccd' && !/^\d{12}$/.test(squash(f.id_number))) e.id_number = 'join_page.error_cccd'
+                    const today = new Date()
+                    const minValid = new Date(today)
+                    minValid.setMonth(minValid.getMonth() + (s.min_id_validity_months || 0))
+                    if (!f.id_expiry_date) e.id_expiry_date = 'join_page.error_required'
+                    else if (f.id_expiry_date <= localIso(today)) e.id_expiry_date = 'join_page.error_id_expired'
+                    else if (f.id_type === 'passport' && f.id_expiry_date < localIso(minValid)) e.id_expiry_date = 'join_page.error_id_expiring'
                 }
                 if (step === 4) {
                     need('store_name'); need('pickup_address')
@@ -229,20 +247,20 @@ export const useJoinStore = defineStore('joinStore', {
                     }
                 }
                 if (step === 6) {
-                    if (!state.documents.id_document.length) e.id_document = 'join_page.error_id_document'
+                    // Passport photo only: Vietnamese sellers give the CCCD number, no photo (NĐ 356)
+                    if (f.id_type === 'passport' && !state.documents.id_document.length) e.id_document = 'join_page.error_id_document'
                 }
                 if (step === 7) {
                     need('bank_account_holder')
                     if (!f.bank_name) e.bank_name = 'join_page.error_required'
                     else if (f.bank_name === 'Other') need('bank_name_other')
                     if (!/^\d{6,20}$/.test(f.bank_account_number.replace(/\s/g, ''))) e.bank_account_number = 'join_page.error_account_number'
+                    // The account must be in the seller's own name (Luật TMĐT 122/2025 Đ21.2.b)
+                    if (squash(f.bank_account_holder) && !nameMatches(f.bank_account_holder, f.full_name, true)) e.bank_account_holder = 'join_page.error_bank_holder'
                 }
                 if (step === 8) {
                     if (!Object.values(state.agree).every(Boolean)) e.agree = 'join_page.error_agree'
-                    const sig = squash(state.signature_name).toLowerCase()
-                    const first = squash(f.first_name).toLowerCase()
-                    const last = squash(f.last_name).toLowerCase()
-                    if (sig !== `${first} ${last}` && sig !== `${last} ${first}`) e.signature_name = 'join_page.error_signature'
+                    if (!nameMatches(state.signature_name, f.full_name)) e.signature_name = 'join_page.error_signature'
                 }
                 return e
             }
@@ -288,7 +306,10 @@ export const useJoinStore = defineStore('joinStore', {
             try {
                 const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
                 if (!draft) return
-                this.form = { ...emptyForm(), ...draft.form }
+                const { first_name: first, last_name: last, ...form } = draft.form || {}
+                this.form = { ...emptyForm(), ...form }
+                // A draft from the two-box form: its name goes in the one box (the seller can fix it)
+                if (!this.form.full_name) this.form.full_name = squash(`${first || ''} ${last || ''}`)
                 this.menu = Array.isArray(draft.menu) ? draft.menu : []
                 this.step = draft.step || 1
             } catch (e) {
@@ -352,10 +373,10 @@ export const useJoinStore = defineStore('joinStore', {
         payload() {
             const f = this.form
             return {
-                first_name: squash(f.first_name), last_name: squash(f.last_name),
+                full_name: squash(f.full_name),
                 date_of_birth: f.date_of_birth,
                 nationality: f.nationality === 'Other' ? squash(f.nationality_other) : f.nationality,
-                id_type: f.id_type, id_number: squash(f.id_number),
+                id_type: f.id_type, id_number: squash(f.id_number), id_expiry_date: f.id_expiry_date || null,
                 email: f.email.trim(), phone: f.phone.trim(),
                 residential_address: squash(f.residential_address),
                 tax_code: squash(f.tax_code) || null,
@@ -373,7 +394,8 @@ export const useJoinStore = defineStore('joinStore', {
                 bank_name: f.bank_name === 'Other' ? squash(f.bank_name_other) : f.bank_name,
                 bank_account_number: f.bank_account_number.replace(/\s/g, ''),
                 bank_account_holder: squash(f.bank_account_holder),
-                agreed: true, agreement_version: this.settings.agreement_version,
+                // Every box is required before submit; consent is its own field (stored with a time).
+                agreed: true, personal_data_consent: this.agree.data, agreement_version: this.settings.agreement_version,
                 signature_name: squash(this.signature_name),
             }
         },
@@ -381,6 +403,7 @@ export const useJoinStore = defineStore('joinStore', {
         uploadJobs() {
             const jobs = []
             for (const kind of DOCUMENT_KINDS) {
+                if (kind === 'id_document' && this.form.id_type !== 'passport') continue   // no CCCD photo
                 this.documents[kind].forEach((doc, i) => jobs.push({ id: `${kind}:${i}`, kind, file: doc.file }))
             }
             for (const dish of this.menu) {
@@ -442,7 +465,13 @@ export const useJoinStore = defineStore('joinStore', {
             } catch (e) {
                 const data = e?.response?.data
                 const code = data?.detail?.code
-                if (code === 'application_not_found') {
+                if (code === 'email_has_account') {
+                    // shown on the email field (step 2) until the seller types another email
+                    this.takenEmail = this.form.email.trim().toLowerCase()
+                    this.touched = { ...this.touched, 2: true }
+                    this.step = 2
+                    this.submitError = i18n.global.t('join_page.error_email_taken')
+                } else if (code === 'application_not_found') {
                     // Over 3 hours since create (or already submitted): start over with a new captcha.
                     this.application = null
                     this.submitError = i18n.global.t('join_page.error_expired')
@@ -450,7 +479,7 @@ export const useJoinStore = defineStore('joinStore', {
                     this.submitError = e?.response ? apiErrorMessage(data) : i18n.global.t('join_page.error_network')
                 }
                 // Agreement changed since the page loaded: pick up the new version (the iframe shows the new text).
-                if (code === 'agreement_outdated') await this.loadSettings()
+                if (code === 'agreement_outdated' || code === 'enterprise_full') await this.loadSettings()
                 console.error('joinStore - submit -', e)
             } finally {
                 this.submitting = false

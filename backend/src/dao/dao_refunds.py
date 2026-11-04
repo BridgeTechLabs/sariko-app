@@ -1,10 +1,11 @@
 import logging
-from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Optional
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
 from dao.dao_base import DAOBase
+from services import zalo
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ class DAORefunds(DAOBase):
     def create_refund(
         self,
         order_id: str,
-        amount: float,
+        amount: Decimal,
         reason: str,
         original_txn_ref: Optional[str] = None,
         ipn_data: Optional[dict] = None,
@@ -27,7 +28,7 @@ class DAORefunds(DAOBase):
         try:
             data = {
                 "order_id": order_id,
-                "amount": amount,
+                "amount": str(amount),
                 "reason": reason,
                 "status": "pending",
             }
@@ -42,7 +43,13 @@ class DAORefunds(DAOBase):
                 .insert(data) \
                 .execute()
 
-            return result.data[0] if result and result.data else None
+            refund = result.data[0] if result and result.data else None
+            try:   # every reason passes here, the IPN's late / duplicate payments too (T136); never fails the insert
+                if refund:
+                    zalo.send("support", zalo.refund_text(refund))
+            except Exception as e:
+                logger.error(f"[Zalo] refund message for order {order_id} skipped: {type(e).__name__}")
+            return refund
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - create_refund: {e}")
@@ -58,7 +65,7 @@ class DAORefunds(DAOBase):
         try:
             return self.create_refund(
                 order_id=order["id"],
-                amount=order["total_amount"],
+                amount=Decimal(str(order["total_amount"])),
                 reason=reason,
                 original_txn_ref=order.get("transaction_ref"),
                 ipn_data=order.get("ipn_data"),
@@ -68,70 +75,8 @@ class DAORefunds(DAOBase):
             logger.error(f"Failed to create {reason} refund for order {order['id']}: {e}")
             return None
 
-    def read_refunds(self, status: Optional[str] = None):
-        try:
-            query = self._supabase_client.table(self._table_name) \
-                .select("*") \
-                .order("created_at", desc=True)
-
-            if status:
-                query = query.eq("status", status)
-
-            result = query.execute()
-            return result.data if result and result.data else []
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - read_refunds: {e}")
-        except Exception as e:
-            raise Exception(f"error read_refunds: {e}")
-
-    def read_refund_by_id(self, refund_id: str):
-        try:
-            result = self._supabase_client.table(self._table_name) \
-                .select("*") \
-                .eq("id", refund_id) \
-                .maybe_single() \
-                .execute()
-
-            return result.data if result and result.data else None
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - read_refund_by_id: {e}")
-        except Exception as e:
-            raise Exception(f"error read_refund_by_id: {e}")
-
-    def update_refund_processed(self, refund_id: str, vnpay_refund_ref: str):
-        try:
-            result = self._supabase_client.table(self._table_name) \
-                .update({
-                    "status": "processed",
-                    "vnpay_refund_ref": vnpay_refund_ref,
-                    "processed_at": datetime.now(timezone.utc).isoformat(),
-                }) \
-                .eq("id", refund_id) \
-                .execute()
-
-            return result.data[0] if result and result.data else None
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - update_refund_processed: {e}")
-        except Exception as e:
-            raise Exception(f"error update_refund_processed: {e}")
-
-    def update_refund_failed(self, refund_id: str, note: str):
-        try:
-            result = self._supabase_client.table(self._table_name) \
-                .update({
-                    "status": "failed",
-                    "note": note,
-                    "processed_at": datetime.now(timezone.utc).isoformat(),
-                }) \
-                .eq("id", refund_id) \
-                .execute()
-
-            return result.data[0] if result and result.data else None
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - update_refund_failed: {e}")
-        except Exception as e:
-            raise Exception(f"error update_refund_failed: {e}")
+    def read_txn_refs(self, order_id: str) -> set:
+        """original_txn_ref of every refund of the order (main + duplicate payments)."""
+        rows = self._supabase_client.table(self._table_name) \
+            .select("original_txn_ref").eq("order_id", order_id).execute().data or []
+        return {r["original_txn_ref"] for r in rows}

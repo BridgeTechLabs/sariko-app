@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -9,20 +10,29 @@ from fastapi import (
     status,
 )
 
+from apis.complaints import complaints_for_order
 from core.auth import verify_token
+from core.phone import to_e164_vn
+from core.store_hours import VN_TZ
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_carts import DAOCarts
 from dao.dao_cart_items import DAOCartItems
+from dao.dao_food_items import DAOFoodItems
 from dao.dao_orders import DAOOrders
 from dao.dao_order_items import DAOOrderItems
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
 from services import push_service
 from services.lalamove_service import get_lalamove_service
-from utils.pricing import cart_item_unit_price
+from utils.pricing import order_amounts
 
 router = APIRouter(prefix="/orders")
 logger = logging.getLogger(__name__)
+
+
+def one_line(text):
+    """None for blank; newlines, tabs and other control characters become one space (TC-14, TC-15)."""
+    return " ".join(re.sub(r"[\x00-\x1f\x7f]", " ", text or "").split()) or None
 
 
 def unavailable_names(cart_items: list) -> list:
@@ -43,6 +53,29 @@ def unavailable_names(cart_items: list) -> list:
     return names
 
 
+def portions_error(wanted: dict, names: dict, sale_date):
+    """T134 Q4: the 409 detail for the first dish asked beyond its portions left on sale_date (Vietnam day),
+    wanted = {food_item_id: quantity} of dishes with a daily limit. Only tells the buyer early: the portions
+    are taken when the money comes in (reserve_order_portions)."""
+    if not wanted:
+        return None
+    left = DAOFoodItems().read_portions_left(list(wanted), sale_date)
+    for food_id, qty in wanted.items():
+        if food_id in left and qty > left[food_id]:
+            return {"code": "portions_left", "message": f"Only {left[food_id]} portion(s) left: {names[food_id]}",
+                    "name": names[food_id], "remaining": left[food_id]}
+    return None
+
+
+def check_quantities(quantities) -> None:
+    """400 when one cart row (dish + price option) asks more than cart_max_quantity_per_item.
+    A bot put ~22 billion ₫ orders through with no cap (docs/dev/20261102-security-fixes S1)."""
+    most = DAOAdminConfig().get_positive_int("cart_max_quantity_per_item", 50)
+    if max(quantities, default=0) > most:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
+            "code": "quantity_max", "message": f"At most {most} of each dish", "max": most})
+
+
 # Shared with POST /cart/add. A closed store still takes pre-orders (delivered on a later
 # day); only same-day dishes (preorder_day 0) are blocked.
 STORE_CLOSED_DETAIL = "This store is closed now. Same-day dishes can't be ordered; pre-order dishes still can."
@@ -55,6 +88,28 @@ def is_same_day(preorder_day) -> bool:
 def same_day_names(cart_items: list) -> list:
     return [(item.get("food_items") or {}).get("name") for item in cart_items
             if is_same_day((item.get("food_items") or {}).get("preorder_day"))]
+
+
+# T127: a cart with a pre-order dish (preorder_day > 0) needs a delivery appointment at least that many days
+# ahead, the cart page's rule (TotalAmounts.vue: now + the cart's largest preorder_day). The grace covers the
+# minutes between the cart page computing its minimum and the order reaching us (a buyer who keeps the page
+# open, latency): a technical tolerance, not a business rule.
+APPOINTMENT_GRACE = timedelta(minutes=30)
+
+
+def appointment_error(cart_items: list, appointment, now: datetime):
+    """None, or the 400 detail for a pre-order cart without a valid appointment. A naive time is Vietnam time."""
+    days = max(((item.get("food_items") or {}).get("preorder_day") or 0 for item in cart_items), default=0)
+    if days <= 0:
+        return None
+    if appointment is None:
+        return {"code": "appointment_required", "message": "Choose a delivery date and time for pre-order dishes", "days": days}
+    when = appointment if appointment.tzinfo else appointment.replace(tzinfo=VN_TZ)
+    if when <= now:
+        return {"code": "appointment_past", "message": "The delivery time has already passed", "days": days}
+    if when < now + timedelta(days=days) - APPOINTMENT_GRACE:
+        return {"code": "appointment_too_early", "message": f"Pre-order dishes need at least {days} day(s)", "days": days}
+    return None
 
 
 @router.post("")
@@ -73,16 +128,36 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
     dao_orders = DAOOrders()
     recent = dao_orders.read_orders_by_user_id(user_id=user_id)
     if recent:
-        import datetime
-        now = datetime.datetime.utcnow()
+        now = datetime.utcnow()
         for r in recent:
             if r["seller_id"] == cart["seller_id"] and r["status"] == "pending":
-                created = datetime.datetime.fromisoformat(r["created_at"].replace("Z", "+00:00").replace("+00:00", ""))
+                created = datetime.fromisoformat(r["created_at"].replace("Z", "+00:00").replace("+00:00", ""))
                 if (now - created).total_seconds() < 60:
                     raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Duplicate order detected. Please wait.")
 
-    # 2. Calculate subtotal + commission (snapshot seller's rate at order time)
+    # 2. Check the cart is still sellable
     cart_items = cart["cart_items"]
+    check_quantities(item["quantity"] for item in cart_items)   # a cart filled before the cap existed
+
+    appointment = request.delivery_appointment
+    if appointment is not None and appointment.tzinfo is None:
+        appointment = appointment.replace(tzinfo=VN_TZ)   # stored as a real moment, not read as UTC
+    bad_appointment = appointment_error(cart_items, appointment, datetime.now(timezone.utc))
+    if bad_appointment:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=bad_appointment)
+
+    # The driver calls this number (delivery-recipient R2): checked now, not when the seller books the trip
+    receiver = {}
+    if request.delivery_method == "delivery":
+        receiver = {key: one_line(getattr(request, key)) for key in ("receiver_name", "receiver_phone", "delivery_note")}
+    if receiver.get("receiver_phone"):
+        try:
+            receiver["receiver_phone"] = to_e164_vn(receiver["receiver_phone"])
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
+                "code": "receiver_phone_invalid",
+                "message": "The receiver's phone number is not a valid Vietnamese number. Please fix it in your address.",
+            })
 
     sold_out = unavailable_names(cart_items)
     if sold_out:
@@ -91,10 +166,17 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
             detail={"code": "no_longer_available", "message": f"No longer available: {', '.join(sold_out)}",
                     "names": ", ".join(sold_out)},
         )
-    subtotal = sum(
-        cart_item_unit_price(item) * item["quantity"]
-        for item in cart_items
-    )
+
+    wanted, names = {}, {}
+    for item in cart_items:
+        food = item.get("food_items") or {}
+        if food.get("daily_portions"):
+            wanted[food["id"]] = wanted.get(food["id"], 0) + item["quantity"]
+            names[food["id"]] = food.get("name")
+    sale_date = (appointment or datetime.now(timezone.utc)).astimezone(VN_TZ).date()
+    short = portions_error(wanted, names, sale_date)
+    if short:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=short)
 
     # 3. Get seller user_id + effective commission rate in one query
     dao_seller_profile = DAOSellerProfiles()
@@ -133,28 +215,20 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
                 "delivery_fee": delivery_fee,
                 "quotation_id": quotation_id,
             })
-    total_amount = subtotal + (delivery_fee or 0)
 
+    # Money columns, Decimal (snapshot seller's rate at order time)
     commission_rate = seller_info["commission_rate"]
-    commission_amount = round(subtotal * commission_rate, 2)
-
     vat_rate = DAOAdminConfig().get_tax_rate("vat_rate")
-    vat_amount = round(commission_amount * vat_rate, 2)
-
-    payout_amount = round(subtotal - commission_amount - vat_amount, 2)
+    amounts = order_amounts(cart_items, commission_rate, vat_rate, delivery_fee)
 
     # 4. Create order (include delivery fields if present)
     order = dao_orders.create_order(
         user_id=user_id,
         seller_id=cart["seller_id"],
         seller_user_id=seller_info["user_id"],
-        subtotal=subtotal,
-        total_amount=total_amount,
         commission_rate=commission_rate,
-        commission_amount=commission_amount,
         vat_rate=vat_rate,
-        vat_amount=vat_amount,
-        payout_amount=payout_amount,
+        **amounts,
         delivery_method=request.delivery_method,
         delivery_address=request.delivery_address,
         note=request.note,
@@ -162,7 +236,8 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
         delivery_lon=request.delivery_lon,
         delivery_fee=delivery_fee,
         quotation_id=quotation_id,
-        delivery_appointment=request.delivery_appointment,
+        delivery_appointment=appointment,
+        **receiver,
     )
 
     if not order:
@@ -215,6 +290,15 @@ def cancel_after(order: dict):
     return None
 
 
+def cancel_before(order: dict):
+    """A pending order with a delivery time: the last moment the buyer may cancel it
+    (buyer_cancel_before_appointment_minutes before that time, R3.3), or None if no such limit."""
+    appointment = _ts(order.get("delivery_appointment"))
+    if order["status"] != "pending" or not appointment:
+        return None
+    return appointment - DAOAdminConfig().get_minutes("buyer_cancel_before_appointment_minutes", 1440)
+
+
 @router.get("/{order_id}")
 def get_order_detail(order_id: str, user=Depends(verify_token)):
 
@@ -226,6 +310,9 @@ def get_order_detail(order_id: str, user=Depends(verify_token)):
 
     deadline = cancel_after(order)
     order["cancel_after"] = deadline.isoformat() if deadline else None
+    last = cancel_before(order)
+    order["cancel_before"] = last.isoformat() if last else None
+    order |= complaints_for_order(order, user["id"], "buyer")   # T35
     return {"success": True, "order": order}
 
 
@@ -241,14 +328,12 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
     now = datetime.now(timezone.utc)
     reason = None
     if order["status"] == "pending":
-        appointment = _ts(order.get("delivery_appointment"))
-        if appointment:
-            cutoff = DAOAdminConfig().get_minutes("buyer_cancel_before_appointment_minutes", 1440)
-            if appointment - now < cutoff:
-                hours = f"{cutoff.total_seconds() / 3600:g}"
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
-                    "code": "cancel_cutoff", "hours": hours,
-                    "message": f"Can't cancel within {hours} hours of the delivery time"})
+        last = cancel_before(order)
+        if last and now > last:
+            hours = f"{(_ts(order['delivery_appointment']) - last).total_seconds() / 3600:g}"
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
+                "code": "cancel_cutoff", "hours": hours,
+                "message": f"Can't cancel within {hours} hours of the delivery time"})
     else:
         deadline = cancel_after(order)
         if not deadline or now < deadline:

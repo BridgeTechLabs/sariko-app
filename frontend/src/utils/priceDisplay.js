@@ -10,11 +10,12 @@ export function formatVnd(amount) {
  * that stops meaning anything once levels exist, so it must never be shown.
  * Sold-out levels are excluded — a range must not advertise a price nobody can buy.
  *
+ * Always formatted from the number: the stored price_text is never shown (docs/dev/vnd-format Q1).
  * Returns "50.000 ₫" for one price, "50.000 ₫ – 80.000 ₫" for several.
  */
 export function foodPriceDisplay(food) {
     const levels = (food?.food_item_variants || []).filter(v => v.is_available !== false)
-    if (!levels.length) return food?.price_text || formatVnd(food?.price)
+    if (!levels.length) return formatVnd(food?.price)
 
     const prices = levels.map(v => Number(v.price))
     const min = Math.min(...prices)

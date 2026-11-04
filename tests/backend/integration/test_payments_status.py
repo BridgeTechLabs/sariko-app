@@ -43,6 +43,7 @@ def test_payment_status_returns_status_for_owner(fastapi_client, monkeypatch):
         "payment_status": "pending",
     })
     monkeypatch.setattr("apis.payments.DAOOrders", lambda: fake_orders)
+    monkeypatch.setattr("apis.payments.DAOAdminConfig", lambda: type("C", (), {"get_positive_int": lambda self, k, d: d})())
 
     # Bypass JWT verification — just inject a user dict
     from apis.payments import router as payments_router
@@ -53,6 +54,7 @@ def test_payment_status_returns_status_for_owner(fastapi_client, monkeypatch):
         res = fastapi_client.get(f"/payments/payment-status/{order_id}")
         assert res.status_code == 200
         assert res.json()["payment_status"] == "pending"
+        assert res.json()["wait_seconds"] == 90     # payment_result_wait_seconds default (T125)
         assert fake_orders.last_user_id == user_id, \
             "DAO must be called with authenticated user_id (ownership check)"
     finally:

@@ -23,6 +23,11 @@ export const apiSellerDashboard = {
         return response.data
     },
 
+    searchOrders: async (q) => {
+        const response = await apiClient.get('/v1/sellers/me/orders/search', { params: { q } })
+        return response.data
+    },
+
     getOrderDetail: async (orderId) => {
         const response = await apiClient.get(`/v1/sellers/me/orders/${orderId}`)
         return response.data
@@ -32,6 +37,16 @@ export const apiSellerDashboard = {
         const payload = { status: newStatus }
         if (cancellationReason) payload.cancellation_reason = cancellationReason
         const response = await apiClient.patch(`/v1/sellers/me/orders/${orderId}/status`, payload)
+        return response.data
+    },
+
+    getEarnings: async () => {
+        const response = await apiClient.get('/v1/sellers/me/earnings')
+        return response.data
+    },
+
+    getReviews: async (limit, offset) => {
+        const response = await apiClient.get('/v1/sellers/me/reviews', { params: { limit, offset } })
         return response.data
     },
 

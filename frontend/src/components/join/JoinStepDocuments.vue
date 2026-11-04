@@ -6,12 +6,16 @@ export default {
     components: { FileText, X },
 
     data() {
-        return { kinds: DOCUMENT_KINDS, loading: null }
+        return { loading: null }
     },
 
     computed: {
         store() {
             return useJoinStore()
+        },
+        // No CCCD photo (NĐ 356): the ID card only for a passport
+        kinds() {
+            return DOCUMENT_KINDS.filter(k => k !== 'id_document' || this.store.form.id_type === 'passport')
         },
         error() {
             const key = this.store.visibleErrors(6).id_document
@@ -39,6 +43,7 @@ export default {
 <template>
     <div class="join-step">
         <div class="join-hint">{{ $t('join_page.documents_hint', store.limits) }}</div>
+        <div v-if="store.form.id_type !== 'passport'" class="join-hint">{{ $t('join_page.hint_no_cccd_photo') }}</div>
 
         <div v-for="kind in kinds" :key="kind" class="join-card doc">
             <div class="doc-head">

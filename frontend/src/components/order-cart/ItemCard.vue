@@ -16,10 +16,6 @@ export default {
             required: true,
             type: Number,
         },
-        itemPriceText: {
-            required: true,
-            type: String,
-        },
         itemCategory: {
             required: true,
             type: String,
@@ -49,6 +45,10 @@ export default {
         sellerSlugName: {
             require: true,
             type: String
+        },
+        itemUnavailable: {
+            type: Boolean,
+            default: false
         }
     },
 
@@ -92,7 +92,7 @@ export default {
 <template>
 
     <div class="background">
-        <div class="container">
+        <div :class="['container', { unavailable: itemUnavailable }]">
 
             <div class="row q-gutter-md">
 
@@ -111,6 +111,7 @@ export default {
                             <div class="item-name">
                                 {{ itemName }}
                                 <span v-if="itemVariantName" class="item-variant">{{ itemVariantName }}</span>
+                                <span v-if="itemUnavailable" class="item-sold-out">{{ $t('cart_page.sold_out_label') }}</span>
                             </div>
                             <div class="item-category">
                                 <div>{{ itemCategory }}</div>
@@ -176,6 +177,19 @@ export default {
     flex-direction: column;
     justify-content: space-between;
     align-items: flex-start;
+}
+
+.unavailable { opacity: 0.55; }
+
+.item-sold-out {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 8px;
+    border-radius: 8px;
+    background: rgba(229, 72, 77, 0.18);
+    color: #e5484d;
+    font-size: 11px;
+    font-weight: 600;
 }
 
 .item-variant {

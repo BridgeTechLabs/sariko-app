@@ -1,5 +1,6 @@
 """Auto-cancel + refund paid orders the seller didn't accept in time
 (admin_settings.order_confirm_minutes, 30 by default) while the store was open.
+order_confirm_reminder_minutes before that, the seller and every admin device get a push.
 
 Runs as a background loop in this process (see lifespan.py). The cancel is
 conditional on the order still being pending, so a seller who acts at the same
@@ -7,6 +8,7 @@ moment wins cleanly, and refunds_order_id_key stops a second refund.
 """
 import asyncio
 import logging
+import math
 from datetime import datetime, timedelta, timezone
 
 from core.store_hours import confirm_deadline, is_open_now
@@ -53,6 +55,8 @@ def expire_unconfirmed_orders(now: datetime = None) -> int:
             if now >= deadline - reminder and order["id"] not in _reminded:
                 _reminded.add(order["id"])
                 push_service.notify_seller_order_expiring(order)
+                push_service.notify_admins("admin_order_expiring", f"/orders?open={order['id']}", code=order["id"][:8],
+                                           minutes=math.ceil((deadline - now).total_seconds() / 60))
             continue
         cancelled = dao_orders.update_order_status(order["id"], "cancelled", TIMEOUT_REASON, expected_status="pending")
         if not cancelled:

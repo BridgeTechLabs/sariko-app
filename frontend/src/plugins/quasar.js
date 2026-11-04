@@ -1,5 +1,5 @@
 import { Quasar, Loading, Notify, Dialog } from 'quasar'
-import iconSet from 'quasar/icon-set/fontawesome-v6'
+import iconSet from 'quasar/icon-set/svg-material-icons'
 
 export default function useQuasarPlugin(app) {
     console.log("Loaded Quasar plugin")

@@ -34,6 +34,7 @@ export default {
             accepting: false,
             rebooking: false,
             rebookError: false,
+            missingInfo: [],   // 'address' / 'phone' still unset when the seller tapped Ready
             tick: 0,
             supportEmail: SUPPORT_EMAIL,
             supportMailto: SUPPORT_MAILTO,
@@ -119,6 +120,16 @@ export default {
         async onAccept() {
             const nextStatus = STATUS_NEXT[this.order.status]
             if (!nextStatus) return
+            // Lalamove needs the pickup point and the seller's phone (same check as the Today card)
+            if (nextStatus === 'ready' && this.order.delivery_method === 'delivery') {
+                const store = useDashboardStore()
+                if (!store.sellerInfo) await store.fetchSellerInfo()
+                this.missingInfo = [
+                    !store.sellerInfo?.has_address && 'address',
+                    !store.sellerInfo?.has_phone && 'phone',
+                ].filter(Boolean)
+                if (this.missingInfo.length) return
+            }
             if (!await confirmEarlyReady(this, this.order)) return
             this.accepting = true
             try {
@@ -126,6 +137,11 @@ export default {
                 this.$q.notify({ classes: 'quasar-notify-positive', message: this.$t('seller_order_detail.toast_order_updated'), position: 'bottom', timeout: 1500 })
             } catch (e) {
                 console.error('SellerOrderActionBar - onAccept -', e)
+                const detail = e?.response?.data?.detail
+                if (detail?.code === 'seller_profile_incomplete') {
+                    this.missingInfo = detail.missing || []
+                    return
+                }
                 this.$q.notify({ type: 'negative', message: this.$t('seller_order_detail.toast_update_failed'), position: 'bottom' })
             } finally {
                 this.accepting = false
@@ -194,6 +210,20 @@ export default {
 
 <template>
     <div>
+        <!-- Store info Lalamove needs before Ready; each line opens the page that sets it -->
+        <div v-if="missingInfo.length" class="missing-info-card">
+            <div class="missing-info-card__header">
+                <AlertTriangle :size="16" />
+                <span>{{ $t('seller_home.error_missing_info') }}</span>
+            </div>
+            <router-link v-if="missingInfo.includes('address')" to="/account/address" class="missing-info-card__link">
+                {{ $t('seller_home.missing_address') }} ›
+            </router-link>
+            <router-link v-if="missingInfo.includes('phone')" to="/account/profile" class="missing-info-card__link">
+                {{ $t('seller_home.missing_phone') }} ›
+            </router-link>
+        </div>
+
         <!-- Contact admin notice — infra errors requiring admin intervention -->
         <a v-if="showContactAdmin" :href="supportMailto" class="contact-admin-notice">
             {{ $t('seller_order_detail.contact_admin_notice', { email: supportEmail }) }}
@@ -276,6 +306,32 @@ export default {
 </template>
 
 <style lang="scss" scoped>
+.missing-info-card {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.missing-info-card__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ef4444;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.missing-info-card__link {
+    font-size: 13px;
+    color: var(--text-primary);
+    text-decoration: underline;
+}
+
 .contact-admin-notice {
     display: block;
     text-decoration: underline;

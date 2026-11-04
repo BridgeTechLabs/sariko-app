@@ -1,8 +1,10 @@
+from decimal import Decimal
 from typing import Optional
 import logging
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
+from core.seller_status import with_buyer_status
 from core.store_hours import is_open_now, with_open_now
 from dao.dao_base import DAOBase
 
@@ -18,14 +20,16 @@ class DAOSellerProfiles(DAOBase):
     def read_founding_sellers(self):
         try:
             query = self._supabase_client.table(self._table_name)
-            query = query.select("id, user_id, store_name, slug, avatar_url, status, is_open, opening_time, closing_time")
+            query = query.select("id, user_id, store_name, slug, avatar_url, status, is_open, opening_time, closing_time, lat, lon")
             query = query.eq("is_listed", True)
             query = query.order("status").order("display_order").order("created_at")
 
             result = query.execute()
             
             if result and result.data:
-                sellers = [with_open_now(s) for s in result.data]
+                sellers = [with_buyer_status(with_open_now(s)) for s in result.data]
+                for s in sellers:  # only needed for the status
+                    s.pop("lat"); s.pop("lon")
                 # active before coming_soon, then open-now before closed; stable, so display_order holds within each block
                 return sorted(sellers, key=lambda s: (s["status"] != "active", not s["is_open"]))
                 
@@ -41,13 +45,13 @@ class DAOSellerProfiles(DAOBase):
     def read_seller_by_slug_name(self, slug: str):
         try:
             query = self._supabase_client.table(self._table_name)
-            query = query.select("id, store_name, slug, address, avatar_url, status, is_verified, phone, lat, lon, tier, description, is_open, opening_time, closing_time, rating_avg, rating_count").eq("slug", slug)
+            query = query.select("id, store_name, slug, address, avatar_url, status, is_verified, lat, lon, tier, description, is_open, opening_time, closing_time, rating_avg, rating_count").eq("slug", slug)
             
             query = query.maybe_single()
             result = query.execute()
             
             if result and result.data:
-                return with_open_now(result.data)
+                return with_buyer_status(with_open_now(result.data))
                 
             return None
             
@@ -192,7 +196,7 @@ class DAOSellerProfiles(DAOBase):
             return {
                 "user_id": row["user_id"],
                 "is_open": is_open_now(row["is_open"], row["opening_time"], row["closing_time"]),
-                "commission_rate": float(effective_rate),
+                "commission_rate": Decimal(str(effective_rate)),
                 "address": row["address"],
                 "lat": row["lat"],
                 "lon": row["lon"],

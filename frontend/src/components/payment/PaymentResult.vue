@@ -1,46 +1,49 @@
 <script>
-import { CircleCheckBig, CircleX, Loader } from 'lucide-vue-next';
+import { CircleCheckBig, CircleX, Clock } from 'lucide-vue-next';
 import apiPayments from '@/apis/payments/apiPayments';
 
 const POLL_INTERVAL = 3000;
-const POLL_TIMEOUT = 60000;
+const DEFAULT_WAIT_SECONDS = 90;   // until /payment-status gives admin_settings.payment_result_wait_seconds
 
+// T125: the page trusts VNPay's SIGNED return result, never a timeout. Signed 00 = paid, waiting for the
+// order to be confirmed (IPN, or the backend's VNPay check); signed other code = not paid; anything else
+// or no confirmation in time = "waiting for VNPay". It never says "failed" because the IPN is late.
 export default {
     components: {
-        CircleCheckBig, CircleX, Loader
+        CircleCheckBig, CircleX, Clock
     },
 
     data() {
         return {
-            // 'verifying' | 'polling' | 'success' | 'failed'
+            // 'verifying' | 'confirming' | 'waiting' | 'failed'
             state: 'verifying',
             responseCode: '',
             orderId: '',
             pollTimer: null,
-            pollStartTime: null,
+            waitSeconds: DEFAULT_WAIT_SECONDS,
+            startedAt: 0,
         }
     },
 
     methods: {
         startPolling() {
+            if (!this.orderId) return
+            this.startedAt = Date.now()
             this.pollTimer = setInterval(async () => {
                 try {
-
                     const res = await apiPayments.pollPaymentStatus(this.orderId)
-                    const status = res?.data?.payment_status
-                    console.log({res})
-                    
-                    if (status === 'paid') {
+                    if (res?.data?.wait_seconds) this.waitSeconds = res.data.wait_seconds
+                    if (res?.data?.payment_status === 'paid') {
                         this.stopPolling()
-                        this.state = 'success'
-                    } else if (status === 'failed') {
-                        this.stopPolling()
-                        this.state = 'failed'
+                        this.$router.replace(`/orders/${this.orderId}`)
+                        return
                     }
-                    // status === 'pending' → keep polling
                 } catch (e) {
-                    console.error('Payment poll error:', e)
-                    // Don't stop polling on network error, keep trying
+                    console.error('Payment poll error:', e)   // keep polling on a network error
+                }
+                if (Date.now() - this.startedAt > this.waitSeconds * 1000) {
+                    this.stopPolling()
+                    this.state = 'waiting'
                 }
             }, POLL_INTERVAL)
         },
@@ -51,98 +54,65 @@ export default {
                 this.pollTimer = null
             }
         },
-
-        cleanup() {
-            if (this.timeoutId) clearTimeout(this.timeoutId)
-            this.stopPolling()
-        },
     },
 
     async created() {
+        const params = new URLSearchParams(window.location.search)
+        const txnRef = params.get('vnp_TxnRef')
+        const orderIdNoDash = txnRef ? txnRef.split('_')[0] : ''
+        this.orderId = orderIdNoDash.length === 32
+            ? `${orderIdNoDash.slice(0,8)}-${orderIdNoDash.slice(8,12)}-${orderIdNoDash.slice(12,16)}-${orderIdNoDash.slice(16,20)}-${orderIdNoDash.slice(20)}`
+            : ''
+
+        let result = null
         try {
-            const params = new URLSearchParams(window.location.search)
-            const responseCode = params.get('vnp_ResponseCode')
-            const txnRef = params.get('vnp_TxnRef')
-
-            const orderIdNoDash = txnRef ? txnRef.split('_')[0] : ''
-            this.orderId = orderIdNoDash.length === 32
-                ? `${orderIdNoDash.slice(0,8)}-${orderIdNoDash.slice(8,12)}-${orderIdNoDash.slice(12,16)}-${orderIdNoDash.slice(16,20)}-${orderIdNoDash.slice(20)}`
-                : ''
-
             const vnpParams = new URLSearchParams()
             for (const [key, value] of params) {
                 if (key.startsWith('vnp_')) vnpParams.append(key, value)
             }
-            const queryString = vnpParams.toString()
-            const res = await apiPayments.checkVnpayReturn(queryString)
-            if (!res?.data) {
-                this.state = 'failed'
-                return
-            }
-
-            this.responseCode = res.data.response_code
-            if (!res.data.success) {
-                this.state = 'failed'
-                return
-            }
-
-            this.state = 'polling'
-            this.startPolling()
-                        
-            this.timeoutId = setTimeout(async () => {
-                this.cleanup()
-                try {
-                    const res = await apiPayments.pollPaymentStatus(this.orderId)
-                    if (res?.data?.payment_status === 'paid') {
-                        this.state = 'success'
-                    } else {
-                        this.state = 'failed'
-                    }
-                } catch (e) {
-                    this.state = 'failed'
-                }
-                
-            }, 30000)
-
+            result = (await apiPayments.checkVnpayReturn(vnpParams.toString()))?.data
         } catch (e) {
             console.error('Payment return error:', e)
-            this.state = 'failed'
         }
-    },
 
-    async mounted() {
+        this.responseCode = result?.response_code || ''
+        if (result?.not_charged) {   // signed, and a code that means no money was taken (24, 51, ...)
+            this.state = 'failed'
+            return
+        }
+        // signed 00 → confirming; anything else (07 charged-but-flagged, 99, unsigned, missing) → waiting,
+        // but still watch for the payment
+        this.state = result?.is_valid && result.response_code === '00' ? 'confirming' : 'waiting'
+        this.startPolling()
     },
 
     beforeUnmount() {
-        // this.stopPolling()
-        this.cleanup()
+        this.stopPolling()
     },
 }
 </script>
 
 <template>
     <div class="payment-result">
-        
+
         <div v-if="state === 'verifying'" class="state-container">
-            <Loader :size="48" class="spinner" />
+            <q-spinner-hourglass color="yellow" size="5em" />
             <div class="title">{{ $t('payment.verifying') }}</div>
         </div>
 
-        <div v-else-if="state === 'polling'" class="state-container">
-            <q-spinner-hourglass  color="yellow" size="5em" />
-            <div class="title">{{ $t('payment.confirming') }}</div>
+        <div v-else-if="state === 'confirming'" class="state-container">
+            <CircleCheckBig :size="64" color="#10b981" />
+            <div class="title">{{ $t('payment.paidConfirming') }}</div>
+            <q-spinner-dots color="yellow" size="2em" />
             <div class="subtext">{{ $t('payment.doNotClose') }}</div>
         </div>
 
-        <div v-else-if="state === 'success'" class="state-container">
-            <CircleCheckBig :size="64" color="#10b981" />
-            <div class="title">{{ $t('payment.success') }}</div>
-            <div class="subtext">{{ $t('payment.successMessage') }}</div>
-            <q-btn class="btn-primary" dense no-caps @click="$router.push('/orders')">
+        <div v-else-if="state === 'waiting'" class="state-container">
+            <Clock :size="64" color="#f59e0b" />
+            <div class="title">{{ $t('payment.waitingTitle') }}</div>
+            <div class="subtext">{{ $t('payment.waitingMessage') }}</div>
+            <q-btn class="btn-primary" dense no-caps @click="$router.push(orderId ? `/orders/${orderId}` : '/orders')">
                 {{ $t('payment.viewOrders') }}
-            </q-btn>
-            <q-btn class="btn-secondary" flat dense no-caps @click="$router.push('/home')">
-                {{ $t('payment.backHome') }}
             </q-btn>
         </div>
 
@@ -150,11 +120,11 @@ export default {
             <CircleX :size="64" color="#ef4444" />
             <div class="title">{{ $t('payment.failed') }}</div>
             <div class="subtext">{{ $t('payment.failedMessage') }}</div>
-            <div v-if="responseCode && responseCode !== '00'" class="error-code">
+            <div v-if="responseCode" class="error-code">
                 Error code: {{ responseCode }}
             </div>
-            <q-btn class="btn-primary" dense no-caps @click="$router.push('/orders')">
-                {{ $t('payment.viewOrders') }}
+            <q-btn class="btn-primary" dense no-caps @click="$router.push(orderId ? `/orders/${orderId}` : '/orders')">
+                {{ $t('payment.payAgain') }}
             </q-btn>
             <q-btn class="btn-secondary" flat dense no-caps @click="$router.push('/home')">
                 {{ $t('payment.backHome') }}
@@ -174,16 +144,6 @@ export default {
     align-items: center;
     text-align: center;
     gap: 12px;
-}
-
-.spinner {
-    color: $accent;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
 }
 
 .title {

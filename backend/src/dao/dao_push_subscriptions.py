@@ -31,12 +31,14 @@ class DAOPushSubscriptions(DAOBase):
             raise Exception(f"error upsert_subscription: {e}")
 
     def read_subscriptions_by_user_id(self, user_id: str):
+        """Marketplace devices only: the same person's admin-panel subscription is not theirs to get."""
         try:
             result = (
                 self._supabase_client
                 .table(self._table_name)
                 .select("endpoint, p256dh, auth")
                 .eq("user_id", user_id)
+                .eq("app", "marketplace")
                 .execute()
             )
             return result.data if result and result.data else []
@@ -45,6 +47,23 @@ class DAOPushSubscriptions(DAOBase):
             raise Exception(f"Supabase error - read_subscriptions_by_user_id: {e}")
         except Exception as e:
             raise Exception(f"error read_subscriptions_by_user_id: {e}")
+
+    def read_admin_subscriptions(self):
+        """Every admin-panel device (no admin roles: all admins get every admin push)."""
+        try:
+            result = (
+                self._supabase_client
+                .table(self._table_name)
+                .select("user_id, endpoint, p256dh, auth")
+                .eq("app", "admin")
+                .execute()
+            )
+            return result.data if result and result.data else []
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_admin_subscriptions: {e}")
+        except Exception as e:
+            raise Exception(f"error read_admin_subscriptions: {e}")
 
     def delete_subscription(self, endpoint: str):
         try:

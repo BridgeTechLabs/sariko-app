@@ -5,6 +5,7 @@ import OrderStatusHeader from '@/components/order-details/OrderStatusHeader.vue'
 import OrderInfoCard from '@/components/order-details/OrderInfoCard.vue';
 import OrderActions from '@/components/order-details/OrderActions.vue';
 import OrderReviewSection from '@/components/order-details/OrderReviewSection.vue';
+import OrderComplaintSection from '@/components/complaints/OrderComplaintSection.vue';
 import DeliveryTracker from '@/components/order-details/DeliveryTracker.vue';
 import { useOrderStore } from '@/stores/order/orderStore.js';
 import { useDeliveryStore } from '@/stores/delivery/deliveryStore.js';
@@ -18,6 +19,7 @@ export default {
         OrderInfoCard,
         OrderActions,
         OrderReviewSection,
+        OrderComplaintSection,
         DeliveryTracker,
     },
 
@@ -96,6 +98,10 @@ export default {
 
         <template #Review>
             <OrderReviewSection />
+        </template>
+
+        <template #Complaint>
+            <OrderComplaintSection role="buyer" />
         </template>
 
         <template #Actions>

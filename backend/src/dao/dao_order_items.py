@@ -24,7 +24,7 @@ class DAOOrderItems(DAOBase):
                     "order_id": order_id,
                     "food_item_id": food.get("id"),
                     "name_snapshot": food.get("name"),
-                    "price_snapshot": cart_item_unit_price(item),
+                    "price_snapshot": str(cart_item_unit_price(item)),
                     "unit_label_snapshot": food.get("unit_label"),
                     "variant_name_snapshot": variant["name"] if variant else None,
                     "quantity": item.get("quantity"),

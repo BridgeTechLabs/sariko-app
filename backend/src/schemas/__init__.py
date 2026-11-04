@@ -36,6 +36,7 @@ from schemas.request_create_review import RequestCreateReview
 from schemas.request_update_order_status import RequestUpdateOrderStatus
 from schemas.request_set_store_open import RequestSetStoreOpen
 from schemas.request_set_store_hours import RequestSetStoreHours
+from schemas.request_seller_profile_completion import RequestSellerProfileCompletion
 
 # Seller Menu — Categories
 from schemas.request_create_category import RequestCreateCategory
@@ -55,6 +56,9 @@ from schemas.request_quotation import RequestQuotation
 # Seller onboarding (/join)
 from schemas.request_create_onboarding_application import RequestCreateOnboardingApplication
 from schemas.request_upload_onboarding_file import RequestUploadOnboardingFile
+
+# Complaints (T35)
+from schemas.request_create_complaint import RequestCreateComplaint
 
 
 class Schema:
@@ -81,6 +85,7 @@ class Schema:
     RequestUpdateOrderStatus = RequestUpdateOrderStatus
     RequestSetStoreOpen = RequestSetStoreOpen
     RequestSetStoreHours = RequestSetStoreHours
+    RequestSellerProfileCompletion = RequestSellerProfileCompletion
 
     RequestCreateCategory = RequestCreateCategory
     RequestUpdateCategory = RequestUpdateCategory
@@ -95,3 +100,5 @@ class Schema:
 
     RequestCreateOnboardingApplication = RequestCreateOnboardingApplication
     RequestUploadOnboardingFile = RequestUploadOnboardingFile
+
+    RequestCreateComplaint = RequestCreateComplaint

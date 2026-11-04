@@ -19,7 +19,7 @@ def mark_done(monkeypatch):
 
     def call(delivery_method, delivery_status):
         written = []
-        order = {"id": "order-1", "status": "ready", "delivery_method": delivery_method}
+        order = {"id": "order-1", "status": "ready", "payment_status": "paid", "delivery_method": delivery_method}
 
         class FakeOrders:
             def read_order_by_id_for_seller(self, order_id, seller_id):
@@ -56,3 +56,28 @@ def test_done_allowed_once_trip_completed(mark_done):
     res, written = mark_done("delivery", "COMPLETED")
     assert res.status_code == 200
     assert written == ["done"]
+
+
+@pytest.mark.parametrize("move", [("pending", "confirmed"), ("confirmed", "ready"), ("ready", "done")])
+def test_unpaid_order_never_moves_forward(monkeypatch, move):
+    """02/11 PROD: an unpaid order reached done; marked ready it would book a real Lalamove trip."""
+    app = FastAPI()
+    app.include_router(sellers.router)
+    app.dependency_overrides[verify_token] = lambda: {"id": "seller-user-1"}
+    monkeypatch.setattr("apis.sellers._get_seller_id", lambda user: "seller-1")
+    written, lalamove = [], []
+    order = {"id": "order-1", "status": move[0], "payment_status": "pending", "delivery_method": "delivery"}
+
+    class FakeOrders:
+        def read_order_by_id_for_seller(self, order_id, seller_id):
+            return order
+
+        def update_order_status(self, order_id, status, reason=None, expected_status=None):
+            written.append(status)
+
+    monkeypatch.setattr("apis.sellers.DAOOrders", FakeOrders)
+    monkeypatch.setattr("services.lalamove_service.get_lalamove_service", lambda: lalamove.append("lalamove"))
+    res = TestClient(app).patch("/sellers/me/orders/order-1/status", json={"status": move[1]})
+    assert res.status_code == 409
+    assert res.json()["detail"]["code"] == "order_not_paid"
+    assert written == [] and lalamove == []
