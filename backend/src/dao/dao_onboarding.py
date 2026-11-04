@@ -57,6 +57,20 @@ class DAOOnboarding(DAOBase):
             raise
         return result.data if result else None
 
+    def get_seller_invoice_info(self, seller_profile_id: str):
+        """Buyer fields (tax code, name, address, phone, email, ID) from the seller's latest approved application, or None."""
+        result = (
+            self._supabase_client.table("onboarding_applications")
+            .select("tax_code, first_name, last_name, residential_address, phone, email, id_type, id_number, "
+                    "bank_name, bank_account_number, nationality")
+            .eq("seller_profile_id", seller_profile_id)
+            .eq("status", "approved")
+            .order("reviewed_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+
     def list_files(self, application_id: str) -> list:
         result = (
             self._supabase_client.table("onboarding_files")
