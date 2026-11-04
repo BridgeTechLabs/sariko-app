@@ -38,14 +38,16 @@ def force_status(order_id: str, body: dict, user=Depends(verify_token)):
     if new_status not in ("pending", "confirmed", "ready", "done", "cancelled"):
         raise HTTPException(status_code=400, detail="Invalid status")
     dao_orders = DAOOrders()
+    order = dao_orders.read_order_by_id_raw(order_id)
     if new_status in ("confirmed", "ready", "done"):
         # orders_paid_before_progress_check requires payment_status='paid' for these
         # statuses; keep force-status a single click instead of needing force-pay first.
         # update_payment_status is the real IPN path (triggers push/Zalo "new order"
-        # alerts), so only call it when the order isn't already paid.
-        order = dao_orders.read_order_by_id_raw(order_id)
+        # alerts and, if a dish sold out meanwhile, an auto-cancel): only call it when
+        # the order isn't already paid, and pin the status write below to the status
+        # read here so a sold-out cancellation racing with it isn't overwritten.
         if order and order.get("payment_status") != "paid":
             dao_orders.update_payment_status(order_id, "paid")
-    dao_orders.update_order_status(order_id, new_status)
+    dao_orders.update_order_status(order_id, new_status, expected_status=order.get("status") if order else None)
     logger.warning(f"[DEV] force-status order {order_id} → {new_status} by user {user['id']}")
     return {"success": True}

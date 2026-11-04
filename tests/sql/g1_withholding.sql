@@ -50,7 +50,7 @@ select pg_temp.expect('TC-17 vat', 6000::numeric, (select wh_vat_amount from ord
 select pg_temp.expect('TC-17 pit', 4000::numeric, (select wh_pit_amount from orders where id = :'o4'));
 
 -- TC-18: refused cases write nothing.
-select pg_temp.t_order(:'s1', 300000, p_paid_at => null) as o_unpaid \gset
+select pg_temp.t_order(:'s1', 300000, p_status => 'pending', p_paid_at => null) as o_unpaid \gset
 select pg_temp.expect_error('TC-18 unpaid', format('select compute_order_withholding(%L)', :'o_unpaid'), '%is not paid%');
 select pg_temp.expect('TC-18 unpaid untouched', null::timestamptz, (select wh_computed_at from orders where id = :'o_unpaid'));
 select pg_temp.expect_error('TC-18 not found', format('select compute_order_withholding(%L)', gen_random_uuid()), '%not found%');
