@@ -185,9 +185,9 @@ class Stop(Exception):
     pass
 
 
-def run_every(monkeypatch, db, ticks, run, interval=60, reset=None, before_tick=None):
-    """every("order_expiry", interval, run) for `ticks` ticks on a fake clock (sleep moves it); before_tick(i) can
-    change the row between ticks. Returns [(tick, "run" | "record:<error>" | "thread:<fn>")]."""
+def run_every(monkeypatch, db, ticks, run, interval=60, reset=None, before_tick=None, run_seconds=0):
+    """every("order_expiry", interval, run) for `ticks` ticks on a fake clock (sleep moves it, each run takes
+    run_seconds); before_tick(i) can change the row between ticks. Returns [(tick, "run" | "record:<error>" | "thread:<fn>")]."""
     clock, log = [0.0], []
 
     async def to_thread(fn, *args):
@@ -215,6 +215,7 @@ def run_every(monkeypatch, db, ticks, run, interval=60, reset=None, before_tick=
 
     def job():
         log.append((len_ticks[0], "run"))
+        clock[0] += run_seconds
         return run()
     with pytest.raises(Stop):
         asyncio.run(job_health.every("order_expiry", interval, job, reset))
@@ -226,8 +227,10 @@ def runs(log):
 
 
 def test_runs_at_start_then_every_interval(monkeypatch, db):
-    log = run_every(monkeypatch, db, 9, lambda: None)            # ticks every 15 s, interval 60 s
-    assert runs(log) == [0, 4, 8]
+    log = run_every(monkeypatch, db, 9, lambda: None, run_seconds=20)   # ticks every 15 s, interval 60 s, runs take 20 s
+    # the interval counts from the START of a run: runs at 0 s, 65 s, 130 s (ticks 0, 3, 6); counted from the end of a
+    # run it would be 0 s, 80 s, 160 s (ticks 0, 4, 8)
+    assert runs(log) == [0, 3, 6]
     assert (0, "record:None") in log and (0, "thread:read_control") in log and (0, "thread:job") in log  # all threaded
 
 
@@ -304,6 +307,8 @@ def test_tc20_api_metrics_paused_keeps_nothing(monkeypatch, db):  # TC-20
 
     def before_tick(i):
         db.rows.setdefault("order_expiry", {}).update(paused=i < 3, interval_seconds=60)
+        if i == 2:
+            assert api_metrics._samples == {}                      # dropped on every paused tick, not kept in memory
         if i < 3:
             for _ in range(5):
                 api_metrics.record("GET", "/rest/v1/cart", 200, 10)   # counted while paused: dropped
@@ -360,3 +365,46 @@ def test_api_metrics_run_cleans_up_once_a_day(monkeypatch):
     monkeypatch.setattr(api_metrics, "flush", lambda: 1 / 0)          # a failed write fails the run, no cleanup
     with pytest.raises(ZeroDivisionError):
         api_metrics.flush_and_cleanup()
+
+
+# ─── Healthchecks.io ping (job-control QĐ 8, TC-26) ───────────────────────────────────────────────────
+@pytest.fixture
+def pings(monkeypatch, db):
+    sent = []
+
+    def urlopen(url, timeout):
+        assert timeout == 10
+        sent.append(url)
+        return type("R", (), {"close": lambda self: None})()
+    monkeypatch.setattr(job_health.urllib.request, "urlopen", urlopen)
+    monkeypatch.setenv("HC_PING_KEY", "pingkey")
+    monkeypatch.setenv("ENV", "dev")
+    return sent
+
+
+def test_tc26_ping_ok_and_fail(pings):
+    ok("payment_reconcile")
+    fail("payment_reconcile")
+    assert pings == ["https://hc-ping.com/pingkey/dev-job-payment-reconcile?create=1",
+                     "https://hc-ping.com/pingkey/dev-job-payment-reconcile/fail?create=1"]   # never the error text
+
+
+def test_tc26_no_key_no_ping(pings, monkeypatch):
+    monkeypatch.delenv("HC_PING_KEY")
+    ok()
+    assert pings == []
+
+
+def test_tc26_paused_no_ping(pings, monkeypatch, db):
+    db.rows["order_expiry"] = {"paused": True}
+    run_every(monkeypatch, db, 3, lambda: pytest.fail("ran while paused"))
+    assert pings == []
+
+
+def test_tc26_ping_timeout_never_raises(pings, monkeypatch, db, caplog):
+    def timeout(url, timeout):
+        raise TimeoutError("timed out")
+    monkeypatch.setattr(job_health.urllib.request, "urlopen", timeout)
+    ok()
+    assert db.rows["order_expiry"]["failures"] == 0 and "Healthchecks ping not sent: TimeoutError" in caplog.text
+    assert "pingkey" not in caplog.text

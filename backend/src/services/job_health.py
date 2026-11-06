@@ -14,7 +14,9 @@ when the job runs again. Zalo is decided before the DB write and each DB step ha
 still sends the alert. record() never raises."""
 import asyncio
 import logging
+import os
 import time
+import urllib.request
 from datetime import datetime, timezone
 
 from dao.dao_admin_config import DAOAdminConfig
@@ -132,3 +134,18 @@ def _record(job: str, error: Exception) -> None:
         DAOJobHealth().update(job, values)
     except Exception as e:
         logger.error(f"[JobHealth] {job} not written: {e!r}")
+    _ping(job, error is not None)
+
+
+def _ping(job: str, failed: bool) -> None:
+    """Healthchecks.io (20261106-job-control QĐ 8): a check per job, <ENV>-job-<job>, made on the first ping; a failed
+    run pings /fail, a paused job does not ping at all (it is not recorded), so Healthchecks reports a job that stopped
+    or stayed paused too long, even when this process is dead. No HC_PING_KEY = nothing. Never raises."""
+    key = os.getenv("HC_PING_KEY")
+    if not key:
+        return
+    slug = f"{os.getenv('ENV', 'local')}-job-{job.replace('_', '-')}"
+    try:
+        urllib.request.urlopen(f"https://hc-ping.com/{key}/{slug}{'/fail' if failed else ''}?create=1", timeout=10).close()
+    except Exception as e:   # the key is in the URL: log the error type only
+        logger.warning(f"[JobHealth] {job} Healthchecks ping not sent: {type(e).__name__}")
