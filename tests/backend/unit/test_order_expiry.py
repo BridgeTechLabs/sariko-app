@@ -15,17 +15,24 @@ def at(hhmm, day=12):  # a VN wall-clock time on 2026-10-<day>, given as UTC (VN
     return datetime(2026, 10, day, 0, 0, tzinfo=timezone.utc) + timedelta(hours=h - 7, minutes=m)
 
 
-@pytest.mark.parametrize("paid, opens, closes, opened_at, now, expected", [
-    (at("12:00"), None, None, None, at("12:10"), at("12:30")),                      # no hours: from payment
-    (at("12:00"), "10:00:00", "20:00:00", None, at("12:10"), at("12:30")),          # paid while open
-    (at("23:00", 11), "10:00:00", "20:00:00", None, at("10:05"), at("10:30")),      # paid after close: from opening
-    (at("12:00"), None, None, at("13:00"), at("13:10"), at("13:30")),               # switched back on later
-    (at("12:00"), None, None, at("09:00"), at("12:10"), at("12:30")),               # old switch-on doesn't matter
-    (at("17:00"), "18:00:00", "02:00:00", None, at("01:00", 13), at("18:30")),      # overnight hours, after midnight
-    (at("03:00"), "08:00:00", "08:00:00", None, at("03:10"), at("03:30")),          # same time = 24h
+def daily(opens, closes, days=range(1, 8)):  # weekly_hours with the same slot on `days`, the rest off
+    return {str(d): ({"open": opens, "close": closes} if d in days else None) for d in range(1, 8)}
+
+
+# 2026-10-12 is a Monday; 11 = Sunday, 13 = Tuesday
+@pytest.mark.parametrize("paid, hours, opened_at, now, expected", [
+    (at("12:00"), None, None, at("12:10"), at("12:30")),                                # no hours: from payment
+    (at("12:00"), daily("10:00", "20:00"), None, at("12:10"), at("12:30")),             # paid while open
+    (at("23:00", 11), daily("10:00", "20:00"), None, at("10:05"), at("10:30")),         # paid after close: from opening
+    (at("12:00"), None, at("13:00"), at("13:10"), at("13:30")),                         # switched back on later
+    (at("12:00"), None, at("09:00"), at("12:10"), at("12:30")),                         # old switch-on doesn't matter
+    (at("17:00"), daily("18:00", "02:00"), None, at("01:00", 13), at("18:30")),         # overnight, after midnight
+    (at("21:00", 11), daily("18:00", "02:00", {1}), None, at("01:00", 13), at("18:30")),  # Tuesday off: Monday's slot
+    (at("12:00", 11), daily("10:00", "20:00", {2}), None, at("10:05", 13), at("10:30", 13)),  # paid Sunday, Monday off
+    (at("03:00"), daily("08:00", "08:00"), None, at("03:10"), at("03:30")),             # same time = whole day
 ])
-def test_confirm_deadline(paid, opens, closes, opened_at, now, expected):
-    assert confirm_deadline(paid, opens, closes, opened_at, now, WINDOW) == expected
+def test_confirm_deadline(paid, hours, opened_at, now, expected):
+    assert confirm_deadline(paid, hours, opened_at, now, WINDOW) == expected
 
 
 class FakeOrders:
@@ -100,9 +107,9 @@ def refunds(monkeypatch):
     return queued
 
 
-def _order(oid, paid, is_open=True, opens=None, closes=None):
+def _order(oid, paid, is_open=True, hours=None):
     return {"id": oid, "paid_at": paid.isoformat(), "payment_status": "paid",
-            "seller_profiles": {"is_open": is_open, "opening_time": opens, "closing_time": closes, "opened_at": None}}
+            "seller_profiles": {"is_open": is_open, "weekly_hours": hours, "opened_at": None}}
 
 
 def test_expiry_cancels_and_refunds_only_timed_out_orders(monkeypatch, config, refunds, seller_pushes, reminders):
@@ -110,6 +117,7 @@ def test_expiry_cancels_and_refunds_only_timed_out_orders(monkeypatch, config, r
         _order("late", at("11:00")),
         _order("fresh", at("11:45")),                        # 15 min, not yet
         _order("closed", at("11:00"), is_open=False),         # switch off: never times out
+        _order("day_off", at("11:00"), hours=daily("10:00", "20:00", {2})),  # Monday off: clock paused
         _order("raced", at("11:00")),                         # seller confirmed at the same moment
     ], seller_acted_first={"raced"})
     monkeypatch.setattr(order_expiry, "DAOOrders", lambda: fake)

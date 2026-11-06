@@ -21,3 +21,17 @@ export function vnDay(value) {
     const d = value instanceof Date ? value : parseDbTime(value)
     return d.toLocaleDateString('en-CA', { timeZone: TZ })
 }
+
+// Weekday keys of seller_profiles.weekly_hours: "1" = Monday ... "7" = Sunday (ISO weekday).
+export const WEEK_KEYS = ['1', '2', '3', '4', '5', '6', '7']
+
+// Today's weekday key in Vietnam time (UTC+7, no DST).
+export function vnWeekdayKey() {
+    return String(new Date(Date.now() + 7 * 3600e3).getUTCDay() || 7)
+}
+
+// "Thứ Hai" / "Monday" for a weekday key, in the current UI language. 2026-10-12 was a Monday.
+export function weekdayName(key) {
+    return new Date(Date.UTC(2026, 9, 11 + Number(key))).toLocaleDateString(
+        i18n.global.locale === 'vi' ? 'vi-VN' : 'en-PH', { weekday: 'long', timeZone: 'UTC' })
+}

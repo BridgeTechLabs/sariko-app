@@ -184,6 +184,44 @@ def test_one_asker_at_a_time(env):
     assert env.calls == []
 
 
+# ---- job health (docs/dev/20261106-job-health QA 1-app): VNPay down must reach 3 failed runs in a row
+def reconcile_runs(monkeypatch, rounds):
+    """The real reconcile_run (reconcile_payments + the kept VNPay result), `rounds` runs 2 minutes apart; returns
+    each run's error (None = ok)."""
+    clock, errors = [NOW], []
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock[0]
+
+    monkeypatch.setattr(payment_reconcile, "datetime", Clock)
+    monkeypatch.setattr(payment_reconcile, "_vnpay_error", None)
+    for _ in range(rounds):
+        try:
+            payment_reconcile.reconcile_run()
+            errors.append(None)
+        except RuntimeError as e:
+            errors.append(e)
+        clock[0] += timedelta(minutes=2)
+    return errors
+
+
+def test_vnpay_down_every_run_fails(env, monkeypatch):
+    def down(payload):
+        env.calls.append(payload)
+        raise ConnectionError("VNPay unreachable")
+    monkeypatch.setattr(vnpay_query, "_post", down)
+    errors = reconcile_runs(monkeypatch, 3)
+    assert len(env.calls) == 1                       # asked once, the 15-minute claim holds the next runs back
+    assert all(e is not None for e in errors)        # ... and they stay failed runs
+
+
+def test_vnpay_answer_is_an_ok_run(env, monkeypatch):
+    env.answers = [answer(env.txn, status="01")]     # a real answer: not paid yet
+    assert reconcile_runs(monkeypatch, 3) == [None, None, None] and len(env.calls) == 1
+
+
 # ---- create a new pay link (Q3)
 @pytest.fixture
 def client(env):

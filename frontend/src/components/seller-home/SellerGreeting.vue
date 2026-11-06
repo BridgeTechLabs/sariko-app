@@ -3,6 +3,7 @@ import { User } from 'lucide-vue-next';
 import { mapState } from 'pinia';
 import { useAuthStore } from '@/stores/auth/authStore';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
+import { vnWeekdayKey } from '@/utils/vnTime';
 
 // Orders that still need the seller after closing: closing only stops new same-day orders
 const ACTIVE_STATUSES = ['pending', 'confirmed', 'ready', 'delivery_failed']
@@ -16,11 +17,6 @@ export default {
         return {
             now: new Date(),
             ticker: null,
-            hoursDialog: false,
-            allDay: true,
-            draftOpen: '10:00',
-            draftClose: '20:00',
-            savingHours: false,
         }
     },
 
@@ -32,10 +28,12 @@ export default {
             return this.sellerInfo?.is_open !== false
         },
 
-        // "10:00–20:00", or null when open all day
+        // Today's hours (Vietnam time): "Today 10:00–20:00", "Closed today", or all day
         hoursText() {
-            const o = this.sellerInfo?.opening_time, c = this.sellerInfo?.closing_time
-            return o && c ? `${o.slice(0, 5)}–${c.slice(0, 5)}` : null
+            const week = this.sellerInfo?.weekly_hours
+            if (!week) return this.$t('seller_home.hours_all_day')
+            const today = week[vnWeekdayKey()]
+            return today ? this.$t('seller_home.hours_today', { open: today.open, close: today.close }) : this.$t('seller_home.hours_today_off')
         },
 
         // Switch on but outside the hours: buyers see the store as closed
@@ -93,26 +91,6 @@ export default {
     },
 
     methods: {
-        openHoursDialog() {
-            this.allDay = !this.hoursText
-            this.draftOpen = this.sellerInfo?.opening_time?.slice(0, 5) || '10:00'
-            this.draftClose = this.sellerInfo?.closing_time?.slice(0, 5) || '20:00'
-            this.hoursDialog = true
-        },
-
-        async saveHours() {
-            this.savingHours = true
-            try {
-                await useDashboardStore().setStoreHours(this.allDay ? null : this.draftOpen, this.allDay ? null : this.draftClose)
-                this.hoursDialog = false
-            } catch (e) {
-                console.error('SellerGreeting - saveHours -', e)
-                this.$q.notify({ classes: 'quasar-notify-negative', message: this.$t('common.toast_update_failed'), position: 'bottom' })
-            } finally {
-                this.savingHours = false
-            }
-        },
-
         async onToggleOpen(open) {
             if (!open && this.activeOrderCount) {
                 const confirmed = await new Promise(resolve => {
@@ -147,26 +125,6 @@ export default {
                 <span class="time-text">{{ timeText }}</span>
             </div>
             <div v-if="outsideHours" class="hours-hint">{{ $t('seller_home.hours_outside_hint') }}</div>
-
-            <q-dialog v-model="hoursDialog">
-                <q-card dark class="hours-dialog">
-                    <q-card-section class="text-subtitle1">{{ $t('seller_home.hours_label') }}</q-card-section>
-                    <q-card-section>
-                        <q-toggle v-model="allDay" :label="$t('seller_home.hours_all_day')" color="positive" dense />
-                        <div v-if="!allDay" class="hours-inputs">
-                            <label>{{ $t('seller_home.hours_open_at') }} <input v-model="draftOpen" type="time" required></label>
-                            <label>{{ $t('seller_home.hours_close_at') }} <input v-model="draftClose" type="time" required></label>
-                            <div class="hours-note">{{ $t('seller_home.hours_overnight_note') }}</div>
-                        </div>
-                    </q-card-section>
-                    <q-card-actions align="right">
-                        <q-btn flat no-caps :label="$t('common.button_label_cancel')" v-close-popup />
-                        <q-btn unelevated no-caps color="positive" :loading="savingHours"
-                            :disable="!allDay && (!draftOpen || !draftClose)"
-                            :label="$t('common.button_label_save')" @click="saveHours" />
-                    </q-card-actions>
-                </q-card>
-            </q-dialog>
         </div>
 
         <!-- Right column like the buyer header's .user-column: avatar, open switch, hours -->
@@ -191,8 +149,8 @@ export default {
                 class="open-toggle"
                 @update:model-value="onToggleOpen"
             />
-            <button v-if="sellerInfo" class="hours-row" :aria-label="$t('seller_home.hours_edit')" @click="openHoursDialog">
-                {{ hoursText || $t('seller_home.hours_all_day') }}
+            <button v-if="sellerInfo" class="hours-row" :aria-label="$t('seller_home.hours_edit')" @click="$router.push({ name: 'seller-opening-hours' })">
+                {{ hoursText }}
             </button>
         </div>
     </div>
@@ -315,37 +273,5 @@ export default {
     margin-top: 4px;
     font-size: 12px;
     color: #f5A623;
-}
-
-.hours-dialog {
-    min-width: 280px;
-}
-
-.hours-inputs {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-top: 14px;
-
-    label {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-    }
-
-    input {
-        background: transparent;
-        color: inherit;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        border-radius: 8px;
-        padding: 6px 8px;
-        color-scheme: dark;
-    }
-}
-
-.hours-note {
-    font-size: 11px;
-    opacity: 0.6;
 }
 </style>

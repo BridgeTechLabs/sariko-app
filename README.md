@@ -101,7 +101,7 @@ sariko-app/
 │   │   ├── schemas/            # Pydantic request/response models
 │   │   ├── core/               # auth.py (JWKS verify), phone, display_name
 │   │   ├── clients/            # supabase.py
-│   │   ├── services/           # lalamove_service, supabase_realtime
+│   │   ├── services/           # lalamove_service
 │   │   ├── utils/              # pricing, storage, image_compressor
 │   │   ├── sql/                # Schema — see sql/README.md
 │   │   └── envs/.env.example
