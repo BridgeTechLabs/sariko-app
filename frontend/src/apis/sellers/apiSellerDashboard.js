@@ -12,9 +12,9 @@ export const apiSellerDashboard = {
         return response.data
     },
 
-    // "HH:MM" strings, or both null for open all day
-    setStoreHours: async (openingTime, closingTime) => {
-        const response = await apiClient.patch('/v1/sellers/me/hours', { opening_time: openingTime, closing_time: closingTime })
+    // { "1".."7": { open: "HH:MM", close: "HH:MM" } | null (day off) }, or null for open all day
+    setStoreHours: async (weeklyHours) => {
+        const response = await apiClient.patch('/v1/sellers/me/hours', { weekly_hours: weeklyHours })
         return response.data
     },
 

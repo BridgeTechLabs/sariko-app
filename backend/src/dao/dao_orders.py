@@ -317,7 +317,7 @@ class DAOOrders(DAOBase):
         try:
             result = self._supabase_client.table(self._table_name) \
                 .select("id, seller_user_id, total_amount, payment_status, transaction_ref, ipn_data, payment_create_date, paid_at, "
-                        "seller_profiles(is_open, opening_time, closing_time, opened_at)") \
+                        "seller_profiles(id, is_open, weekly_hours, opened_at)") \
                 .eq("status", "pending") \
                 .eq("payment_status", "paid") \
                 .lte("paid_at", paid_before.isoformat()) \

@@ -9,7 +9,7 @@ import pytest
 from apis import sellers, users
 from core.sariko_cache import cache
 
-SELLER = {"id": "s1", "user_id": "u1", "is_open": True, "opening_time": None, "closing_time": None,
+SELLER = {"id": "s1", "user_id": "u1", "is_open": True, "weekly_hours": None,
           "avatar_url": "https://img/a.jpg", "phone": "+84901234567"}
 VALIDATION = {"detail", "errors"}   # main.validation_exception_handler
 
@@ -127,7 +127,6 @@ def test_users_push_subscription_only_push_services(api, monkeypatch, endpoint):
                    "then drop this mark (README PHÁT HIỆN)")
 @pytest.mark.parametrize("router,method,path,body", [
     ("users", "post", "/users/me/push-subscriptions", {"endpoint": "https://evil.example/x", "keys": {"p256dh": "p", "auth": "a"}}),
-    ("sellers", "patch", "/sellers/me/hours", {"opening_time": "09:00"}),
 ])
 def test_custom_validator_errors_should_be_422(api, profiles, router, method, path, body):
     r = api({"users": users, "sellers": sellers}[router].router).request(method.upper(), path, json=body)
@@ -186,7 +185,7 @@ def test_sellers_open_switch(api, profiles):
 
 
 @pytest.mark.parametrize("path,body", [("/sellers/me/open", {"is_open": True}),
-                                       ("/sellers/me/hours", {"opening_time": "09:00", "closing_time": "20:00"})])
+                                       ("/sellers/me/hours", {"weekly_hours": None})])
 def test_sellers_store_settings_refuse_a_buyer(api, profiles, path, body):
     profiles.profile = None
     r = api(sellers.router).patch(path, json=body)
@@ -194,11 +193,16 @@ def test_sellers_store_settings_refuse_a_buyer(api, profiles, path, body):
 
 
 def test_sellers_hours(api, profiles):
-    r = api(sellers.router).patch("/sellers/me/hours", json={"opening_time": "09:00", "closing_time": "20:00"})
-    assert r.status_code == 200 and set(r.json()) == {"success", "opening_time", "closing_time", "open_now"}
-    assert profiles.updated == [{"opening_time": "09:00:00", "closing_time": "20:00:00"}]
-    r = api(sellers.router).patch("/sellers/me/hours", json={"opening_time": None, "closing_time": None})
-    assert r.json()["opening_time"] is None and r.json()["closing_time"] is None   # all day
+    week = {str(d): {"open": "09:00", "close": "20:00"} for d in range(1, 6)} | {"6": None, "7": None}
+    r = api(sellers.router).patch("/sellers/me/hours", json={"weekly_hours": week})
+    assert r.status_code == 200 and set(r.json()) == {"success", "weekly_hours", "open_now"}
+    assert profiles.updated == [{"weekly_hours": week}]
+    r = api(sellers.router).patch("/sellers/me/hours", json={"weekly_hours": None})
+    assert r.status_code == 200 and r.json()["weekly_hours"] is None   # all day
+    for bad in ({k: v for k, v in week.items() if k != "7"},           # a day missing
+                week | {"1": {"open": "9am", "close": "20:00"}}):      # not a time
+        r = api(sellers.router).patch("/sellers/me/hours", json={"weekly_hours": bad})
+        assert r.status_code == 422 and set(r.json()) == VALIDATION
 
 
 def test_sellers_open_switch_needs_a_bool(api, profiles):
