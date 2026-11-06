@@ -156,9 +156,10 @@ export default {
                     <div class="store-name">
                         <span class="store-name__label">{{ seller?.store_name }}</span>
                         <BadgeCheck v-if="isVerified" :size="18" class="verified-check" />
-                        <q-badge v-if="seller?.is_founding" rounded class="founding">{{ $t('seller_page.founding_seller') }}</q-badge>
                     </div>
                 </div>
+
+                <q-badge v-if="seller?.is_founding" rounded class="founding">{{ $t('seller_page.founding_seller') }}</q-badge>
 
                 <div v-if="seller && !isOpen" class="closed-notice">{{ $t('seller_page.closed_notice') }}</div>
 
@@ -301,6 +302,7 @@ export default {
 
 /* Row 1: name + status */
 .name-row {
+    align-self: stretch;         /* full card width, so a long name ellipsizes instead of running off the edge */
     display: flex;
     align-items: center;
     margin-top: 10px;
@@ -414,7 +416,7 @@ export default {
 }
 
 .founding {
-    flex-shrink: 0;
+    margin-top: 6px;
     font-family: $sariko-font-family-secondary;
     font-size: 11px;
     font-weight: 700;

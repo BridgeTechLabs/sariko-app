@@ -35,6 +35,15 @@ def _invalidate_seller_orders(seller_id: Optional[str]) -> None:
         cache.invalidate(seller_orders_key(seller_id))
 
 
+def _with_preorder_days(order: dict) -> dict:
+    """Pre-order days of a buyer's order (the buyer UI shows "Scheduled" until the cooking day):
+    the largest preorder_day of its dishes, read live from food_items since orders don't store it.
+    A deleted dish (food_items null) doesn't count; 0 = same-day."""
+    order["preorder_days"] = max(((item.get("food_items") or {}).get("preorder_day") or 0
+                                  for item in order.get("order_items") or []), default=0)
+    return order
+
+
 class DAOOrders(DAOBase):
 
     def __init__(self):
@@ -108,16 +117,13 @@ class DAOOrders(DAOBase):
     def read_orders_by_user_id(self, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), review_stores(id), deliveries(status)") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), review_stores(id), deliveries(status), order_items(food_items(preorder_day))") \
                 .eq("user_id", user_id) \
                 .neq("refunds.reason", "duplicate_payment") \
                 .order("created_at", desc=True) \
                 .execute()
 
-            if result and result.data:
-                return result.data
-
-            return []
+            return [_with_preorder_days(order) for order in result.data] if result and result.data else []
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_orders_by_user_id: {e}")
@@ -127,17 +133,14 @@ class DAOOrders(DAOBase):
     def read_order_by_id(self, order_id: str, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url)), refunds(status)") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url, preorder_day)), refunds(status)") \
                 .eq("id", order_id) \
                 .eq("user_id", user_id) \
                 .neq("refunds.reason", "duplicate_payment") \
                 .maybe_single() \
                 .execute()
 
-            if result and result.data:
-                return result.data
-
-            return None
+            return _with_preorder_days(result.data) if result and result.data else None
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_order_by_id: {e}")

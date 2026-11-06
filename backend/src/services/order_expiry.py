@@ -6,7 +6,6 @@ Runs as a background loop in this process (see lifespan.py). The cancel is
 conditional on the order still being pending, so a seller who acts at the same
 moment wins cleanly, and refunds_order_id_key stops a second refund.
 """
-import asyncio
 import logging
 import math
 from datetime import datetime, timedelta, timezone
@@ -15,7 +14,7 @@ from core.store_hours import confirm_deadline, is_open_now
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_orders import DAOOrders
 from dao.dao_refunds import DAORefunds
-from services import push_service
+from services import job_health, push_service
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +67,5 @@ def expire_unconfirmed_orders(now: datetime = None) -> int:
     return expired
 
 
-async def run_order_expiry(interval_seconds: int = 60):
-    while True:
-        try:
-            # The Supabase client is synchronous: keep it off the event loop.
-            await asyncio.to_thread(expire_unconfirmed_orders)
-        except Exception:
-            logger.exception("[Expiry] run failed")
-        await asyncio.sleep(interval_seconds)
+async def run_order_expiry():
+    await job_health.every("order_expiry", 60, expire_unconfirmed_orders)

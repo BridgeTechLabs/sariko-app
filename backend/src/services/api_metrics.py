@@ -1,9 +1,8 @@
 """T135 (docs/dev/monitoring Q1): how long each API takes. A middleware times every request (except /health) and
 counts it in memory per (method, route pattern, status class); every FLUSH_SECONDS a background loop writes one row
 per group to metrics_api (count, p50 / p95 / max in whole ms) and starts counting again. A failed write is
-logged and that batch dropped: requests never wait on it. No IP, user or query string is kept. Once a day rows older
+logged, that batch dropped and the run marked failed: requests never wait on it. No IP, user or query string is kept. Once a day rows older
 than api_metrics_retention_days are deleted."""
-import asyncio
 import logging
 import math
 import threading
@@ -12,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_api_metrics import DAOApiMetrics
+from services import job_health
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,8 @@ def take(now: datetime = None):
 
 
 def flush(now: datetime = None) -> int:
-    """Write the bucket; on a DB error log it and drop the batch (counting has already started again)."""
+    """Write the bucket; on a DB error log it, drop the batch (counting has already started again) and raise,
+    so the run counts as failed in metrics_job_health."""
     rows = take(now)
     if not rows:
         return 0
@@ -69,7 +70,7 @@ def flush(now: datetime = None) -> int:
         return len(rows)
     except Exception as e:
         logger.error(f"[ApiMetrics] {len(rows)} rows not written, dropped: {e!r}")
-        return 0
+        raise
 
 
 def cleanup(now: datetime = None) -> str:
@@ -80,15 +81,19 @@ def cleanup(now: datetime = None) -> str:
     return cutoff
 
 
+_last_cleanup = None
+
+
+def flush_and_cleanup() -> None:
+    """One run: write the bucket, and once a day delete old rows."""
+    global _last_cleanup
+    flush()
+    today = datetime.now(timezone.utc).date()
+    if _last_cleanup != today:
+        cleanup()
+        _last_cleanup = today
+
+
 async def run_api_metrics():
-    last_cleanup = None
-    while True:
-        await asyncio.sleep(FLUSH_SECONDS)
-        try:
-            await asyncio.to_thread(flush)
-            today = datetime.now(timezone.utc).date()
-            if last_cleanup != today:
-                await asyncio.to_thread(cleanup)
-                last_cleanup = today
-        except Exception:
-            logger.exception("[ApiMetrics] run failed")
+    # reset: while paused nothing is kept, and the first bucket after start / resume is one full FLUSH_SECONDS
+    await job_health.every("api_metrics", FLUSH_SECONDS, flush_and_cleanup, reset=take)
