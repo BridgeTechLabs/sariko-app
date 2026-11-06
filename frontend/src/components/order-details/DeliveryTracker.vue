@@ -2,6 +2,8 @@
 import { Bike, Phone, ExternalLink, Loader, Package, MapPin, CircleCheck, ChefHat } from 'lucide-vue-next';
 import { mapState } from 'pinia';
 import { useDeliveryStore } from '@/stores/delivery/deliveryStore';
+import { useOrderStore } from '@/stores/order/orderStore.js';
+import { isScheduled } from '@/utils/orderStage';
 
 const STEPS = [
     { key: 'PREPARING', icon: 'ChefHat' },
@@ -35,9 +37,10 @@ export default {
             return idx >= 0 ? idx : 0
         },
         steps() {
+            const scheduled = isScheduled(useOrderStore().currentOrder)
             return STEPS.map((step, i) => ({
                 ...step,
-                label: this.$t(`delivery_tracker.status_${step.key}`),
+                label: this.$t(`delivery_tracker.status_${scheduled && i === 0 ? 'SCHEDULED' : step.key}`),
                 active: i <= this.currentStepIndex,
                 current: i === this.currentStepIndex,
             }))

@@ -1,6 +1,7 @@
 <script>
 import { useOrderStore } from '@/stores/order/orderStore.js';
 import { orderCode } from '@/utils/orderCode';
+import { isScheduled } from '@/utils/orderStage';
 
 export default {
     computed: {
@@ -19,6 +20,7 @@ export default {
             return new Intl.NumberFormat('vi-VN').format(this.order.total_amount) + ' ₫'
         },
         statusLabel() {
+            if (isScheduled(this.order)) return this.$t('order_detail.status_scheduled')
             const map = {
                 pending: 'status_pending',
                 confirmed: 'status_confirmed',
