@@ -1,7 +1,7 @@
 """T135 (docs/dev/monitoring Q1): how long each API takes. A middleware times every request (except /health) and
 counts it in memory per (method, route pattern, status class); every FLUSH_SECONDS a background loop writes one row
 per group to metrics_api (count, p50 / p95 / max in whole ms) and starts counting again. A failed write is
-logged and that batch dropped: requests never wait on it. No IP, user or query string is kept. Once a day rows older
+logged, that batch dropped and the run marked failed: requests never wait on it. No IP, user or query string is kept. Once a day rows older
 than api_metrics_retention_days are deleted."""
 import asyncio
 import logging
@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_api_metrics import DAOApiMetrics
+from services import job_health
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,8 @@ def take(now: datetime = None):
 
 
 def flush(now: datetime = None) -> int:
-    """Write the bucket; on a DB error log it and drop the batch (counting has already started again)."""
+    """Write the bucket; on a DB error log it, drop the batch (counting has already started again) and raise,
+    so the run counts as failed in metrics_job_health."""
     rows = take(now)
     if not rows:
         return 0
@@ -69,7 +71,7 @@ def flush(now: datetime = None) -> int:
         return len(rows)
     except Exception as e:
         logger.error(f"[ApiMetrics] {len(rows)} rows not written, dropped: {e!r}")
-        return 0
+        raise
 
 
 def cleanup(now: datetime = None) -> str:
@@ -84,11 +86,14 @@ async def run_api_metrics():
     last_cleanup = None
     while True:
         await asyncio.sleep(FLUSH_SECONDS)
+        error = None
         try:
             await asyncio.to_thread(flush)
             today = datetime.now(timezone.utc).date()
             if last_cleanup != today:
                 await asyncio.to_thread(cleanup)
                 last_cleanup = today
-        except Exception:
+        except Exception as e:
             logger.exception("[ApiMetrics] run failed")
+            error = e
+        await asyncio.to_thread(job_health.record, "api_metrics", FLUSH_SECONDS, error)

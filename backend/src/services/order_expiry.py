@@ -15,7 +15,7 @@ from core.store_hours import confirm_deadline, is_open_now
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_orders import DAOOrders
 from dao.dao_refunds import DAORefunds
-from services import push_service
+from services import job_health, push_service
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +70,12 @@ def expire_unconfirmed_orders(now: datetime = None) -> int:
 
 async def run_order_expiry(interval_seconds: int = 60):
     while True:
+        error = None
         try:
             # The Supabase client is synchronous: keep it off the event loop.
             await asyncio.to_thread(expire_unconfirmed_orders)
-        except Exception:
+        except Exception as e:
             logger.exception("[Expiry] run failed")
+            error = e
+        await asyncio.to_thread(job_health.record, "order_expiry", interval_seconds, error)
         await asyncio.sleep(interval_seconds)

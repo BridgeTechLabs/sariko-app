@@ -184,6 +184,53 @@ def test_one_asker_at_a_time(env):
     assert env.calls == []
 
 
+# ---- job health (docs/dev/20261106-job-health QA 1-app): VNPay down must reach 3 failed runs in a row
+def run_reconcile_loop(monkeypatch, rounds):
+    """The real loop over the real reconcile_payments, `rounds` runs 2 minutes apart; returns what record() got."""
+    import asyncio
+    from services import job_health
+    clock, records = [NOW], []
+
+    class Stop(Exception):
+        pass
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock[0]
+
+    async def to_thread(fn, *args):
+        return fn(*args)
+
+    async def sleep(seconds):
+        clock[0] += timedelta(seconds=seconds)
+        if len(records) >= rounds:
+            raise Stop
+
+    monkeypatch.setattr(payment_reconcile, "datetime", Clock)
+    monkeypatch.setattr(asyncio, "to_thread", to_thread)
+    monkeypatch.setattr(asyncio, "sleep", sleep)
+    monkeypatch.setattr(job_health, "record", lambda job, interval, error=None: records.append(error))
+    with pytest.raises(Stop):
+        asyncio.run(payment_reconcile.run_payment_reconcile())
+    return records
+
+
+def test_vnpay_down_every_run_fails(env, monkeypatch):
+    def down(payload):
+        env.calls.append(payload)
+        raise ConnectionError("VNPay unreachable")
+    monkeypatch.setattr(vnpay_query, "_post", down)
+    records = run_reconcile_loop(monkeypatch, 3)
+    assert len(env.calls) == 1                       # asked once, the 15-minute claim holds the next runs back
+    assert all(e is not None for e in records)       # ... and they stay failed runs
+
+
+def test_vnpay_answer_is_an_ok_run(env, monkeypatch):
+    env.answers = [answer(env.txn, status="01")]     # a real answer: not paid yet
+    assert run_reconcile_loop(monkeypatch, 3) == [None, None, None] and len(env.calls) == 1
+
+
 # ---- create a new pay link (Q3)
 @pytest.fixture
 def client(env):
