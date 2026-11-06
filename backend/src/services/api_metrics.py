@@ -3,7 +3,6 @@ counts it in memory per (method, route pattern, status class); every FLUSH_SECON
 per group to metrics_api (count, p50 / p95 / max in whole ms) and starts counting again. A failed write is
 logged, that batch dropped and the run marked failed: requests never wait on it. No IP, user or query string is kept. Once a day rows older
 than api_metrics_retention_days are deleted."""
-import asyncio
 import logging
 import math
 import threading
@@ -82,18 +81,19 @@ def cleanup(now: datetime = None) -> str:
     return cutoff
 
 
+_last_cleanup = None
+
+
+def flush_and_cleanup() -> None:
+    """One run: write the bucket, and once a day delete old rows."""
+    global _last_cleanup
+    flush()
+    today = datetime.now(timezone.utc).date()
+    if _last_cleanup != today:
+        cleanup()
+        _last_cleanup = today
+
+
 async def run_api_metrics():
-    last_cleanup = None
-    while True:
-        await asyncio.sleep(FLUSH_SECONDS)
-        error = None
-        try:
-            await asyncio.to_thread(flush)
-            today = datetime.now(timezone.utc).date()
-            if last_cleanup != today:
-                await asyncio.to_thread(cleanup)
-                last_cleanup = today
-        except Exception as e:
-            logger.exception("[ApiMetrics] run failed")
-            error = e
-        await asyncio.to_thread(job_health.record, "api_metrics", FLUSH_SECONDS, error)
+    # reset: while paused nothing is kept, and the first bucket after start / resume is one full FLUSH_SECONDS
+    await job_health.every("api_metrics", FLUSH_SECONDS, flush_and_cleanup, reset=take)

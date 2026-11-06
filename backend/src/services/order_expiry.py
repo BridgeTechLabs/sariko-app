@@ -6,7 +6,6 @@ Runs as a background loop in this process (see lifespan.py). The cancel is
 conditional on the order still being pending, so a seller who acts at the same
 moment wins cleanly, and refunds_order_id_key stops a second refund.
 """
-import asyncio
 import logging
 import math
 from datetime import datetime, timedelta, timezone
@@ -68,14 +67,5 @@ def expire_unconfirmed_orders(now: datetime = None) -> int:
     return expired
 
 
-async def run_order_expiry(interval_seconds: int = 60):
-    while True:
-        error = None
-        try:
-            # The Supabase client is synchronous: keep it off the event loop.
-            await asyncio.to_thread(expire_unconfirmed_orders)
-        except Exception as e:
-            logger.exception("[Expiry] run failed")
-            error = e
-        await asyncio.to_thread(job_health.record, "order_expiry", interval_seconds, error)
-        await asyncio.sleep(interval_seconds)
+async def run_order_expiry():
+    await job_health.every("order_expiry", 60, expire_unconfirmed_orders)

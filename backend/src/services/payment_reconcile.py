@@ -7,7 +7,6 @@ per link, never an order with a refund, never a link the IPN already answered).
   failed -> buyer push "not completed, you can pay again", once per link; payment_status stays 'pending'
   else   -> ask again later
 Runs as a background loop in this process (lifespan.py), like order_expiry."""
-import asyncio
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -55,21 +54,20 @@ def reconcile_payments(now: datetime = None) -> dict:
     return counts
 
 
-async def run_payment_reconcile(interval_seconds: int = 120):
-    # VNPay is asked at most once per 15 minutes per link, so the runs in between keep the result of the last run
-    # that asked: every ask failing (VNPay unreachable) stays a failed run until an ask works or no order is waiting.
-    vnpay_error = None
-    while True:
-        error = None
-        try:
-            # The Supabase client and requests are synchronous: keep them off the event loop.
-            counts = await asyncio.to_thread(reconcile_payments)
-            if counts["asked"] or not counts["tried"]:
-                failed = counts["asked"] and counts["errors"] == counts["asked"]
-                vnpay_error = RuntimeError(f"all {counts['asked']} VNPay checks failed") if failed else None
-            error = vnpay_error
-        except Exception as e:
-            logger.exception("[Reconcile] run failed")
-            error = e
-        await asyncio.to_thread(job_health.record, "payment_reconcile", interval_seconds, error)
-        await asyncio.sleep(interval_seconds)
+# VNPay is asked at most once per 15 minutes per link, so the runs in between keep the result of the last run that
+# asked: every ask failing (VNPay unreachable) stays a failed run until an ask works or no order is waiting.
+_vnpay_error = None
+
+
+def reconcile_run():
+    global _vnpay_error
+    counts = reconcile_payments()
+    if counts["asked"] or not counts["tried"]:
+        failed = counts["asked"] and counts["errors"] == counts["asked"]
+        _vnpay_error = f"all {counts['asked']} VNPay checks failed" if failed else None
+    if _vnpay_error:
+        raise RuntimeError(_vnpay_error)
+
+
+async def run_payment_reconcile():
+    await job_health.every("payment_reconcile", 120, reconcile_run)
