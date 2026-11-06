@@ -93,17 +93,17 @@ def _with_deadlines(orders: list, seller: dict) -> list:
     pending (paid): when it auto-cancels; None while the store is closed, that clock is paused.
     confirmed: when the buyer may cancel it for a full refund (R4)."""
     now = datetime.now(timezone.utc)
-    opening, closing = seller.get("opening_time"), seller.get("closing_time")
+    hours = seller.get("weekly_hours")
     window = None
     for order in orders:
         order["deadline"] = None
         if (order["status"] == "pending" and order.get("payment_status") == "paid" and order.get("paid_at")
-                and is_open_now(seller.get("is_open"), opening, closing, now)):
+                and is_open_now(seller.get("is_open"), hours, now, seller.get("id"))):
             window = window or confirm_window()
             opened_at = seller.get("opened_at")
-            order["deadline"] = confirm_deadline(datetime.fromisoformat(order["paid_at"]), opening, closing,
+            order["deadline"] = confirm_deadline(datetime.fromisoformat(order["paid_at"]), hours,
                                                  datetime.fromisoformat(opened_at) if opened_at else None,
-                                                 now, window).isoformat()
+                                                 now, window, seller.get("id")).isoformat()
         elif order["status"] == "confirmed" and order.get("status_changed_at"):
             order["deadline"] = cancel_after(order).isoformat()
     return orders
@@ -128,9 +128,8 @@ def get_seller_info(user=Depends(verify_token)):
             "has_address": bool(profile.get("address") and profile.get("lat") and profile.get("lon")),
             "has_phone": bool(profile.get("phone")),
             "is_open": profile.get("is_open") is not False,   # the switch itself
-            "opening_time": profile.get("opening_time"),
-            "closing_time": profile.get("closing_time"),
-            "open_now": is_open_now(profile.get("is_open"), profile.get("opening_time"), profile.get("closing_time")),
+            "weekly_hours": profile.get("weekly_hours"),
+            "open_now": is_open_now(profile.get("is_open"), profile.get("weekly_hours"), seller_id=profile["id"]),
             "rating_avg": profile.get("rating_avg"),
             "rating_count": profile.get("rating_count") or 0,
         }
@@ -152,7 +151,7 @@ def set_store_open(body: Schema.RequestSetStoreOpen, user=Depends(verify_token))
         return {
             "success": True,
             "is_open": updated["is_open"],
-            "open_now": is_open_now(updated["is_open"], updated.get("opening_time"), updated.get("closing_time")),
+            "open_now": is_open_now(updated["is_open"], updated.get("weekly_hours"), seller_id=updated.get("id")),
         }
     except HTTPException:
         raise
@@ -163,20 +162,15 @@ def set_store_open(body: Schema.RequestSetStoreOpen, user=Depends(verify_token))
 
 @router.patch("/me/hours")
 def set_store_hours(body: Schema.RequestSetStoreHours, user=Depends(verify_token)):
-    """Daily opening hours (same every day); both null = all day. The open switch still wins."""
+    """Weekly opening hours, one slot per day (or a day off); null = all day. The open switch still wins."""
     try:
-        fields = {
-            "opening_time": body.opening_time.isoformat() if body.opening_time else None,
-            "closing_time": body.closing_time.isoformat() if body.closing_time else None,
-        }
-        updated = DAOSellerProfiles().update_seller_profile_info(user["id"], fields)
+        updated = DAOSellerProfiles().update_seller_profile_info(user["id"], {"weekly_hours": body.as_json()})
         if not updated:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not a seller")
         return {
             "success": True,
-            "opening_time": updated["opening_time"],
-            "closing_time": updated["closing_time"],
-            "open_now": is_open_now(updated["is_open"], updated["opening_time"], updated["closing_time"]),
+            "weekly_hours": updated["weekly_hours"],
+            "open_now": is_open_now(updated["is_open"], updated["weekly_hours"], seller_id=updated.get("id")),
         }
     except HTTPException:
         raise

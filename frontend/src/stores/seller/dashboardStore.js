@@ -80,8 +80,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
                     has_address: res.has_address,
                     has_phone: res.has_phone,
                     is_open: res.is_open,          // the switch
-                    opening_time: res.opening_time,
-                    closing_time: res.closing_time,
+                    weekly_hours: res.weekly_hours,  // null = all day
                     open_now: res.open_now,        // switch + hours: what buyers see
                     rating_avg: res.rating_avg,
                     rating_count: res.rating_count,
@@ -96,11 +95,9 @@ export const useDashboardStore = defineStore("dashboardStore", {
             if (this.sellerInfo) Object.assign(this.sellerInfo, { is_open: res.is_open, open_now: res.open_now })
         },
 
-        async setStoreHours(openingTime, closingTime) {
-            const res = await apiSellerDashboard.setStoreHours(openingTime, closingTime)
-            if (this.sellerInfo) Object.assign(this.sellerInfo, {
-                opening_time: res.opening_time, closing_time: res.closing_time, open_now: res.open_now,
-            })
+        async setStoreHours(weeklyHours) {
+            const res = await apiSellerDashboard.setStoreHours(weeklyHours)
+            if (this.sellerInfo) Object.assign(this.sellerInfo, { weekly_hours: res.weekly_hours, open_now: res.open_now })
         },
 
         async fetchOrders({ silent = false } = {}) {

@@ -259,7 +259,17 @@
         "aria_search": "Tìm kiếm",
         "aria_share": "Chia sẻ",
         "aria_favorite": "Lưu vào yêu thích",
-        "link_copied": "Đã sao chép liên kết"
+        "link_copied": "Đã sao chép liên kết",
+        "aria_info": "Thông tin quán",
+        "aria_close": "Đóng",
+        "info_no_address": "Chưa có địa chỉ",
+        "info_hours": "Giờ mở cửa",
+        "info_open_now": "Đang mở",
+        "info_closed_now": "Đang đóng",
+        "info_today": "Hôm nay",
+        "info_day_off": "Nghỉ",
+        "info_all_day": "Mở cả ngày",
+        "info_preorder_note": "Ngày nghỉ hoặc ngoài giờ: vẫn đặt trước được món đặt trước."
     },
     "seller_card": {
         "closed": "Đã đóng",
@@ -596,12 +606,8 @@
         "deadline_auto_cancel_now": "Sắp tự hủy",
         "deadline_buyer_cancel": "Khách được hủy sau {wait}",
         "deadline_buyer_can_cancel": "Khách đã có thể hủy và được hoàn tiền",
-        "hours_label": "Giờ mở cửa",
         "hours_all_day": "Cả ngày",
         "hours_edit": "Sửa",
-        "hours_open_at": "Mở lúc",
-        "hours_close_at": "Đóng lúc",
-        "hours_overnight_note": "Áp dụng mọi ngày. Đóng sớm hơn giờ mở = mở qua đêm (VD 18:00–02:00).",
         "hours_outside_hint": "Ngoài giờ mở cửa: khách đang thấy cửa hàng Đã đóng (vẫn nhận đặt trước).",
         "store_open": "Đang mở cửa",
         "store_closed": "Đã đóng cửa",
@@ -656,7 +662,9 @@
         "tab_upcoming": "Sắp tới",
         "order_total": "Tổng",
         "empty_tab_upcoming": "Chưa có đơn đặt trước",
-        "empty_tab_upcoming_sub": "Đơn đặt trước của khách sẽ hiển thị ở đây."
+        "empty_tab_upcoming_sub": "Đơn đặt trước của khách sẽ hiển thị ở đây.",
+        "hours_today": "Hôm nay {open}–{close}",
+        "hours_today_off": "Hôm nay nghỉ"
     },
     "seller_orders": {
         "customer_fallback": "Khách hàng",
@@ -1259,6 +1267,25 @@
         "error_missing_group": "Vui lòng điền thêm: {items}",
         "error_location": "Chọn địa chỉ lấy hàng trên bản đồ",
         "error_save": "Không lưu được. Kiểm tra kết nối rồi thử lại."
+    },
+    "seller_hours": {
+        "page_title": "Giờ mở cửa",
+        "mode_weekly": "Theo lịch tuần",
+        "mode_all_day": "Mở cả ngày, mọi ngày",
+        "all_day_note": "Quán nhận đơn giao ngay bất cứ giờ nào, mọi ngày trong tuần, miễn là nút Mở trên trang chủ đang bật.",
+        "today": "Hôm nay",
+        "overnight": "qua đêm",
+        "open": "Mở",
+        "day_off": "Nghỉ",
+        "day_off_note": "Nghỉ cả ngày",
+        "aria_opens": "{day} giờ mở",
+        "aria_closes": "{day} giờ đóng",
+        "copy_weekdays": "Áp dụng cho Thứ Hai – Thứ Sáu",
+        "copy_all": "Áp dụng cho mọi ngày",
+        "hint": "Giờ đóng sớm hơn giờ mở nghĩa là quán mở qua nửa đêm (ví dụ 18:00 – 02:00). Ngày nghỉ: khách vẫn đặt trước được món đặt trước, chỉ không đặt giao ngay.",
+        "error_same": "Giờ mở và giờ đóng phải khác nhau",
+        "error_missing": "Chọn đủ giờ mở và giờ đóng",
+        "saved": "Đã lưu giờ mở cửa"
     },
     "complaints": {
         "menu_label": "Khiếu nại của tôi",

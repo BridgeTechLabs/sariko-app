@@ -20,7 +20,7 @@ def fakes(monkeypatch):
 
 
 NOW = datetime.now(timezone.utc)
-OPEN = {"is_open": True, "opening_time": None, "closing_time": None, "opened_at": None}
+OPEN = {"is_open": True, "weekly_hours": None, "opened_at": None}
 
 
 def iso(dt):

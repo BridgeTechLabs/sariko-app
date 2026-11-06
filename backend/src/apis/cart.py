@@ -76,7 +76,7 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
     # Coming soon (or active without pickup coordinates): no menu to order from yet
     if gate and with_buyer_status(dict(seller)).get("status") != "active":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This store is not taking orders yet")
-    if gate and is_same_day(gate.get("preorder_day")) and not is_open_now(seller.get("is_open"), seller.get("opening_time"), seller.get("closing_time")):
+    if gate and is_same_day(gate.get("preorder_day")) and not is_open_now(seller.get("is_open"), seller.get("weekly_hours"), seller_id=request.seller_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=STORE_CLOSED_DETAIL)
     # T134: today's portions of a same-day dish (a pre-order dish is checked for its delivery day at POST /orders)
     if gate and gate.get("daily_portions") and is_same_day(gate.get("preorder_day")):

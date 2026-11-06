@@ -5,11 +5,12 @@ import { User, Search, Share2, Heart, Star, BadgeCheck, MessageCircle, ArrowLeft
 import { useSellerStore } from '@/stores/seller/sellerStore';
 import { useAuthStore } from '@/stores/auth/authStore';
 import { useChatStore } from '@/stores/chat/chatStore';
+import SellerInfoSheet from './SellerInfoSheet.vue';
 
 const DEFAULT_COVER = '/images/defaullt-kitchen-bg.jpg';
 
 export default {
-    components: { User, Search, Share2, Heart, Star, BadgeCheck, MessageCircle, ArrowLeft },
+    components: { User, Search, Share2, Heart, Star, BadgeCheck, MessageCircle, ArrowLeft, SellerInfoSheet },
 
     data() {
         return {
@@ -37,11 +38,6 @@ export default {
             const myProfileId = auth.sellerId || auth.user?.sellerId;
             return !!myProfileId && myProfileId === this.seller?.id;
         },
-        hoursLabel() {
-            const o = this.fmtTime(this.seller?.opening_time);
-            const c = this.fmtTime(this.seller?.closing_time);
-            return (o && c) ? `${o}–${c}` : null;
-        },
         distanceLabel() {
             const auth = useAuthStore();
             const raw = [auth.inputLat, auth.inputLon, this.seller?.lat, this.seller?.lon];
@@ -62,12 +58,6 @@ export default {
     },
 
     methods: {
-        fmtTime(t) {
-            if (!t) return null;
-            const [h, m] = String(t).split(':');
-            if (h == null || m == null) return null;
-            return `${Number(h)}:${m}`;
-        },
         goBack() {
             if (window.history.length > 1) this.$router.back();
             else this.$router.push({ name: 'home' });
@@ -185,6 +175,7 @@ export default {
                         </template>
                     </div>
 
+                    <SellerInfoSheet />
                     <button v-if="!isOwnStore" class="chat-btn" :disabled="isOpeningChat" @click="chatWithSeller">
                         <q-spinner-dots v-if="isOpeningChat" color="dark" size="1.4em" />
                         <template v-else>

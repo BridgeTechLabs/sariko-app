@@ -46,10 +46,10 @@ def expire_unconfirmed_orders(now: datetime = None) -> int:
     _reminded.intersection_update(order["id"] for order in waiting)  # forget orders that moved on
     for order in waiting:
         seller = order.get("seller_profiles") or {}
-        opening, closing = seller.get("opening_time"), seller.get("closing_time")
-        if not is_open_now(seller.get("is_open"), opening, closing, now):
+        hours = seller.get("weekly_hours")
+        if not is_open_now(seller.get("is_open"), hours, now, seller.get("id")):
             continue
-        deadline = confirm_deadline(_ts(order["paid_at"]), opening, closing, _ts(seller.get("opened_at")), now, window)
+        deadline = confirm_deadline(_ts(order["paid_at"]), hours, _ts(seller.get("opened_at")), now, window, seller.get("id"))
         if now < deadline:
             if now >= deadline - reminder and order["id"] not in _reminded:
                 _reminded.add(order["id"])

@@ -35,11 +35,11 @@ def add_to_cart(monkeypatch):
     monkeypatch.setattr("apis.cart.DAOCartItems", _FakeCartItems)
     monkeypatch.setattr("apis.orders.DAOAdminConfig", lambda: type("S", (), {"get_positive_int": lambda self, k, d: d})())
 
-    def call(preorder_day, is_open, opening_time=None, closing_time=None, is_available=True):
+    def call(preorder_day, is_open, weekly_hours=None, is_available=True):
         _FakeCartItems.added = []
         gate = {"is_available": is_available, "preorder_day": preorder_day,
                 "seller_profiles": {"status": "active", "lat": 10.77, "lon": 106.70,
-                                    "is_open": is_open, "opening_time": opening_time, "closing_time": closing_time}}
+                                    "is_open": is_open, "weekly_hours": weekly_hours}}
         monkeypatch.setattr("apis.cart.DAOFoodItems", lambda: type("D", (), {"read_order_gate": lambda self, i: gate})())
         res = client.post("/cart/add", json={"seller_id": "seller-1", "food_item_id": "food-1", "quantity": 1})
         return res, _FakeCartItems.added
@@ -74,16 +74,36 @@ def test_order_create_flags_only_same_day_items():
     assert same_day_names(items) == ["Adobo", "Pancit"]
 
 
+def _week_with_today(today_hours):
+    """Every day open all day (open = close) except today; yesterday too, so nothing runs past midnight."""
+    from datetime import datetime, timedelta
+    from core.store_hours import VN_TZ
+    today = datetime.now(VN_TZ)
+    week = {str(d): {"open": "00:00", "close": "00:00"} for d in range(1, 8)}
+    week[str((today - timedelta(days=1)).isoweekday())] = None
+    week[str(today.isoweekday())] = today_hours
+    return week
+
+
 def test_switch_on_but_outside_hours_blocks_same_day(add_to_cart):
-    # Hours = a 1-minute window starting 5 min from now, so "now" is outside it
+    # Today's slot = 1 minute starting 5 min from now, so "now" is outside it
     from datetime import datetime, timedelta
     from core.store_hours import VN_TZ
     now = datetime.now(VN_TZ)
-    opens = (now + timedelta(minutes=5)).strftime("%H:%M:00")
-    closes = (now + timedelta(minutes=6)).strftime("%H:%M:00")
-    res, added = add_to_cart(preorder_day=0, is_open=True, opening_time=opens, closing_time=closes)
+    if now.strftime("%H:%M") >= "23:50":
+        pytest.skip("the slot would cross midnight")
+    slot = {"open": (now + timedelta(minutes=5)).strftime("%H:%M"), "close": (now + timedelta(minutes=6)).strftime("%H:%M")}
+    res, added = add_to_cart(preorder_day=0, is_open=True, weekly_hours=_week_with_today(slot))
     assert res.status_code == 400
     assert added == []
+
+
+def test_day_off_blocks_same_day_but_takes_preorders(add_to_cart):
+    week = _week_with_today(None)
+    res, added = add_to_cart(preorder_day=0, is_open=True, weekly_hours=week)
+    assert res.status_code == 400 and added == []
+    res, added = add_to_cart(preorder_day=2, is_open=True, weekly_hours=week)
+    assert res.status_code == 200 and added == ["food-1"]
 
 
 def test_sold_out_dish_blocked_even_when_open(add_to_cart):

@@ -20,7 +20,7 @@ class DAOSellerProfiles(DAOBase):
     def read_founding_sellers(self):
         try:
             query = self._supabase_client.table(self._table_name)
-            query = query.select("id, user_id, store_name, slug, avatar_url, status, is_open, opening_time, closing_time, lat, lon")
+            query = query.select("id, user_id, store_name, slug, avatar_url, status, is_open, weekly_hours, lat, lon")
             query = query.eq("is_listed", True)
             query = query.order("status").order("display_order").order("created_at")
 
@@ -45,7 +45,7 @@ class DAOSellerProfiles(DAOBase):
     def read_seller_by_slug_name(self, slug: str):
         try:
             query = self._supabase_client.table(self._table_name)
-            query = query.select("id, store_name, slug, address, avatar_url, status, is_verified, lat, lon, tier, description, is_open, opening_time, closing_time, rating_avg, rating_count").eq("slug", slug)
+            query = query.select("id, store_name, slug, address, avatar_url, status, is_verified, lat, lon, tier, description, is_open, weekly_hours, rating_avg, rating_count").eq("slug", slug)
             
             query = query.maybe_single()
             result = query.execute()
@@ -67,7 +67,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("id, store_name, slug, avatar_url, address, phone, lat, lon, rating_avg, rating_count, is_open, opening_time, closing_time, opened_at")
+                .select("id, store_name, slug, avatar_url, address, phone, lat, lon, rating_avg, rating_count, is_open, weekly_hours, opened_at")
                 .eq("user_id", user_id)
                 .maybe_single()
                 .execute()
@@ -133,7 +133,7 @@ class DAOSellerProfiles(DAOBase):
 
     def update_seller_profile_info(self, user_id: str, data: dict):
         try:
-            allowed = {"phone", "address", "lat", "lon", "store_name", "is_open", "opening_time", "closing_time"}
+            allowed = {"phone", "address", "lat", "lon", "store_name", "is_open", "weekly_hours"}
             update_fields = {k: v for k, v in data.items() if k in allowed}
             if not update_fields:
                 return None
@@ -183,7 +183,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("user_id, is_open, opening_time, closing_time, address, lat, lon, commission_rate_override, admin_tier_config(commission_rate)")
+                .select("user_id, is_open, weekly_hours, address, lat, lon, commission_rate_override, admin_tier_config(commission_rate)")
                 .eq("id", seller_id)
                 .maybe_single()
                 .execute()
@@ -195,7 +195,7 @@ class DAOSellerProfiles(DAOBase):
             effective_rate = row["commission_rate_override"] if row["commission_rate_override"] is not None else tier_rate
             return {
                 "user_id": row["user_id"],
-                "is_open": is_open_now(row["is_open"], row["opening_time"], row["closing_time"]),
+                "is_open": is_open_now(row["is_open"], row["weekly_hours"], seller_id=seller_id),
                 "commission_rate": Decimal(str(effective_rate)),
                 "address": row["address"],
                 "lat": row["lat"],
