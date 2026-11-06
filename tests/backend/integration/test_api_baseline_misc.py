@@ -201,15 +201,21 @@ def test_chat_pin_as_seller(api, chats):
 
 def test_dev_force_routes(api, monkeypatch):
     log = []
-    monkeypatch.setattr(dev, "DAOOrders", lambda: SimpleNamespace(update_payment_status=lambda o, s: log.append(("pay", o, s)),
-                                                                  update_order_status=lambda o, s: log.append(("status", o, s))))
+    monkeypatch.setattr(dev, "DAOOrders", lambda: SimpleNamespace(
+        update_payment_status=lambda o, s: log.append(("pay", o, s)),
+        update_order_status=lambda o, s, expected_status=None: log.append(("status", o, s, expected_status)),
+        read_order_by_id_raw=lambda o: {"payment_status": "pending", "status": "pending"}))
     c = api(dev.router)
     assert c.patch("/dev/orders/o1/force-pay").json() == {"success": True}
     assert c.patch("/dev/orders/o1/force-unpay").json() == {"success": True}
     assert c.patch("/dev/orders/o1/force-status", json={"status": "ready"}).json() == {"success": True}
-    assert log == [("pay", "o1", "paid"), ("pay", "o1", "pending"), ("status", "o1", "ready")]
+    # "ready" needs payment_status='paid' (orders_paid_before_progress_check), so force-status
+    # marks it paid first; expected_status pins the write to the status just read, so a
+    # sold-out cancellation racing with update_payment_status isn't silently overwritten.
+    assert log == [("pay", "o1", "paid"), ("pay", "o1", "pending"),
+                   ("pay", "o1", "paid"), ("status", "o1", "ready", "pending")]
     r = c.patch("/dev/orders/o1/force-status", json={"status": "delivery_failed"})
-    assert r.status_code == 400 and r.json() == {"detail": "Invalid status"} and len(log) == 3
+    assert r.status_code == 400 and r.json() == {"detail": "Invalid status"} and len(log) == 4
 
 
 @pytest.mark.parametrize("env,mounted", [("local", True), ("dev", True), ("prod", False)])
