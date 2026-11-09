@@ -89,8 +89,12 @@ MESSAGES = {
         "vi": ("Đơn #{code} chưa được nhận", "Còn {minutes} phút trước khi tự hủy. Hãy gọi người bán."),
     },
     "admin_delivery_failed": {
-        "en": ("Order #{code}: delivery failed", "Lalamove could not deliver it. Tap to open the order."),
-        "vi": ("Đơn #{code} giao thất bại", "Lalamove không giao được. Nhấn để mở đơn."),
+        "en": ("Order #{code}: delivery failed", "The delivery company could not deliver it. Tap to open the order."),
+        "vi": ("Đơn #{code} giao thất bại", "Hãng giao hàng không giao được. Nhấn để mở đơn."),
+    },
+    "admin_delivery_wallet_empty": {
+        "en": ("Delivery wallet is empty", "No rider booked for order #{code}. Top up the delivery wallet."),
+        "vi": ("Ví giao hàng hết tiền", "Chưa đặt được xe cho đơn #{code}. Hãy nạp tiền vào ví giao hàng."),
     },
 }
 
@@ -98,7 +102,8 @@ MESSAGES = {
 ZALO_ADMIN = {
     "admin_new_complaint": ("support", "📣 New complaint {code} · {category}"),
     "admin_order_expiring": ("ops", "⏰ Order #{code} not accepted by the seller, auto-cancels in {minutes} min. Call the seller."),
-    "admin_delivery_failed": ("ops", "🚚 Order #{code}: delivery failed, Lalamove could not deliver it."),
+    "admin_delivery_failed": ("ops", "🚚 Order #{code}: delivery failed, the delivery company could not deliver it."),
+    "admin_delivery_wallet_empty": ("ops", "💸 Delivery wallet is empty: no rider booked for order #{code}. Top up the wallet."),
 }
 
 # Complaint types (apis/complaints.py CATEGORIES), same words as the app's complaint form.
@@ -153,7 +158,7 @@ def notify_seller_order_expired(order: dict):
 
 
 def notify_seller_driver_assigned(order: dict):
-    """Seller side: Lalamove assigned a driver (again, if the first one cancelled). Called from the webhook."""
+    """Seller side: the delivery company assigned a driver (again, if the first one cancelled). Called from the webhooks."""
     _send_async(order.get("seller_user_id"), "seller_driver_assigned", f"/seller/orders/{order['id']}")
 
 

@@ -71,7 +71,7 @@ select pg_temp.t_order(:'p4', 2000, p_wh_vat => 0, p_wh_pit => 0) as taken \gset
 update orders set payout_status = 'processing', payout_id = :'other_payout' where id = :'taken';
 select pg_temp.t_order(:'p4', 4000, p_wh_vat => 0, p_wh_pit => 0) as paid_out \gset
 update orders set payout_status = 'paid_out' where id = :'paid_out';
-select pg_temp.t_order(:'p4', 8000, p_paid_at => null, p_wh_vat => 0, p_wh_pit => 0);
+select pg_temp.t_order(:'p4', 8000, p_status => 'pending', p_paid_at => null, p_wh_vat => 0, p_wh_pit => 0);
 select pg_temp.t_order(:'p4', 32000, p_status => 'ready', p_wh_vat => 0, p_wh_pit => 0);
 select pg_temp.t_order(:'p4', 16000, p_wh_vat => 0, p_wh_pit => 0);
 select admin_generate_payout_for_seller(:'p4', '2026-09-01', '2026-09-07');

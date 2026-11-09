@@ -66,7 +66,8 @@ def test_tc3_write_error_drops_the_batch(monkeypatch, client, caplog):  # TC-3
         raise Exception("db down")
     monkeypatch.setattr(api_metrics, "DAOApiMetrics", lambda: type("D", (), {"insert_many": boom})())
     assert client.get("/rest/v1/orders/a1").status_code == 200   # requests never wait on the DB
-    assert api_metrics.flush() == 0
+    with pytest.raises(Exception, match="db down"):               # the run counts as failed (job health)
+        api_metrics.flush()
     assert "1 rows not written, dropped" in caplog.text
     assert api_metrics.take() == []                               # the counters start again from 0
     assert client.get("/rest/v1/orders/a1").status_code == 200

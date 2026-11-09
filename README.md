@@ -12,9 +12,10 @@
 **This repository includes:**
 1. **Buyer App** (`/frontend`) — Vue 3 PWA for browsing, ordering, and payment
 2. **Seller Dashboard** (within buyer app, `/seller/*` routes) — Menu & order management
-3. **Quê Tôi** (`/frontend-quetoi`) — Second-tenant mock clone (Vietnamese community in Seoul)
-4. **Landing page** (`/landing`) — Static marketing site
-5. **Admin Panel** (separate repo) — Seller payouts & marketplace analytics, linked only through the Admin Gateway endpoints
+3. **Landing page** (`/landing`) — Static marketing site
+4. **Admin Panel** (separate repo) — Seller payouts & marketplace analytics, linked only through the Admin Gateway endpoints
+
+The Quê Tôi (Seoul) mock frontend that used to live in `/frontend-quetoi` moved to the separate repo `BridgeTechLabs/pangeatown-tenant-demo` (`demo-quetoi/`).
 
 ## 🎯 Key Features
 
@@ -101,14 +102,13 @@ sariko-app/
 │   │   ├── schemas/            # Pydantic request/response models
 │   │   ├── core/               # auth.py (JWKS verify), phone, display_name
 │   │   ├── clients/            # supabase.py
-│   │   ├── services/           # lalamove_service, supabase_realtime
+│   │   ├── services/           # lalamove_service
 │   │   ├── utils/              # pricing, storage, image_compressor
 │   │   ├── sql/                # Schema — see sql/README.md
 │   │   └── envs/.env.example
 │   ├── Dockerfile
 │   └── requirements.txt
 │
-├── frontend-quetoi/             # Quê Tôi tenant — mock-adapter clone
 ├── landing/                     # Static landing page
 ├── infra/{dev,prod}/            # mirror of ~ on each EC2; push with infra/sync.sh <env>
 ├── tests/                       # backend (pytest), frontend, smoke, manual

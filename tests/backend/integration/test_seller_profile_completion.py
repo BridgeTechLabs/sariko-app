@@ -34,7 +34,7 @@ def seller(sid, **kw):
     row = {"id": sid, "user_id": next(u for u, s in USERS.items() if s == sid), "store_name": f"Store {sid}",
            "tier": "founding", "phone": None, "address": "1 Le Loi", "lat": None, "lon": None,
            "bank_name": None, "bank_account_number": None, "bank_account_holder": None,
-           "status": "active", "slug": sid, "is_open": True, "opening_time": None, "closing_time": None}
+           "status": "active", "slug": sid, "is_open": True, "weekly_hours": None}
     row.update(kw)
     return row
 

@@ -1,5 +1,6 @@
 <script>
 import { liveDeliveryKey } from '@/utils/deliveryBadge';
+import { isScheduled } from '@/utils/orderStage';
 import { Store, Truck, ChevronRight, Star } from 'lucide-vue-next';
 
 export default {
@@ -36,6 +37,7 @@ export default {
             if (this.isUnpaid) return this.$t('orders_page.status_unpaid')
             const live = liveDeliveryKey(this.order)
             if (live) return this.$t(live)
+            if (isScheduled(this.order)) return this.$t('orders_page.status_scheduled')
             const map = {
                 pending: this.$t('orders_page.status_pending'),
                 confirmed: this.$t('orders_page.status_confirmed'),

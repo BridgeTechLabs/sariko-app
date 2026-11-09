@@ -157,4 +157,4 @@ def test_deliver_pushes_the_formatted_payload(monkeypatch):
     monkeypatch.setattr(push_service, "DAOUsers", lambda: type("U", (), {"get_users": lambda self, user_id: {"preferred_language": "Tiếng Việt"}})())
     monkeypatch.setattr(push_service, "webpush", lambda **kw: sent.append((kw["subscription_info"]["endpoint"], json.loads(kw["data"]))))
     push_service._deliver("a1", [{"endpoint": "e1", "p256dh": "k", "auth": "a"}], "admin_delivery_failed", "/orders?open=o1", {"code": "o1"})
-    assert sent == [("e1", {"title": "Đơn #o1 giao thất bại", "body": "Lalamove không giao được. Nhấn để mở đơn.", "url": "/orders?open=o1"})]
+    assert sent == [("e1", {"title": "Đơn #o1 giao thất bại", "body": "Hãng giao hàng không giao được. Nhấn để mở đơn.", "url": "/orders?open=o1"})]

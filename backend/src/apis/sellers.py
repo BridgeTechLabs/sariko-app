@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 
 from apis.complaints import complaints_for_order
-from apis.deliveries import lalamove_recipient
+from apis.deliveries import book_allingo, cancel_trip, keep_taken_trip, lalamove_recipient
 from apis.orders import cancel_after
 from core.store_hours import confirm_deadline, is_open_now
 from services.order_expiry import confirm_window
@@ -26,6 +26,8 @@ from core.phone import to_e164_vn
 from core.sariko_cache import cache
 from dao.dao_orders import DAOOrders, seller_orders_key
 from schemas import Schema
+from services import allingo_service
+from services.allingo_service import AllingoError
 from dao.dao_food_item_variants import DAOFoodItemVariants
 from utils.storage import upload_image_base64
 
@@ -93,17 +95,17 @@ def _with_deadlines(orders: list, seller: dict) -> list:
     pending (paid): when it auto-cancels; None while the store is closed, that clock is paused.
     confirmed: when the buyer may cancel it for a full refund (R4)."""
     now = datetime.now(timezone.utc)
-    opening, closing = seller.get("opening_time"), seller.get("closing_time")
+    hours = seller.get("weekly_hours")
     window = None
     for order in orders:
         order["deadline"] = None
         if (order["status"] == "pending" and order.get("payment_status") == "paid" and order.get("paid_at")
-                and is_open_now(seller.get("is_open"), opening, closing, now)):
+                and is_open_now(seller.get("is_open"), hours, now, seller.get("id"))):
             window = window or confirm_window()
             opened_at = seller.get("opened_at")
-            order["deadline"] = confirm_deadline(datetime.fromisoformat(order["paid_at"]), opening, closing,
+            order["deadline"] = confirm_deadline(datetime.fromisoformat(order["paid_at"]), hours,
                                                  datetime.fromisoformat(opened_at) if opened_at else None,
-                                                 now, window).isoformat()
+                                                 now, window, seller.get("id")).isoformat()
         elif order["status"] == "confirmed" and order.get("status_changed_at"):
             order["deadline"] = cancel_after(order).isoformat()
     return orders
@@ -128,9 +130,8 @@ def get_seller_info(user=Depends(verify_token)):
             "has_address": bool(profile.get("address") and profile.get("lat") and profile.get("lon")),
             "has_phone": bool(profile.get("phone")),
             "is_open": profile.get("is_open") is not False,   # the switch itself
-            "opening_time": profile.get("opening_time"),
-            "closing_time": profile.get("closing_time"),
-            "open_now": is_open_now(profile.get("is_open"), profile.get("opening_time"), profile.get("closing_time")),
+            "weekly_hours": profile.get("weekly_hours"),
+            "open_now": is_open_now(profile.get("is_open"), profile.get("weekly_hours"), seller_id=profile["id"]),
             "rating_avg": profile.get("rating_avg"),
             "rating_count": profile.get("rating_count") or 0,
         }
@@ -152,7 +153,7 @@ def set_store_open(body: Schema.RequestSetStoreOpen, user=Depends(verify_token))
         return {
             "success": True,
             "is_open": updated["is_open"],
-            "open_now": is_open_now(updated["is_open"], updated.get("opening_time"), updated.get("closing_time")),
+            "open_now": is_open_now(updated["is_open"], updated.get("weekly_hours"), seller_id=updated.get("id")),
         }
     except HTTPException:
         raise
@@ -163,20 +164,15 @@ def set_store_open(body: Schema.RequestSetStoreOpen, user=Depends(verify_token))
 
 @router.patch("/me/hours")
 def set_store_hours(body: Schema.RequestSetStoreHours, user=Depends(verify_token)):
-    """Daily opening hours (same every day); both null = all day. The open switch still wins."""
+    """Weekly opening hours, one slot per day (or a day off); null = all day. The open switch still wins."""
     try:
-        fields = {
-            "opening_time": body.opening_time.isoformat() if body.opening_time else None,
-            "closing_time": body.closing_time.isoformat() if body.closing_time else None,
-        }
-        updated = DAOSellerProfiles().update_seller_profile_info(user["id"], fields)
+        updated = DAOSellerProfiles().update_seller_profile_info(user["id"], {"weekly_hours": body.as_json()})
         if not updated:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not a seller")
         return {
             "success": True,
-            "opening_time": updated["opening_time"],
-            "closing_time": updated["closing_time"],
-            "open_now": is_open_now(updated["is_open"], updated["opening_time"], updated["closing_time"]),
+            "weekly_hours": updated["weekly_hours"],
+            "open_now": is_open_now(updated["is_open"], updated["weekly_hours"], seller_id=updated.get("id")),
         }
     except HTTPException:
         raise
@@ -261,6 +257,7 @@ def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
         order["status_history"] = dao.read_status_history(order_id)
+        order["delivery_history"] = dao.read_delivery_history(order_id)   # BUGS #39: times of the delivery steps
         order |= complaints_for_order(order, user["id"], "seller")   # T35
         return {"success": True, "order": _with_deadlines([order], seller)[0]}
     except HTTPException:
@@ -339,17 +336,19 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     detail="Missing pickup or dropoff address. Please update your store address in settings."
                 )
 
-            service = get_lalamove_service()
+            allingo = allingo_service.enabled()
+            if not allingo:
+                service = get_lalamove_service()
 
-            # Re-quote (original quotation has expired)
-            quotation = service.get_quotation(
-                pickup_lat=float(seller.get("lat") or 0),
-                pickup_lon=float(seller.get("lon") or 0),
-                pickup_address=pickup_address,
-                dropoff_lat=float(full_order.get("delivery_lat") or 0),
-                dropoff_lon=float(full_order.get("delivery_lon") or 0),
-                dropoff_address=dropoff_address,
-            )
+                # Re-quote (original quotation has expired)
+                quotation = service.get_quotation(
+                    pickup_lat=float(seller.get("lat") or 0),
+                    pickup_lon=float(seller.get("lon") or 0),
+                    pickup_address=pickup_address,
+                    dropoff_lat=float(full_order.get("delivery_lat") or 0),
+                    dropoff_lon=float(full_order.get("delivery_lon") or 0),
+                    dropoff_address=dropoff_address,
+                )
 
             try:
                 sender_phone = to_e164_vn(seller.get("phone") or "")
@@ -362,20 +361,29 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
             booking_result = None
             last_booking_error = None
             attempts = DAOAdminConfig().get_positive_int("driver_booking_attempts", 3)
-            for attempt in range(1, attempts + 1):
+            taken = False
+            if allingo:
                 try:
-                    booking_result = service.place_order(
-                        quotation_id=quotation.quotation_id,
-                        stop_id_0=quotation.stop_id_0,
-                        stop_id_1=quotation.stop_id_1,
-                        sender_name=seller.get("store_name", "Seller"),
-                        sender_phone=sender_phone,
-                        **recipient,
-                    )
-                    break
-                except Exception as e:
+                    booking_result, taken = book_allingo(full_order, sender_phone, recipient, attempts)
+                except AllingoError as e:   # an empty wallet goes the failed-booking way too (admins already told)
                     last_booking_error = e
-                    logger.warning(f"[Delivery] place_order attempt {attempt}/{attempts} failed for order={order_id}: {e}")
+            else:
+                for attempt in range(1, attempts + 1):
+                    try:
+                        result = service.place_order(
+                            quotation_id=quotation.quotation_id,
+                            stop_id_0=quotation.stop_id_0,
+                            stop_id_1=quotation.stop_id_1,
+                            sender_name=seller.get("store_name", "Seller"),
+                            sender_phone=sender_phone,
+                            **recipient,
+                        )
+                        booking_result = {"provider": "lalamove", "status": result.status,
+                                          "lalamove_order_id": result.lalamove_order_id, "share_link": result.share_link}
+                        break
+                    except Exception as e:
+                        last_booking_error = e
+                        logger.warning(f"[Delivery] place_order attempt {attempt}/{attempts} failed for order={order_id}: {e}")
 
             if booking_result is None:
                 logger.error(f"[Delivery] All {attempts} booking attempts failed for order={order_id}: {last_booking_error}")
@@ -385,26 +393,27 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                 DAORefunds().create_refund_for_order(order, "driver_booking_failed")
                 raise HTTPException(status_code=503, detail="Unable to book a delivery driver. Your order has been cancelled.")
 
+            trip_id = booking_result.get("allingo_order_id") or booking_result["lalamove_order_id"]
             dao_deliveries = DAODeliveries()
             try:
-                dao_deliveries.create_delivery(
-                    order_id=order_id,
-                    provider="lalamove",
-                    status=booking_result.status,
-                    user_id=full_order.get("user_id"),
-                    seller_user_id=full_order.get("seller_user_id"),
-                    lalamove_order_id=booking_result.lalamove_order_id,
-                    share_link=booking_result.share_link,
-                )
+                # A trip taken over from a double tap may already have its row (one row per trip id: the webhook reads one)
+                written = taken and dao_deliveries.read_delivery_by_order_id(order_id)
+                if not (written and written.get("allingo_order_id") == trip_id):
+                    dao_deliveries.create_delivery(
+                        order_id=order_id,
+                        user_id=full_order.get("user_id"),
+                        seller_user_id=full_order.get("seller_user_id"),
+                        **booking_result,
+                    )
             except Exception as db_err:
-                # DB insert failed but Lalamove already booked a driver — roll back to avoid orphan.
-                logger.error(f"[Delivery] create_delivery failed (lalamove={booking_result.lalamove_order_id}); cancelling Lalamove order")
+                # DB insert failed but the trip is already booked — roll back to avoid orphan.
+                logger.error(f"[Delivery] create_delivery failed ({booking_result['provider']}={trip_id}); cancelling the trip")
                 try:
-                    service.cancel_order(booking_result.lalamove_order_id)
+                    cancel_trip(booking_result, get_lalamove_service)
                 except Exception as cancel_err:
-                    logger.error(f"[Delivery] Rollback cancel failed for {booking_result.lalamove_order_id}: {cancel_err} — MANUAL INTERVENTION NEEDED")
+                    logger.error(f"[Delivery] Rollback cancel failed for {trip_id}: {cancel_err} — MANUAL INTERVENTION NEEDED")
                 raise HTTPException(status_code=500, detail=f"Failed to record delivery: {db_err}")
-            logger.warning(f"[Delivery] Auto-booked order={order_id} lalamove={booking_result.lalamove_order_id}")
+            logger.warning(f"[Delivery] Auto-booked order={order_id} {booking_result['provider']}={trip_id}")
 
         # Only update status after delivery booking succeeds (or if not a delivery order).
         # Conditional on the status read above: the confirm-timeout job or a buyer
@@ -413,9 +422,9 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                                                  expected_status=order["status"])
         if not updated:
             # The trip was booked for an order that is no longer ours to send (R4.6).
-            # It is still ASSIGNING_DRIVER, which Lalamove lets us cancel.
-            if booking_result and not service.cancel_order(booking_result.lalamove_order_id):
-                logger.error(f"[Delivery] order={order_id} changed while booking; cancel of lalamove={booking_result.lalamove_order_id} failed — MANUAL INTERVENTION NEEDED")
+            # It is still ASSIGNING_DRIVER, which the company lets us cancel.
+            if booking_result and not keep_taken_trip(taken, dao_orders, order_id) and not cancel_trip(booking_result, get_lalamove_service):
+                logger.error(f"[Delivery] order={order_id} changed while booking; cancel of {trip_id} failed — MANUAL INTERVENTION NEEDED")
             raise HTTPException(status_code=409, detail="Order status changed, please refresh")
 
         if body.status == "cancelled":

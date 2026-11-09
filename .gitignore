@@ -4,7 +4,6 @@
 node_modules
 
 frontend/dist
-frontend-quetoi/dist
 
 # next.js
 /.next/

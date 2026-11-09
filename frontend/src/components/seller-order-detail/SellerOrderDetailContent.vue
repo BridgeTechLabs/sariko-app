@@ -174,12 +174,20 @@ export default {
         // alone as "16-10"). Orders before 2026-10-16 have no history.
         stepTime(step) {
             if (!step.done && !step.current) return ''
-            const hit = (this.order.status_history || []).filter(h => h.status === step.key).pop()
+            const hit = this.isDeliveryStep(step)
+                ? (this.order.delivery_history || []).find(h => step.key === 'delivery_created' || h.status === step.key)
+                : (this.order.status_history || []).filter(h => h.status === step.key).pop()
             if (!hit) return ''
             const sameDay = vnDay(hit.changed_at) === vnDay(new Date())
             return formatVnTime(hit.changed_at, sameDay
                 ? { hour: '2-digit', minute: '2-digit' }
                 : { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        },
+
+        // Delivery steps (BUGS #39) take their time from history_delivery of the current trip (the backend cuts
+        // earlier trips off): its first row (= booked), then the first time each Lalamove status was reached.
+        isDeliveryStep(step) {
+            return step.key === 'delivery_created' || DELIVERY_STATUS_ORDER.includes(step.key)
         },
 
         fmt(amount) {

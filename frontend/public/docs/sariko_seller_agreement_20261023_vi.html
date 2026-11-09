@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thỏa thuận Người bán — SariKo</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Outfit:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:   #0B1E45;
+    --gold:   #C9A84C;
+    --gold-lt:#E2C47A;
+    --cream:  #F4EFE4;
+    --text:   #1A1A2E;
+    --border: #D9D0BC;
+    --surface:#FDFAF5;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Outfit', sans-serif; background: var(--surface); color: var(--text); font-size: 15px; line-height: 1.75; }
+
+  .site-header { background: var(--navy); padding: 18px 40px; display: flex; align-items: center; justify-content: space-between; }
+  .wordmark { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 600; color: #fff; text-decoration: none; }
+  .wordmark span { color: var(--gold); }
+  .back-link { font-size: 13px; color: var(--gold-lt); text-decoration: none; }
+
+  .hero { background: var(--navy); padding: 52px 40px 44px; border-bottom: 3px solid var(--gold); }
+  .hero-tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--gold); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 12px; }
+  .hero h1 { font-family: 'Cormorant Garamond', serif; font-size: clamp(32px, 5vw, 52px); font-weight: 500; color: #fff; line-height: 1.1; margin-bottom: 16px; }
+  .hero-meta { display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; color: rgba(255,255,255,0.6); font-family: 'JetBrains Mono', monospace; }
+  .hero-meta strong { color: var(--gold-lt); font-weight: 500; }
+
+  .layout { max-width: 900px; margin: 0 auto; padding: 56px 40px 80px; }
+  .section { margin-bottom: 40px; padding-bottom: 40px; border-bottom: 1px solid var(--border); }
+  .section:last-of-type { border-bottom: none; }
+  .section h2 { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 600; color: var(--navy); margin-bottom: 18px; line-height: 1.15; }
+  .section p, .section li { color: #2C2C3E; margin-bottom: 10px; }
+  .section ul { padding-left: 20px; }
+
+  .fee-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+  .fee-table thead tr { background: var(--navy); color: #fff; }
+  .fee-table th { padding: 10px 14px; text-align: left; font-weight: 500; font-size: 13px; }
+  .fee-table tbody tr { border-bottom: 1px solid var(--border); }
+  .fee-table tbody tr:nth-child(even) { background: var(--cream); }
+  .fee-table td { padding: 10px 14px; vertical-align: top; }
+
+  .acceptance { background: var(--cream); border-left: 3px solid var(--gold); padding: 16px 20px; font-size: 14px; }
+
+  .page-footer { background: var(--navy); padding: 28px 40px; text-align: center; }
+  .page-footer p { font-size: 12px; color: rgba(255,255,255,0.4); line-height: 1.8; }
+
+  @media (max-width: 640px) {
+    .site-header, .hero, .layout { padding-left: 16px; padding-right: 16px; }
+    .fee-table { font-size: 12px; }
+    .fee-table th, .fee-table td { padding: 8px 8px; }
+  }
+  /* Phones (docs-mobile, BUGS #36): 16px margins, a short header and hero, tables scroll in their own box.
+     .table-scroll keeps the table's 20px margin outside the box, so desktop spacing is unchanged. */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 20px 0; }
+  .table-scroll > table { margin: 0; }
+  @media (max-width: 600px) {
+    .site-header { padding: 12px 16px; }
+    .site-header .wordmark { font-size: 22px; }
+    .hero { padding: 24px 16px 20px; }
+    .hero h1 { font-size: 30px; margin-bottom: 10px; }
+    .hero-meta { gap: 2px 16px; }
+    .layout { padding: 28px 16px 48px; }
+    .section { margin-bottom: 28px; padding-bottom: 28px; }
+    .section h2 { font-size: 24px; margin-bottom: 12px; }
+    .fee-table, .data-table { font-size: 14px; }
+    .fee-table th, .fee-table td, .data-table th, .data-table td { padding: 8px 10px; }
+    .fee-table th, .data-table th { font-size: 13px; }
+    .page-footer { padding: 20px 16px; }
+    .method-card p, .payout-card p, .provider-card p, .node-card p, .team-card p, .parent-note, .fee-table .mono { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="wordmark" href="https://www.sariko.store">Sari<span>Ko</span></a>
+  <a class="back-link" href="https://www.sariko.store">← sariko.store</a>
+</header>
+
+<div class="hero">
+  <div class="hero-tag">Thỏa thuận người bán</div>
+  <h1>Thỏa thuận Người bán SariKo</h1>
+  <div class="hero-meta">
+    <span><strong>Phiên bản</strong> 2026-10-23</span>
+    <span><strong>Đơn vị vận hành</strong> Công ty TNHH Zen Tech Asia</span>
+  </div>
+</div>
+
+<div class="layout">
+
+  <div class="section">
+    <h2>1. Các bên</h2>
+    <p>Thỏa thuận này được lập giữa <strong>Công ty TNHH Zen Tech Asia</strong> (mã số thuế 0316852554), Tầng 6, Tòa nhà Rosana, 60 Nguyễn Đình Chiểu, Phường Tân Định, Thành phố Hồ Chí Minh, đơn vị vận hành chợ trực tuyến SariKo ("SariKo"), và người nộp hồ sơ đăng ký bán hàng ("Người bán").</p>
+    <p>Liên hệ: <a href="mailto:support@sariko.store">support@sariko.store</a>.</p>
+  </div>
+
+  <div class="section">
+    <h2>2. Phí và chi trả</h2>
+    <p>Không có phí đăng ký. Phí hằng tháng và phí dịch vụ trên mỗi đơn hàng tùy theo gói:</p>
+    <div class="table-scroll"><table class="fee-table">
+      <thead>
+        <tr><th>Gói</th><th>Phí hằng tháng (đồng)</th><th>Phí dịch vụ mỗi đơn</th><th>Tối đa món ăn, danh mục</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Community</td><td>Miễn phí</td><td>19%</td><td>3 món, 1 danh mục</td></tr>
+        <tr><td>Tindahan</td><td>750.000</td><td>17%</td><td>30 món, 5 danh mục</td></tr>
+        <tr><td>Negosyo</td><td>1.250.000</td><td>15%</td><td>90 món, 10 danh mục</td></tr>
+        <tr><td>Enterprise (theo lời mời, tối đa 5 người bán)</td><td>2.300.000</td><td>13%</td><td>Không giới hạn</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li>Phí dịch vụ tính trên tiền món ăn của các đơn hàng đã hoàn tất. Không tính trên phí giao hàng, cũng không tính trên đơn hàng bị hủy hoặc được hoàn tiền.</li>
+      <li>Các mức phí trên chưa bao gồm thuế giá trị gia tăng (VAT); VAT được cộng thêm theo mức đang áp dụng tại thời điểm tính phí. SariKo chịu phí cổng thanh toán VNPAY.</li>
+      <li><strong>Gói Người bán sáng lập (Founding Seller):</strong> gói riêng dành cho 50 người bán đầu tiên. Miễn phí hằng tháng trong 4 tháng đầu, sau đó 750.000 đồng/tháng. Phí dịch vụ 17% được giữ cố định, không đổi, trong suốt thời gian Người bán còn sử dụng gói này.</li>
+      <li>Việc đổi gói có hiệu lực từ tháng kế tiếp. SariKo thông báo trước ít nhất 30 ngày trước khi thay đổi biểu phí; quy định này không áp dụng cho mức phí dịch vụ 17% của gói Người bán sáng lập, vì mức này không thay đổi.</li>
+      <li><strong>Chi trả</strong> được thực hiện vào thứ Ba hằng tuần cho các đơn hàng hoàn tất từ thứ Hai đến Chủ nhật của tuần trước đó (thứ Ba trùng ngày nghỉ lễ thì chi trả vào ngày làm việc kế tiếp), bằng chuyển khoản đồng Việt Nam vào tài khoản ngân hàng Việt Nam đứng tên chính Người bán, kèm bảng kê liệt kê từng đơn hàng, các khoản phí và thuế đã khấu trừ, và số tiền thực nhận. Mỗi kỳ chi trả là tiền món ăn của các đơn hàng đã hoàn tất, sau khi trừ phí dịch vụ, VAT trên phí dịch vụ và số thuế khấu trừ theo mục 4. Phí hằng tháng được trừ vào kỳ chi trả đầu tiên của mỗi tháng.</li>
+      <li><strong>Tạm giữ và khấu trừ:</strong> khoản chi trả của đơn hàng đang bị khiếu nại được tạm giữ cho đến khi khiếu nại được giải quyết xong. Nếu người mua được hoàn tiền do lỗi của Người bán sau khi đơn hàng đã được chi trả, số tiền đó được khấu trừ vào các kỳ chi trả sau của Người bán. Mỗi kỳ chi trả chỉ bị giảm tối đa một tỷ lệ phần trăm, do SariKo quy định, trên số tiền Người bán thực nhận trong kỳ đó; phần còn lại được khấu trừ vào các kỳ chi trả tiếp theo.</li>
+    </ul>
+    <p>Biểu phí đầy đủ: <a href="/docs/sariko_fees.html">sariko_fees.html</a>.</p>
+  </div>
+
+  <div class="section">
+    <h2>3. Nghĩa vụ của Người bán</h2>
+    <ul>
+      <li>Chỉ bán món ăn do chính Người bán tự chế biến, và được phép kinh doanh theo pháp luật.</li>
+      <li>Giữ mô tả, hình ảnh và giá (bằng đồng Việt Nam) chính xác.</li>
+      <li>Có giấy chứng nhận an toàn thực phẩm còn hiệu lực trước khi bắt đầu bán hàng.</li>
+      <li>Xác nhận hoặc từ chối mỗi đơn hàng trong vòng 30 phút khi gian hàng đang mở cửa, và chuẩn bị xong đơn đã nhận trong vòng 1 giờ.</li>
+      <li>Đóng gói món ăn để vận chuyển an toàn bằng xe máy.</li>
+      <li>Cập nhật đúng địa chỉ lấy hàng và giờ mở cửa.</li>
+      <li>Không đưa người mua ra khỏi nền tảng để nhận đơn hàng hoặc thanh toán ngoài SariKo.</li>
+      <li>Mỗi người chỉ được giữ một tài khoản.</li>
+      <li>Báo cho SariKo trong vòng 7 ngày khi có bất kỳ thông tin nào trong hồ sơ đăng ký thay đổi.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>4. Thuế</h2>
+    <p>Theo Nghị định 252/2026/NĐ-CP (Điều 43 đến Điều 46) và Nghị định 68/2026/NĐ-CP, SariKo khấu trừ thuế giá trị gia tăng (VAT) và thuế thu nhập cá nhân trên tiền món ăn của mỗi đơn hàng đã hoàn tất, và nộp thay cho cơ quan thuế. Mức thuế áp dụng theo Luật Thuế giá trị gia tăng (48/2024/QH15) và Luật Thuế thu nhập cá nhân (109/2025/QH15), tùy theo Người bán có là đối tượng cư trú thuế tại Việt Nam hay không. Mọi Người bán món ăn nhà nấu đều thuộc cùng một nhóm ngành, dịch vụ gắn với hàng hóa:</p>
+    <div class="table-scroll"><table class="fee-table">
+      <thead>
+        <tr><th>Nhóm ngành</th><th>Cư trú thuế</th><th>Không cư trú hoặc chưa xác định cư trú</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Món ăn nhà nấu (dịch vụ gắn với hàng hóa)</td><td>4,5%</td><td>5%</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li>Mọi người bán món ăn nhà nấu đều thuộc nhóm này.</li>
+      <li>Nếu doanh thu trong năm của Người bán từ 500.000.000 đồng trở xuống, Người bán không phải nộp VAT hay thuế thu nhập cá nhân và có thể đề nghị cơ quan thuế hoàn lại số thuế đã bị khấu trừ.</li>
+      <li>Số thuế đã khấu trừ trên đơn hàng sau đó bị hủy hoặc hoàn tiền sẽ được hoàn lại cho Người bán.</li>
+      <li>SariKo cấp chứng từ khấu trừ thuế hằng năm.</li>
+      <li>Người bán nước ngoài chỉ cần hộ chiếu cho việc này; không bắt buộc phải có mã số thuế Việt Nam ngay từ đầu.</li>
+      <li>Mọi nghĩa vụ thuế tại Philippines (BIR) hay quốc gia khác vẫn do Người bán tự chịu trách nhiệm.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>5. Dữ liệu cá nhân</h2>
+    <p>SariKo thu thập giấy tờ tùy thân, thông tin liên hệ, tài khoản ngân hàng và dữ liệu giao dịch của Người bán để vận hành tài khoản người bán, thực hiện chi trả, kê khai thuế và thực hiện nghĩa vụ báo cáo theo pháp luật Việt Nam. SariKo lưu trữ dữ liệu này an toàn, chỉ nhân sự được phân công các công việc này mới được xem. SariKo xử lý dữ liệu cá nhân theo đúng pháp luật Việt Nam về bảo vệ dữ liệu cá nhân; xem thêm <a href="/docs/privacy-policy.html">chính sách bảo mật</a>.</p>
+  </div>
+
+  <div class="section">
+    <h2>6. Khiếu nại và tranh chấp</h2>
+    <ul>
+      <li>SariKo tiếp nhận phản ánh khiếu nại của người mua trong vòng 24 giờ và giải quyết trong vòng 7 ngày làm việc.</li>
+      <li>Khi việc hoàn tiền là do lỗi của Người bán, khoản chi trả của đơn hàng đó bị tạm giữ hoặc số tiền hoàn lại được khấu trừ vào các kỳ chi trả sau, theo quy định tại mục 2.</li>
+      <li>Tranh chấp giữa SariKo và Người bán được giải quyết trước hết bằng thương lượng, sau đó bằng hòa giải thông qua quy trình khiếu nại của nền tảng. Nếu không giải quyết được, mỗi bên có quyền đưa tranh chấp ra cơ quan nhà nước có thẩm quyền hoặc Tòa án có thẩm quyền tại Thành phố Hồ Chí Minh.</li>
+      <li>Thỏa thuận này chịu sự điều chỉnh của pháp luật Việt Nam.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>7. Tạm ngừng và chấm dứt</h2>
+    <ul>
+      <li>Người bán có thể đóng tài khoản bất cứ lúc nào.</li>
+      <li>SariKo thông báo cho Người bán trước ít nhất 5 ngày, nêu rõ lý do, trước khi tạm ngừng, chấm dứt hoặc hạn chế tài khoản, trừ trường hợp cơ quan nhà nước có thẩm quyền yêu cầu khác.</li>
+      <li>Tiền của các đơn hàng đã hoàn tất luôn được chi trả đầy đủ.</li>
+      <li>Thông tin về các món ăn Người bán đã đăng được lưu trữ ít nhất 1 năm (theo Nghị định 248).</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <p class="acceptance">Thỏa thuận này được chấp nhận bằng hình thức điện tử khi đánh dấu đồng ý vào các ô và gõ họ tên đầy đủ theo giấy tờ tại sariko.store/join; SariKo ghi lại ngày, giờ và địa chỉ IP làm bằng chứng.</p>
+  </div>
+
+</div>
+
+<footer class="page-footer">
+  <p>
+    Công ty TNHH Zen Tech Asia (MST 0316852554) · Tầng 6, Tòa nhà Rosana, 60 Nguyễn Đình Chiểu, P. Tân Định, TP. Hồ Chí Minh<br>
+    Thanh toán: VNPAY · Giao hàng: Lalamove
+  </p>
+</footer>
+
+</body>
+</html>

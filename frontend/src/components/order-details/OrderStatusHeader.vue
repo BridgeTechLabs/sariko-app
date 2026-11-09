@@ -1,6 +1,7 @@
 <script>
 import { CircleCheckBig, Clock, CircleX } from 'lucide-vue-next';
 import { useOrderStore } from '@/stores/order/orderStore.js';
+import { cookingDay, isScheduled } from '@/utils/orderStage';
 
 // Cancels made by the system store a fixed English text (backend constants);
 // show those translated. Reasons a seller picked or typed are shown as written.
@@ -35,6 +36,7 @@ export default {
         },
         statusTitle() {
             if (this.isPaymentPending) return this.$t('order_detail.status_title_awaiting_payment')
+            if (isScheduled(this.order)) return this.$t('order_detail.status_title_scheduled')
             const map = {
                 pending: 'status_title_pending',
                 confirmed: 'status_title_confirmed',
@@ -53,6 +55,12 @@ export default {
         },
         statusSubtext() {
             if (this.isPaymentPending) return this.$t('order_detail.status_subtext_awaiting_payment')
+            if (isScheduled(this.order)) {
+                const date = new Date(`${cookingDay(this.order)}T12:00:00+07:00`).toLocaleDateString(
+                    this.$i18n.locale === 'vi' ? 'vi-VN' : 'en-GB',
+                    { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })
+                return this.$t('order_detail.status_subtext_scheduled', { date })
+            }
             if (this.isCancelled && this.cancellationReason) {
                 return `${this.$t('order_detail.cancelled_reason')}: ${this.cancellationReason}`
             }

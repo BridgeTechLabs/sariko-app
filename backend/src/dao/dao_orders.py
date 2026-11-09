@@ -35,6 +35,18 @@ def _invalidate_seller_orders(seller_id: Optional[str]) -> None:
         cache.invalidate(seller_orders_key(seller_id))
 
 
+def _with_preorder_days(order: dict) -> dict:
+    """Pre-order days of a buyer's order (the buyer UI shows "Scheduled" until the cooking day):
+    the largest preorder_day of its dishes, read live from food_items since orders don't store it.
+    A deleted dish (food_items null) doesn't count; 0 = same-day."""
+    order["preorder_days"] = max(((item.get("food_items") or {}).get("preorder_day") or 0
+                                  for item in order.get("order_items") or []), default=0)
+    return order
+
+
+TRIP_ENDED = {"REJECTED", "CANCELLED", "CANCELED", "EXPIRED"}   # Lalamove statuses after which a rebook may follow
+
+
 class DAOOrders(DAOBase):
 
     def __init__(self):
@@ -108,16 +120,13 @@ class DAOOrders(DAOBase):
     def read_orders_by_user_id(self, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), review_stores(id), deliveries(status)") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), review_stores(id), deliveries(status), order_items(food_items(preorder_day))") \
                 .eq("user_id", user_id) \
                 .neq("refunds.reason", "duplicate_payment") \
                 .order("created_at", desc=True) \
                 .execute()
 
-            if result and result.data:
-                return result.data
-
-            return []
+            return [_with_preorder_days(order) for order in result.data] if result and result.data else []
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_orders_by_user_id: {e}")
@@ -127,17 +136,14 @@ class DAOOrders(DAOBase):
     def read_order_by_id(self, order_id: str, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url)), refunds(status)") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url, preorder_day)), refunds(status)") \
                 .eq("id", order_id) \
                 .eq("user_id", user_id) \
                 .neq("refunds.reason", "duplicate_payment") \
                 .maybe_single() \
                 .execute()
 
-            if result and result.data:
-                return result.data
-
-            return None
+            return _with_preorder_days(result.data) if result and result.data else None
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_order_by_id: {e}")
@@ -275,6 +281,28 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_status_history: {e}")
 
+    def read_delivery_history(self, order_id: str):
+        """[{status, changed_at}] of the order's CURRENT trip, oldest first (log_delivery trigger, from 2026-10-16).
+        A rebook rewrites the same deliveries row, so one delivery_id holds every trip: the current one starts
+        right after the last ended status followed by a non-ended one."""
+        try:
+            result = self._supabase_client.table("history_delivery") \
+                .select("status, changed_at") \
+                .eq("order_id", order_id) \
+                .order("changed_at") \
+                .execute()
+
+            rows = result.data or []
+            # an ended row followed by another ended row (our CANCELLED, then Lalamove's CANCELED webhook) is not a rebook
+            start = max((i + 1 for i, row in enumerate(rows[:-1])
+                         if row["status"] in TRIP_ENDED and rows[i + 1]["status"] not in TRIP_ENDED), default=0)
+            return rows[start:]
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_delivery_history: {e}")
+        except Exception as e:
+            raise Exception(f"error read_delivery_history: {e}")
+
     def update_order_status(self, order_id: str, status: str, cancellation_reason: Optional[str] = None,
                             expected_status: Optional[str] = None):
         """expected_status makes the write conditional: if someone else changed the
@@ -314,7 +342,7 @@ class DAOOrders(DAOBase):
         try:
             result = self._supabase_client.table(self._table_name) \
                 .select("id, seller_user_id, total_amount, payment_status, transaction_ref, ipn_data, payment_create_date, paid_at, "
-                        "seller_profiles(is_open, opening_time, closing_time, opened_at)") \
+                        "seller_profiles(id, is_open, weekly_hours, opened_at)") \
                 .eq("status", "pending") \
                 .eq("payment_status", "paid") \
                 .lte("paid_at", paid_before.isoformat()) \
