@@ -31,7 +31,7 @@ backend only through the Admin Gateway endpoints (`X-Api-Key`).
    default, `--apply` writes). It is not part of the deploy pipeline.
 
 ## Branches, CI, release
-- Work on a feature branch (currently `feature-moit`) -> PR into `develop` -> DEV pipeline
+- Work on the shared branch `integration` (big or risky work: its own branch when the maintainer asks) -> PR into `develop` -> DEV pipeline
   (pytest in the image, `supabase db push`, deploy, readiness check with rollback).
   `develop` -> `main` runs the same pipeline for PROD. PROD uses live VNPay + Lalamove: a merge to
   `main` handles real money.
