@@ -256,10 +256,6 @@
         "btn_view_cart": "Xem giỏ hàng",
         "menu_empty_category": "Chưa có món trong danh mục này",
         "aria_back": "Quay lại",
-        "aria_search": "Tìm kiếm",
-        "aria_share": "Chia sẻ",
-        "aria_favorite": "Lưu vào yêu thích",
-        "link_copied": "Đã sao chép liên kết",
         "aria_info": "Thông tin quán",
         "aria_close": "Đóng",
         "info_no_address": "Chưa có địa chỉ",
@@ -268,6 +264,7 @@
         "info_closed_now": "Đang đóng",
         "info_today": "Hôm nay",
         "info_day_off": "Nghỉ",
+        "info_closed_today": "Nghỉ hôm nay",
         "info_all_day": "Mở cả ngày",
         "info_preorder_note": "Ngày nghỉ hoặc ngoài giờ: vẫn đặt trước được món đặt trước."
     },

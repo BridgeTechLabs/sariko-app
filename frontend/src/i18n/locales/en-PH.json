@@ -256,10 +256,6 @@
         "btn_view_cart": "View cart",
         "menu_empty_category": "No dishes in this category",
         "aria_back": "Go back",
-        "aria_search": "Search",
-        "aria_share": "Share",
-        "aria_favorite": "Save to favorites",
-        "link_copied": "Link copied",
         "aria_info": "Store info",
         "aria_close": "Close",
         "info_no_address": "No address yet",
@@ -268,6 +264,7 @@
         "info_closed_now": "Closed now",
         "info_today": "Today",
         "info_day_off": "Closed",
+        "info_closed_today": "Closed today",
         "info_all_day": "Open all day",
         "info_preorder_note": "On days off or outside opening hours, you can still pre-order."
     },
