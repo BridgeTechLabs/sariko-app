@@ -44,6 +44,9 @@ def _with_preorder_days(order: dict) -> dict:
     return order
 
 
+TRIP_ENDED = {"REJECTED", "CANCELLED", "CANCELED", "EXPIRED"}   # Lalamove statuses after which a rebook may follow
+
+
 class DAOOrders(DAOBase):
 
     def __init__(self):
@@ -277,6 +280,28 @@ class DAOOrders(DAOBase):
             raise Exception(f"Supabase error - read_status_history: {e}")
         except Exception as e:
             raise Exception(f"error read_status_history: {e}")
+
+    def read_delivery_history(self, order_id: str):
+        """[{status, changed_at}] of the order's CURRENT trip, oldest first (log_delivery trigger, from 2026-10-16).
+        A rebook rewrites the same deliveries row, so one delivery_id holds every trip: the current one starts
+        right after the last ended status followed by a non-ended one."""
+        try:
+            result = self._supabase_client.table("history_delivery") \
+                .select("status, changed_at") \
+                .eq("order_id", order_id) \
+                .order("changed_at") \
+                .execute()
+
+            rows = result.data or []
+            # an ended row followed by another ended row (our CANCELLED, then Lalamove's CANCELED webhook) is not a rebook
+            start = max((i + 1 for i, row in enumerate(rows[:-1])
+                         if row["status"] in TRIP_ENDED and rows[i + 1]["status"] not in TRIP_ENDED), default=0)
+            return rows[start:]
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_delivery_history: {e}")
+        except Exception as e:
+            raise Exception(f"error read_delivery_history: {e}")
 
     def update_order_status(self, order_id: str, status: str, cancellation_reason: Optional[str] = None,
                             expected_status: Optional[str] = None):

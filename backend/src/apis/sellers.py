@@ -255,6 +255,7 @@ def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
         order["status_history"] = dao.read_status_history(order_id)
+        order["delivery_history"] = dao.read_delivery_history(order_id)   # BUGS #39: times of the delivery steps
         order |= complaints_for_order(order, user["id"], "seller")   # T35
         return {"success": True, "order": _with_deadlines([order], seller)[0]}
     except HTTPException:
