@@ -90,6 +90,8 @@ def test_webhook_completed_marks_order_done(fastapi_client, lalamove_secret, lal
     monkeypatch.setattr("apis.deliveries.DAOOrders", lambda: fake_ord)
     notified = []
     monkeypatch.setattr("apis.deliveries.push_service.notify_seller_delivered", notified.append)
+    invoiced = []
+    monkeypatch.setattr("apis.deliveries.create_invoice_for_done_order", invoiced.append)
 
     body, raw = _make_webhook_body(
         lalamove_api_key, lalamove_secret,
@@ -107,6 +109,7 @@ def test_webhook_completed_marks_order_done(fastapi_client, lalamove_secret, lal
     assert fake_del.last_update["status"] == "COMPLETED"
     assert fake_ord.last_status == "done"
     assert [o["id"] for o in notified] == ["ord-uuid"], "Seller must be told the driver delivered"
+    assert [o["id"] for o in invoiced] == ["ord-uuid"], "A delivered order gets its commission invoice"
 
 
 def test_webhook_terminal_status_clears_driver_and_marks_failed(

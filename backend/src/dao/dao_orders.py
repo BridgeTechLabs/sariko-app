@@ -371,6 +371,22 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_order_by_id_raw: {e}")
 
+    def read_order_for_invoice(self, order_id: str):
+        """Read the order fields a commission e-invoice needs, or None."""
+        try:
+            result = self._supabase_client.table(self._table_name) \
+                .select("id, seller_id, payment_status, commission_amount, vat_rate, vat_amount") \
+                .eq("id", order_id) \
+                .maybe_single() \
+                .execute()
+
+            return result.data if result and result.data else None
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_order_for_invoice: {e}")
+        except Exception as e:
+            raise Exception(f"error read_order_for_invoice: {e}")
+
     def read_order_with_seller_coords(self, order_id: str):
         """Read order with seller profile coords for delivery booking."""
         try:

@@ -6,7 +6,7 @@ import os
 import time
 import uuid
 from decimal import Decimal
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, Request
 
 from core.auth import verify_token
 from core.phone import to_e164_vn
@@ -15,6 +15,7 @@ from dao.dao_deliveries import DAODeliveries
 from dao.dao_orders import DAOOrders, TRIP_ENDED
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
+from services.invoice_service import create_invoice_for_done_order
 from services import allingo_service, push_service
 from services.allingo_service import AllingoError, address, trip_fields
 from services.lalamove_service import get_lalamove_service
@@ -123,6 +124,7 @@ def order_follows_trip(dao_orders, order_id: str, trip_status: str):
             updated = dao_orders.update_order_status(order_id, "done", expected_status=order["status"])
             if updated:
                 push_service.notify_seller_delivered(updated)
+                background_tasks.add_task(create_invoice_for_done_order, updated)
     elif trip_status in TRIP_ENDED:
         order = dao_orders.read_order_by_id_raw(order_id)
         if order and order["status"] == "ready":
@@ -214,7 +216,7 @@ def get_delivery_status(order_id: str, user=Depends(verify_token)):
 # POST /deliveries/webhook — Lalamove status callback (public, v3)
 # --------------------------------------------------------------------------
 @router.post("/webhook")
-async def delivery_webhook(request: Request):
+async def delivery_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
         # Read raw bytes first — needed for exact HMAC verification
         raw_body = await request.body()

@@ -58,6 +58,20 @@ class DAOOnboarding(DAOBase):
             raise
         return result.data if result else None
 
+    def get_seller_invoice_info(self, seller_profile_id: str):
+        """Buyer fields (tax code, name, address, phone, email, ID) from the seller's latest approved application, or None."""
+        result = (
+            self._supabase_client.table("onboarding_applications")
+            .select("tax_code, full_name, residential_address, phone, email, id_type, id_number, "
+                    "bank_name, bank_account_number, nationality")
+            .eq("seller_profile_id", seller_profile_id)
+            .eq("status", "approved")
+            .order("reviewed_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+
     def email_has_account(self, email: str) -> bool:
         """A Sariko account (public.users) already uses this email (join-review T2). Exact match on the lower-case
         address: users.email is copied from auth.users, which Supabase Auth stores in lower case."""
