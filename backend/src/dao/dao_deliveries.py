@@ -13,7 +13,7 @@ class DAODeliveries(DAOBase):
 
     def create_delivery(self, order_id: str, provider: str, status: str,
                         user_id: str = None, seller_user_id: str = None,
-                        lalamove_order_id: str = None, share_link: str = None):
+                        lalamove_order_id: str = None, share_link: str = None, allingo_order_id: str = None):
         try:
             data = {
                 "order_id": order_id,
@@ -26,6 +26,8 @@ class DAODeliveries(DAOBase):
                 data["seller_user_id"] = seller_user_id
             if lalamove_order_id:
                 data["lalamove_order_id"] = lalamove_order_id
+            if allingo_order_id:
+                data["allingo_order_id"] = allingo_order_id
             if share_link:
                 data["share_link"] = share_link
 
@@ -76,6 +78,23 @@ class DAODeliveries(DAOBase):
             raise Exception(f"Supabase error - read_delivery_by_lalamove_order_id: {e}")
         except Exception as e:
             raise Exception(f"error read_delivery_by_lalamove_order_id: {e}")
+
+    def read_delivery_by_allingo_order_id(self, allingo_order_id: str):
+        try:
+            result = (
+                self._supabase_client
+                .table(self._table_name)
+                .select("*")
+                .eq("allingo_order_id", allingo_order_id)
+                .maybe_single()
+                .execute()
+            )
+            return result.data if result else None
+
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_delivery_by_allingo_order_id: {e}")
+        except Exception as e:
+            raise Exception(f"error read_delivery_by_allingo_order_id: {e}")
 
     def update_delivery(self, delivery_id: str, data: dict):
         try:

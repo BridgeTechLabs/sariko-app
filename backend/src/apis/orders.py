@@ -11,6 +11,7 @@ from fastapi import (
 )
 
 from apis.complaints import complaints_for_order
+from apis.deliveries import quote_trip
 from core.auth import verify_token
 from core.phone import to_e164_vn
 from core.store_hours import VN_TZ
@@ -195,7 +196,8 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
         if not seller_info["lat"] or not seller_info["lon"]:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Seller location not configured")
         try:
-            quote = get_lalamove_service().get_quotation(
+            quote = quote_trip(
+                get_lalamove_service,
                 pickup_lat=float(seller_info["lat"]),
                 pickup_lon=float(seller_info["lon"]),
                 pickup_address=seller_info["address"] or "Pickup",
@@ -204,7 +206,7 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
                 dropoff_address=request.delivery_address,
             )
         except Exception as e:
-            logger.exception(f"Lalamove quotation failed in POST /orders: {e}")
+            logger.exception(f"Delivery quotation failed in POST /orders: {e}")
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,
                                 detail="Could not get a delivery fee quote. Please try again.")
         delivery_fee, quotation_id = quote.total_fee, quote.quotation_id

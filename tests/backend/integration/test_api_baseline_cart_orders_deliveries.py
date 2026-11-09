@@ -261,11 +261,11 @@ def test_webhook_signed_by_another_secret_is_401(fastapi_client, lalamove_api_ke
 
 
 def test_webhook_same_completed_event_twice(fastapi_client, lalamove_secret, lalamove_api_key, hook):
-    """Lalamove retries: both calls answer 200 and the order stays done. Today each call writes and
-    pushes again (the fake update returns the order both times): kept as the baseline."""
+    """Lalamove retries: both calls answer 200 and the order stays done. The order moves (and the seller
+    is pushed) once: a done order is not moved again (T161 QD 7)."""
     _, raw = _make_webhook_body(lalamove_api_key, lalamove_secret, "ORDER_STATUS_CHANGED", {"order": {"orderId": "LM1", "status": "COMPLETED"}})
     assert [_webhook(fastapi_client, raw).json() for _ in range(2)] == [{"success": True}] * 2
-    assert hook.order.last_status == "done" and hook.order._order["status"] == "done" and len(hook.delivered) == 2
+    assert hook.order.last_status == "done" and hook.order._order["status"] == "done" and len(hook.delivered) == 1
 
 
 def test_webhook_broken_json_answers_200_not_ok(fastapi_client, hook):

@@ -145,7 +145,7 @@ def test_tc4_admin_events(http, monkeypatch):
         ("c-support", "📣 New complaint KN-0001 · Missing item\nhttps://admin.sariko.store/complaints?open=c1"),
         ("c-ops", "⏰ Order #ABC12345 not accepted by the seller, auto-cancels in 4 min. Call the seller.\n"
                   "https://admin.sariko.store/orders?open=o1"),
-        ("c-ops", "🚚 Order #ABC12345: delivery failed, Lalamove could not deliver it.\nhttps://admin.sariko.store/orders?open=o1"),
+        ("c-ops", "🚚 Order #ABC12345: delivery failed, the delivery company could not deliver it.\nhttps://admin.sariko.store/orders?open=o1"),
     ]
 
 

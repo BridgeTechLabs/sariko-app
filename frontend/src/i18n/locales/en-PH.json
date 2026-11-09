@@ -218,7 +218,7 @@
             "label_tax_code": "Tax code",
             "label_address": "Address",
             "label_email": "Email",
-            "label_partners": "Payments: VNPAY · Delivery: Lalamove",
+            "label_partners": "Payments: VNPAY · Delivery: our delivery partners",
             "link_sell": "Sell on SariKo"
         },
         "missing_banner": {
@@ -308,7 +308,7 @@
             "title_estimated_delivery_fee": "Estimated Delivery Fee",
             "title_total_amount": "Total Amount",
             "button_label_checkout": "Place Order",
-            "partners_note": "Payments by VNPAY · Delivery by Lalamove",
+            "partners_note": "Payments by VNPAY · Delivered by our delivery partners",
             "agree_order": "I have reviewed my order and agree to the {policy}",
             "agree_order_policy": "Delivery & Refund Policy"
         },
@@ -1080,7 +1080,7 @@
         "button_retry": "Retry submit",
         "welcome_title": "Before you start",
         "welcome_point_1": "Sell your home cooking to the Filipino community in Ho Chi Minh City.",
-        "welcome_point_2": "SariKo handles ordering, online payment (VNPAY) and Lalamove delivery.",
+        "welcome_point_2": "SariKo handles ordering, online payment (VNPAY) and delivery through our delivery partners.",
         "welcome_point_3": "You pay a service fee only on completed orders. Plans with a monthly fee have a lower rate.",
         "welcome_point_4": "Payouts go to your own Vietnamese bank account, with a statement for each period.",
         "welcome_point_5": "SariKo withholds and pays the tax on your sales for you, as Vietnamese law requires.",

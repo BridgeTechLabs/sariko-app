@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 
 from apis.complaints import complaints_for_order
-from apis.deliveries import lalamove_recipient
+from apis.deliveries import book_allingo, cancel_trip, keep_taken_trip, lalamove_recipient
 from apis.orders import cancel_after
 from core.store_hours import confirm_deadline, is_open_now
 from services.order_expiry import confirm_window
@@ -26,6 +26,8 @@ from core.phone import to_e164_vn
 from core.sariko_cache import cache
 from dao.dao_orders import DAOOrders, seller_orders_key
 from schemas import Schema
+from services import allingo_service
+from services.allingo_service import AllingoError
 from dao.dao_food_item_variants import DAOFoodItemVariants
 from utils.storage import upload_image_base64
 
@@ -334,17 +336,19 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     detail="Missing pickup or dropoff address. Please update your store address in settings."
                 )
 
-            service = get_lalamove_service()
+            allingo = allingo_service.enabled()
+            if not allingo:
+                service = get_lalamove_service()
 
-            # Re-quote (original quotation has expired)
-            quotation = service.get_quotation(
-                pickup_lat=float(seller.get("lat") or 0),
-                pickup_lon=float(seller.get("lon") or 0),
-                pickup_address=pickup_address,
-                dropoff_lat=float(full_order.get("delivery_lat") or 0),
-                dropoff_lon=float(full_order.get("delivery_lon") or 0),
-                dropoff_address=dropoff_address,
-            )
+                # Re-quote (original quotation has expired)
+                quotation = service.get_quotation(
+                    pickup_lat=float(seller.get("lat") or 0),
+                    pickup_lon=float(seller.get("lon") or 0),
+                    pickup_address=pickup_address,
+                    dropoff_lat=float(full_order.get("delivery_lat") or 0),
+                    dropoff_lon=float(full_order.get("delivery_lon") or 0),
+                    dropoff_address=dropoff_address,
+                )
 
             try:
                 sender_phone = to_e164_vn(seller.get("phone") or "")
@@ -357,20 +361,29 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
             booking_result = None
             last_booking_error = None
             attempts = DAOAdminConfig().get_positive_int("driver_booking_attempts", 3)
-            for attempt in range(1, attempts + 1):
+            taken = False
+            if allingo:
                 try:
-                    booking_result = service.place_order(
-                        quotation_id=quotation.quotation_id,
-                        stop_id_0=quotation.stop_id_0,
-                        stop_id_1=quotation.stop_id_1,
-                        sender_name=seller.get("store_name", "Seller"),
-                        sender_phone=sender_phone,
-                        **recipient,
-                    )
-                    break
-                except Exception as e:
+                    booking_result, taken = book_allingo(full_order, sender_phone, recipient, attempts)
+                except AllingoError as e:   # an empty wallet goes the failed-booking way too (admins already told)
                     last_booking_error = e
-                    logger.warning(f"[Delivery] place_order attempt {attempt}/{attempts} failed for order={order_id}: {e}")
+            else:
+                for attempt in range(1, attempts + 1):
+                    try:
+                        result = service.place_order(
+                            quotation_id=quotation.quotation_id,
+                            stop_id_0=quotation.stop_id_0,
+                            stop_id_1=quotation.stop_id_1,
+                            sender_name=seller.get("store_name", "Seller"),
+                            sender_phone=sender_phone,
+                            **recipient,
+                        )
+                        booking_result = {"provider": "lalamove", "status": result.status,
+                                          "lalamove_order_id": result.lalamove_order_id, "share_link": result.share_link}
+                        break
+                    except Exception as e:
+                        last_booking_error = e
+                        logger.warning(f"[Delivery] place_order attempt {attempt}/{attempts} failed for order={order_id}: {e}")
 
             if booking_result is None:
                 logger.error(f"[Delivery] All {attempts} booking attempts failed for order={order_id}: {last_booking_error}")
@@ -380,26 +393,27 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                 DAORefunds().create_refund_for_order(order, "driver_booking_failed")
                 raise HTTPException(status_code=503, detail="Unable to book a delivery driver. Your order has been cancelled.")
 
+            trip_id = booking_result.get("allingo_order_id") or booking_result["lalamove_order_id"]
             dao_deliveries = DAODeliveries()
             try:
-                dao_deliveries.create_delivery(
-                    order_id=order_id,
-                    provider="lalamove",
-                    status=booking_result.status,
-                    user_id=full_order.get("user_id"),
-                    seller_user_id=full_order.get("seller_user_id"),
-                    lalamove_order_id=booking_result.lalamove_order_id,
-                    share_link=booking_result.share_link,
-                )
+                # A trip taken over from a double tap may already have its row (one row per trip id: the webhook reads one)
+                written = taken and dao_deliveries.read_delivery_by_order_id(order_id)
+                if not (written and written.get("allingo_order_id") == trip_id):
+                    dao_deliveries.create_delivery(
+                        order_id=order_id,
+                        user_id=full_order.get("user_id"),
+                        seller_user_id=full_order.get("seller_user_id"),
+                        **booking_result,
+                    )
             except Exception as db_err:
-                # DB insert failed but Lalamove already booked a driver — roll back to avoid orphan.
-                logger.error(f"[Delivery] create_delivery failed (lalamove={booking_result.lalamove_order_id}); cancelling Lalamove order")
+                # DB insert failed but the trip is already booked — roll back to avoid orphan.
+                logger.error(f"[Delivery] create_delivery failed ({booking_result['provider']}={trip_id}); cancelling the trip")
                 try:
-                    service.cancel_order(booking_result.lalamove_order_id)
+                    cancel_trip(booking_result, get_lalamove_service)
                 except Exception as cancel_err:
-                    logger.error(f"[Delivery] Rollback cancel failed for {booking_result.lalamove_order_id}: {cancel_err} — MANUAL INTERVENTION NEEDED")
+                    logger.error(f"[Delivery] Rollback cancel failed for {trip_id}: {cancel_err} — MANUAL INTERVENTION NEEDED")
                 raise HTTPException(status_code=500, detail=f"Failed to record delivery: {db_err}")
-            logger.warning(f"[Delivery] Auto-booked order={order_id} lalamove={booking_result.lalamove_order_id}")
+            logger.warning(f"[Delivery] Auto-booked order={order_id} {booking_result['provider']}={trip_id}")
 
         # Only update status after delivery booking succeeds (or if not a delivery order).
         # Conditional on the status read above: the confirm-timeout job or a buyer
@@ -408,9 +422,9 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                                                  expected_status=order["status"])
         if not updated:
             # The trip was booked for an order that is no longer ours to send (R4.6).
-            # It is still ASSIGNING_DRIVER, which Lalamove lets us cancel.
-            if booking_result and not service.cancel_order(booking_result.lalamove_order_id):
-                logger.error(f"[Delivery] order={order_id} changed while booking; cancel of lalamove={booking_result.lalamove_order_id} failed — MANUAL INTERVENTION NEEDED")
+            # It is still ASSIGNING_DRIVER, which the company lets us cancel.
+            if booking_result and not keep_taken_trip(taken, dao_orders, order_id) and not cancel_trip(booking_result, get_lalamove_service):
+                logger.error(f"[Delivery] order={order_id} changed while booking; cancel of {trip_id} failed — MANUAL INTERVENTION NEEDED")
             raise HTTPException(status_code=409, detail="Order status changed, please refresh")
 
         if body.status == "cancelled":
