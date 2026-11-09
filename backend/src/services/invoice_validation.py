@@ -10,28 +10,16 @@ from services.vnpay.invoices.invoice_builder import buyer_legal_name
 
 class InvoiceValidationService:
 
-    def validate_orders(self, order_ids: list[str], orders: list[dict]) -> list[dict]:
-        """`orders` as read from the DB; returns them in the caller's order (the invoice line order)."""
-        order_by_id = {order["id"]: order for order in orders}
-
-        not_found = [order_id for order_id in order_ids if order_id not in order_by_id]
-        if not_found:
-            raise ValueError(f"Orders not found: {not_found}")
-
-        not_paid = [order_id for order_id in order_ids if order_by_id[order_id]["payment_status"] != "paid"]
-        if not_paid:
-            raise ValueError(f"Orders not paid: {not_paid}")
-
+    def validate_order(self, order_id: str, order: dict | None) -> dict:
+        """`order` as read from the DB (None when it does not exist); returns it."""
+        if not order:
+            raise ValueError(f"Order {order_id} not found")
+        if order["payment_status"] != "paid":
+            raise ValueError(f"Order {order_id} is not paid")
         # Nothing to invoice on an order Sariko took no commission on (e.g. founding tier, 0%).
-        no_commission = [order_id for order_id in order_ids if not order_by_id[order_id]["commission_amount"]]
-        if no_commission:
-            raise ValueError(f"Orders without commission: {no_commission}")
-
-        seller_ids = {order["seller_id"] for order in orders}
-        if len(seller_ids) > 1:
-            raise ValueError(f"Orders belong to more than one seller: {sorted(seller_ids)}")
-
-        return [order_by_id[order_id] for order_id in order_ids]
+        if not order["commission_amount"]:
+            raise ValueError(f"Order {order_id} has no commission")
+        return order
 
     def validate_buyer(self, seller_id: str, application: dict | None) -> None:
         """`application` is the seller's latest approved onboarding application (DAOOnboarding.get_seller_invoice_info).

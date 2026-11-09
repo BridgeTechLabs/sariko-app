@@ -1,4 +1,4 @@
-"""services/vnpay/invoices/invoice_builder.py — orders → Sariko's commission VAT invoice to the seller.
+"""services/vnpay/invoices/invoice_builder.py — an order → Sariko's commission VAT invoice to the seller.
 
 Why this matters: an e-invoice is a legal document — amounts must match the order snapshot
 and the tax rate must be one viiAPI accepts.
@@ -10,7 +10,7 @@ import pytest
 from services.vnpay.invoices.invoice_builder import build_commission_invoice, tax_rate_label
 from services.vnpay.invoices import TaxRateCode, TaxType
 
-APPLICATION = {"tax_code": "0312345678", "first_name": "Maria", "last_name": "Santos",
+APPLICATION = {"tax_code": "0312345678", "full_name": "Maria Santos",
                "residential_address": "12 Nguyễn Huệ, Q1", "phone": "+84901234567",
                "email": "maria@example.com", "id_type": "cccd",
                "id_number": "079123456789", "bank_name": "Vietcombank", "bank_account_number": "1234567890",
@@ -36,9 +36,8 @@ def test_tax_rate_codes_match_the_doc_and_pass_model_validation():
         TaxType(tax=code.value, amount=0, tax_amount=0)
 
 
-def test_one_line_per_order_and_totals_from_snapshot():
-    orders = [order("11111111-aaaa", 19000, 0.1, 1900), order("22222222-bbbb", 10000, 0.1, 1000)]
-    inv = build_commission_invoice(orders, "req-1", "0102030405", "C26TSA", "VND", APPLICATION).to_wire()
+def test_one_line_for_the_order_and_totals_from_snapshot():
+    inv = build_commission_invoice(order("11111111-aaaa", 19000, 0.1, 1900), "req-1", "0102030405", "C26TSA", "VND", APPLICATION).to_wire()
     assert inv["taxCode"] == "0102030405"
     assert inv["autoRelease"] is False
     assert inv["autoSign"] is False
@@ -55,15 +54,15 @@ def test_one_line_per_order_and_totals_from_snapshot():
     assert inv["invoice"]["createdBy"] == "Sariko System"
     body = inv["invoice"]
     assert body["requestId"] == "req-1"
-    assert [p["ordinalNumber"] for p in body["products"]] == [1, 2]
+    assert [p["ordinalNumber"] for p in body["products"]] == [1]
     assert body["products"][0]["name"] == "Phí dịch vụ nền tảng Sariko - đơn hàng 11111111-aaaa"  # full order id
     assert body["products"][0]["property"] == 1 and body["products"][0]["quantity"] == Decimal(1)
-    assert body["products"][1]["amountAfterTax"] == Decimal("11000")
-    assert body["totalAmount"] == Decimal("29000")
-    assert body["totalTaxAmount"] == Decimal("2900")
-    assert body["totalAmountAfterTax"] == Decimal("31900")
-    assert body["totalPaymentInWord"] == "Ba mươi mốt nghìn chín trăm đồng"
-    assert body["taxTypes"] == [{"tax": "10%", "amount": Decimal("29000"), "taxAmount": Decimal("2900")}]
+    assert body["products"][0]["amountAfterTax"] == Decimal("20900")
+    assert body["totalAmount"] == Decimal("19000")
+    assert body["totalTaxAmount"] == Decimal("1900")
+    assert body["totalAmountAfterTax"] == Decimal("20900")
+    assert body["totalPaymentInWord"] == "Hai mươi nghìn chín trăm đồng"
+    assert body["taxTypes"] == [{"tax": "10%", "amount": Decimal("19000"), "taxAmount": Decimal("1900")}]
     assert body["buyerCustomerCode"] == "s1"
     assert body["buyerTaxCode"] == "0312345678"
     assert body["buyerName"] == "Maria Santos"
@@ -79,13 +78,10 @@ def test_one_line_per_order_and_totals_from_snapshot():
     assert body["buyerEmail"] == "maria@example.com"
 
 
-def test_tax_types_has_one_entry_per_rate():
-    orders = [order("o1", 19000, 0.1, 1900), order("o2", 10000, 0.08, 800), order("o3", 5000, 0.1, 500)]
-    body = build_commission_invoice(orders, "req-1", "0102030405", "C26TSA", "VND", APPLICATION).to_wire()["invoice"]
-    assert body["taxTypes"] == [
-        {"tax": "10%", "amount": Decimal("24000"), "taxAmount": Decimal("2400")},
-        {"tax": "8%", "amount": Decimal("10000"), "taxAmount": Decimal("800")},
-    ]
+def test_tax_types_carries_the_orders_rate():
+    body = build_commission_invoice(order("o1", 10000, 0.08, 800), "req-1", "0102030405", "C26TSA", "VND",
+                                    APPLICATION).to_wire()["invoice"]
+    assert body["taxTypes"] == [{"tax": "8%", "amount": Decimal("10000"), "taxAmount": Decimal("800")}]
 
 
 @pytest.mark.parametrize("id_type, id_number, id_field, passport_field", [
@@ -94,7 +90,7 @@ def test_tax_types_has_one_entry_per_rate():
 ])
 def test_id_goes_to_id_or_passport_field_by_id_type(id_type, id_number, id_field, passport_field):
     application = {**APPLICATION, "id_type": id_type, "id_number": id_number}
-    body = build_commission_invoice([order("o1", 19000, 0.1, 1900)], "req-1", "0102030405", "C26TSA", "VND",
+    body = build_commission_invoice(order("o1", 19000, 0.1, 1900), "req-1", "0102030405", "C26TSA", "VND",
                                     application).to_wire()["invoice"]
     assert body.get("buyerIdNumber") == id_field
     assert body.get("buyerPassportNumber") == passport_field
@@ -107,21 +103,23 @@ def test_id_goes_to_id_or_passport_field_by_id_type(id_type, id_number, id_field
 ])
 def test_nationality_code_only_for_known_countries(nationality, code, name):
     application = {**APPLICATION, "nationality": nationality}
-    body = build_commission_invoice([order("o1", 19000, 0.1, 1900)], "req-1", "0102030405", "C26TSA", "VND",
+    body = build_commission_invoice(order("o1", 19000, 0.1, 1900), "req-1", "0102030405", "C26TSA", "VND",
                                     application).to_wire()["invoice"]
     assert body.get("buyerNationalityCode") == code
     assert body.get("buyerNationality") == name
 
 
-def test_amounts_are_rounded_half_up_per_line_so_totals_and_words_are_whole():
-    orders = [order("o1", 2345.55, 0.1, 234.56), order("o2", 1000.49, 0.1, 100.05)]
-    body = build_commission_invoice(orders, "req-1", "0102030405", "C26TSA", "VND", APPLICATION).to_wire()["invoice"]
+@pytest.mark.parametrize("commission, vat, amount, tax_amount, words", [
+    ("2345.55", "234.56", "2346", "235", "Hai nghìn năm trăm tám mươi mốt đồng"),   # .55 / .56 → up
+    ("1000.49", "100.05", "1000", "100", "Một nghìn một trăm đồng"),                 # .49 / .05 → down
+])
+def test_amounts_are_rounded_half_up_so_totals_and_words_are_whole(commission, vat, amount, tax_amount, words):
+    body = build_commission_invoice(order("o1", commission, 0.1, vat), "req-1", "0102030405", "C26TSA", "VND",
+                                    APPLICATION).to_wire()["invoice"]
+    after_tax = Decimal(amount) + Decimal(tax_amount)
     assert [(p["amount"], p["taxAmount"], p["amountAfterTax"]) for p in body["products"]] == [
-        (Decimal("2346"), Decimal("235"), Decimal("2581")),    # .55 / .56 → up
-        (Decimal("1000"), Decimal("100"), Decimal("1100")),    # .49 / .05 → down
-    ]
-    assert body["totalAmount"] == Decimal("3346")
-    assert body["totalTaxAmount"] == Decimal("335")
-    assert body["totalAmountAfterTax"] == Decimal("3681")
-    assert body["taxTypes"] == [{"tax": "10%", "amount": Decimal("3346"), "taxAmount": Decimal("335")}]
-    assert body["totalPaymentInWord"] == "Ba nghìn sáu trăm tám mươi mốt đồng"
+        (Decimal(amount), Decimal(tax_amount), after_tax)]
+    assert (body["totalAmount"], body["totalTaxAmount"], body["totalAmountAfterTax"]) == (
+        Decimal(amount), Decimal(tax_amount), after_tax)
+    assert body["taxTypes"] == [{"tax": "10%", "amount": Decimal(amount), "taxAmount": Decimal(tax_amount)}]
+    assert body["totalPaymentInWord"] == words

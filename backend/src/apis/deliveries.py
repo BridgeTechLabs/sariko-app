@@ -3,7 +3,7 @@ import hmac
 import json
 import logging
 import os
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, Request
 
 from core.auth import verify_token
 from core.phone import to_e164_vn
@@ -13,6 +13,7 @@ from dao.dao_orders import DAOOrders
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
 from services import push_service
+from services.invoice_service import create_invoice_for_done_order
 from services.lalamove_service import get_lalamove_service
 
 router = APIRouter(prefix="/deliveries")
@@ -126,7 +127,7 @@ def get_delivery_status(order_id: str, user=Depends(verify_token)):
 # POST /deliveries/webhook — Lalamove status callback (public, v3)
 # --------------------------------------------------------------------------
 @router.post("/webhook")
-async def delivery_webhook(request: Request):
+async def delivery_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
         # Read raw bytes first — needed for exact HMAC verification
         raw_body = await request.body()
@@ -244,6 +245,7 @@ async def delivery_webhook(request: Request):
             updated = dao_orders.update_order_status(delivery["order_id"], "done")
             if updated:
                 push_service.notify_seller_delivered(updated)
+                background_tasks.add_task(create_invoice_for_done_order, updated)
         elif new_status in TERMINAL_STATUSES:
             order = dao_orders.read_order_by_id_raw(delivery["order_id"])
             if order and order["status"] == "ready":

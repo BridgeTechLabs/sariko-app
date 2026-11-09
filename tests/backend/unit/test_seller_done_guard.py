@@ -58,6 +58,15 @@ def test_done_allowed_once_trip_completed(mark_done):
     assert written == ["done"]
 
 
+def test_seller_done_creates_no_invoice(mark_done, monkeypatch):
+    """Only a delivered order is invoiced: the Lalamove COMPLETED webhook does it, never a seller's done."""
+    invoiced = []
+    monkeypatch.setattr("services.invoice_service.create_invoice", invoiced.append)
+    res, _ = mark_done("delivery", "COMPLETED")
+    assert res.status_code == 200
+    assert invoiced == []
+
+
 @pytest.mark.parametrize("move", [("pending", "confirmed"), ("confirmed", "ready"), ("ready", "done")])
 def test_unpaid_order_never_moves_forward(monkeypatch, move):
     """02/11 PROD: an unpaid order reached done; marked ready it would book a real Lalamove trip."""

@@ -185,3 +185,9 @@ def test_rejects_long_symbol_and_bad_date():
 def test_rejects_unknown_field():
     with pytest.raises(ValidationError):
         _request(buyer_mail="a@b.c")
+
+
+def test_accepts_integer_invoice_type_from_sandbox(service, calls):
+    calls["responses"] = [_ok({"requestId": "order-123", "invoiceType": 1, "invoiceSymbol": "C26TZT"})]
+    result = service.create_vat_original(_request())
+    assert result.invoice_type == "1"

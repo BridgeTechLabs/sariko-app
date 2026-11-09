@@ -7,7 +7,7 @@ import pytest
 
 from services.invoice_validation import InvoiceValidationService
 
-APPLICATION = {"tax_code": "0312345678", "first_name": "Maria", "last_name": "Santos",
+APPLICATION = {"tax_code": "0312345678", "full_name": "Maria Santos",
                "residential_address": "12 Nguyễn Huệ, Q1", "phone": "+84901234567",
                "email": "maria@example.com", "id_type": "cccd", "id_number": "079123456789",
                "bank_name": "Vietcombank", "bank_account_number": "1234567890", "nationality": "Philippines"}
@@ -16,24 +16,23 @@ APPLICATION = {"tax_code": "0312345678", "first_name": "Maria", "last_name": "Sa
 validator = InvoiceValidationService()
 
 
-def order(order_id, seller_id="s1", payment_status="paid", commission_amount=19000):
-    return {"id": order_id, "seller_id": seller_id, "payment_status": payment_status,
+def order(order_id="o1", payment_status="paid", commission_amount=19000):
+    return {"id": order_id, "seller_id": "s1", "payment_status": payment_status,
             "commission_amount": commission_amount}
 
 
-def test_valid_orders_come_back_in_the_callers_order():
-    assert [o["id"] for o in validator.validate_orders(["o1", "o2"], [order("o2"), order("o1")])] == ["o1", "o2"]
+def test_valid_order_comes_back():
+    assert validator.validate_order("o1", order()) == order()
 
 
 @pytest.mark.parametrize("found, message", [
-    ([order("o1")], "Orders not found: \\['o2'\\]"),
-    ([order("o1"), order("o2", payment_status="pending")], "Orders not paid: \\['o2'\\]"),
-    ([order("o1"), order("o2", commission_amount=0)], "Orders without commission: \\['o2'\\]"),
-    ([order("o1"), order("o2", seller_id="s2")], "more than one seller"),
+    (None, "Order o1 not found"),
+    (order(payment_status="pending"), "Order o1 is not paid"),
+    (order(commission_amount=0), "Order o1 has no commission"),    # e.g. founding tier
 ])
-def test_invalid_orders_raise(found, message):
+def test_invalid_order_raises(found, message):
     with pytest.raises(ValueError, match=message):
-        validator.validate_orders(["o1", "o2"], found)
+        validator.validate_order("o1", found)
 
 
 def test_valid_buyer_passes():
@@ -54,7 +53,7 @@ def test_buyer_without_tax_code_raises(tax_code):
 
 @pytest.mark.parametrize("changes, field", [
     ({"tax_code": "0" * 15}, "buyerTaxCode"),
-    ({"first_name": "M" * 100}, "buyerName"),
+    ({"full_name": "M" * 101}, "buyerName"),
     ({"residential_address": "a" * 401}, "buyerAddress"),
     ({"phone": "0" * 21}, "buyerPhoneNumber"),
     ({"email": "m" * 41 + "@example.com"}, "buyerEmail"),

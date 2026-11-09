@@ -2,7 +2,7 @@ import logging
 import os
 import jwt
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from clients.supabase import get_supabase_client
@@ -10,7 +10,6 @@ from clients.supabase import get_supabase_client
 oauth2_scheme = HTTPBearer()
 SUPABASE_JWKS_URL = os.getenv("SUPABASE_JWKS_URL", None)
 SUPABASE_JWT_ALGORITHM = os.getenv("SUPABASE_JWT_ALGORITHM", "ES256")  # Supabase defaults to HS256
-ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
 
 logger = logging.getLogger(__name__) 
 
@@ -37,7 +36,3 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(oauth2_sche
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED
         )
-
-def verify_admin_key(x_api_key: str = Header(...)):
-    if not ADMIN_API_KEY or x_api_key != ADMIN_API_KEY:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")

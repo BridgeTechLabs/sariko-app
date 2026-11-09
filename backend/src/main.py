@@ -18,7 +18,7 @@ from fastapi.exceptions import RequestValidationError
 from apis import (
     users, sellers, cart, orders, payments, deliveries,
     address, moit, search, chat, reviews,
-    user_addresses, onboarding, seller_profile_completion, complaints, launch, admin_refunds, admin
+    user_addresses, onboarding, seller_profile_completion, complaints, launch
 )
 from services import api_metrics
 
@@ -93,8 +93,6 @@ app.include_router(launch.router, prefix="/rest/v1", tags=["v1"])
 if os.environ.get("ENV", "local") in ("local", "dev"):
     from apis import dev
     app.include_router(dev.router, prefix="/rest/v1", tags=["dev"])
-app.include_router(admin_refunds.router, prefix="/rest/v1", tags=["admin"])
-app.include_router(admin.router, prefix="/rest/v1", tags=["admin"])
 app.include_router(moit.router, prefix="/rest/v1", tags=["moit"])
 
 # Registered BEFORE CORSMiddleware so CORS stays the outermost middleware.

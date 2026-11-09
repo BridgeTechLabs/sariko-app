@@ -3,6 +3,6 @@ from decimal import Decimal
 
 PAYMENT_METHOD = "TM/CK"
 CURRENCY_EXCHANGE_RATE = Decimal(1)
-CREATED_BY = "Sariko System"  # the admin route has no per-person identity (shared X-Api-Key)
+CREATED_BY = "Sariko System"  # invoices are issued by the system, not by a named person
 # /join nationality → buyerNationalityCode. "Other" is free text, so it gets no code.
 NATIONALITY_CODES = {"Philippines": "PH", "Vietnam": "VN"}

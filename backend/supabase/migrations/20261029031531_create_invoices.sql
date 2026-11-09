@@ -1,6 +1,5 @@
 -- ============================================================
 -- Invoices — VNPAY Invoice (viiAPI) e-invoices issued to a seller.
--- One invoice groups several orders of that seller through invoice_orders.
 -- Adjustment / replacement invoices point back to the original through ref_request_id.
 -- request_id is the idempotency key sent to VNPAY (globally unique there too).
 -- Columns hold what we filter / join / reconcile on; the full request payload
@@ -66,25 +65,5 @@ create trigger on_invoices_update
   for each row
   execute function public.set_invoices_updated_at ();
 
--- ============================================================
--- Invoice orders — which orders an invoice covers.
--- active = false once the invoice is failed / cancelled, so its orders can be invoiced again;
--- the partial unique index keeps an order in at most one active invoice.
--- ============================================================
-
-create table if not exists public.invoice_orders (
-  invoice_id uuid not null,
-  order_id uuid not null,
-  active boolean not null default true,
-  created_at timestamp with time zone not null default now(),
-  constraint invoice_orders_pkey primary key (invoice_id, order_id),
-  constraint invoice_orders_invoice_id_fkey foreign key (invoice_id) references invoices (id) on delete cascade,
-  constraint invoice_orders_order_id_fkey foreign key (order_id) references orders (id)
-) TABLESPACE pg_default;
-
-create unique index if not exists idx_invoice_orders_active_order_id on public.invoice_orders using btree (order_id)
-  where active;
-
 -- Backend-only tables (service_role bypasses RLS); no policies → anon/authenticated get nothing.
 alter table public.invoices enable row level security;
-alter table public.invoice_orders enable row level security;

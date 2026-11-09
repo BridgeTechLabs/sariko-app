@@ -7,7 +7,8 @@ from pydantic.alias_generators import to_camel
 
 class CreateInvoiceResult(BaseModel):
     """GeneralInvoiceInfo returned by every create endpoint."""
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    # VNPAY sends invoiceType as an int (1) though the doc says string, so numbers are accepted for str fields.
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, coerce_numbers_to_str=True)
 
     request_id: str
     invoice_number: Optional[int] = None   # empty until the invoice is released

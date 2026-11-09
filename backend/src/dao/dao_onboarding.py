@@ -62,7 +62,7 @@ class DAOOnboarding(DAOBase):
         """Buyer fields (tax code, name, address, phone, email, ID) from the seller's latest approved application, or None."""
         result = (
             self._supabase_client.table("onboarding_applications")
-            .select("tax_code, first_name, last_name, residential_address, phone, email, id_type, id_number, "
+            .select("tax_code, full_name, residential_address, phone, email, id_type, id_number, "
                     "bank_name, bank_account_number, nationality")
             .eq("seller_profile_id", seller_profile_id)
             .eq("status", "approved")
