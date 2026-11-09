@@ -27,11 +27,11 @@ logger = logging.getLogger(__name__)
 
 class QuotationResult(BaseModel):
     quotation_id: str
-    stop_id_0: str          # stopId of pickup stop (from quotation response)
-    stop_id_1: str          # stopId of dropoff stop (from quotation response)
+    stop_id_0: Optional[str]  # stopId of pickup stop (from quotation response); None for AllinGo
+    stop_id_1: Optional[str]  # stopId of dropoff stop (from quotation response); None for AllinGo
     total_fee: int          # VND integer (e.g. 25000)
     currency: str           # "VND"
-    distance_km: float      # e.g. 3.2
+    distance_km: float      # e.g. 3.2; 0 for AllinGo (it gives none)
 
 class PlaceOrderResult(BaseModel):
     lalamove_order_id: str

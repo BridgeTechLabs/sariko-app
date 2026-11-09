@@ -65,7 +65,9 @@ class _FakeOrderDAO:
     def touch_order(self, order_id):
         self.touched = order_id
 
-    def update_order_status(self, order_id, status):
+    def update_order_status(self, order_id, status, expected_status=None):
+        if expected_status and self._order["status"] != expected_status:
+            return None
         self.last_status = status
         if self._order:
             self._order["status"] = status

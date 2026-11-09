@@ -31,6 +31,13 @@ os.environ.setdefault("SUPABASE_JWKS_URL", "https://stub.supabase.co/jwks")
 
 
 # ─── fixtures ────────────────────────────────────────────────────────────────
+@pytest.fixture(autouse=True)
+def lalamove_by_default(monkeypatch):
+    """admin_settings delivery_provider_allingo = 0 (Lalamove) unless a test says otherwise: the real
+    switch reads Supabase. AllinGo tests set it back (tests/backend/unit/test_allingo_delivery.py)."""
+    monkeypatch.setattr("services.allingo_service.enabled", lambda: False)
+
+
 @pytest.fixture
 def vnp_secret():
     return os.environ["VNPAY_HASH_SECRET"]
