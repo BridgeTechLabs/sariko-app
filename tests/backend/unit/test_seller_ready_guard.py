@@ -81,9 +81,16 @@ def test_detail_has_status_history(client, monkeypatch):  # TC-17
         def read_status_history(self, order_id):
             return history[order_id]
 
+        def read_delivery_history(self, order_id):  # BUGS #39
+            return [{"status": "ASSIGNING_DRIVER", "changed_at": "2026-10-20T04:00:00+00:00"}] \
+                if order_id == "order-1" else []
+
     monkeypatch.setattr("apis.sellers.DAOOrders", FakeOrders)
-    assert client.get("/sellers/me/orders/order-1").json()["order"]["status_history"] == history["order-1"]
-    assert client.get("/sellers/me/orders/order-2").json()["order"]["status_history"] == []
+    first = client.get("/sellers/me/orders/order-1").json()["order"]
+    assert first["status_history"] == history["order-1"]
+    assert first["delivery_history"][0]["status"] == "ASSIGNING_DRIVER"
+    second = client.get("/sellers/me/orders/order-2").json()["order"]
+    assert second["status_history"] == [] and second["delivery_history"] == []
 
 
 def test_status_history_query():  # TC-17: only this order, oldest first
@@ -106,3 +113,57 @@ def test_status_history_query():  # TC-17: only this order, oldest first
     assert ("table", ("history_order_status",), {}) in calls
     assert ("eq", ("order_id", "order-1"), {}) in calls
     assert ("order", ("changed_at",), {}) in calls
+
+
+def test_delivery_history_query():  # BUGS #39: this order, oldest first
+    from dao.dao_orders import DAOOrders
+    calls = []
+
+    class Q:
+        def __getattr__(self, name):
+            def record(*args, **kwargs):
+                calls.append((name, args, kwargs))
+                return self
+            return record
+
+        def execute(self):
+            return type("R", (), {"data": None})()
+
+    dao = DAOOrders.__new__(DAOOrders)
+    dao._supabase_client = type("C", (), {"table": lambda self, t: calls.append(("table", (t,), {})) or Q()})()
+    assert dao.read_delivery_history("order-1") == []
+    assert ("table", ("history_delivery",), {}) in calls
+    assert ("select", ("status, changed_at",), {}) in calls
+    assert ("eq", ("order_id", "order-1"), {}) in calls
+    assert ("order", ("changed_at",), {}) in calls
+
+
+@pytest.mark.parametrize("statuses,expected", [
+    (["ASSIGNING_DRIVER", "ON_GOING", "PICKED_UP", "COMPLETED"], ["ASSIGNING_DRIVER", "ON_GOING", "PICKED_UP", "COMPLETED"]),
+    # rebook: same deliveries row, so the first trip's rows are cut off after its REJECTED
+    (["ASSIGNING_DRIVER", "ON_GOING", "REJECTED", "ASSIGNING_DRIVER", "ON_GOING", "PICKED_UP", "COMPLETED"],
+     ["ASSIGNING_DRIVER", "ON_GOING", "PICKED_UP", "COMPLETED"]),
+    # failed, not rebooked yet: the failed trip stays whole; two rebooks: only the last trip
+    (["ASSIGNING_DRIVER", "EXPIRED"], ["ASSIGNING_DRIVER", "EXPIRED"]),
+    (["ASSIGNING_DRIVER", "EXPIRED", "ASSIGNING_DRIVER", "CANCELED", "ASSIGNING_DRIVER"], ["ASSIGNING_DRIVER"]),
+    # cancelled by us, then Lalamove's CANCELED webhook: still one trip
+    (["ASSIGNING_DRIVER", "CANCELLED", "CANCELED"], ["ASSIGNING_DRIVER", "CANCELLED", "CANCELED"]),
+    ([], []),
+])
+def test_delivery_history_current_trip(statuses, expected):  # BUGS #39 QA round 1
+    from dao.dao_orders import DAOOrders
+    rows = [{"status": s, "changed_at": f"2026-11-09T0{i}:00:00+00:00"} for i, s in enumerate(statuses)]
+
+    class Q:
+        def __getattr__(self, name):
+            return lambda *args, **kwargs: self
+
+        def execute(self):
+            return type("R", (), {"data": rows})()
+
+    dao = DAOOrders.__new__(DAOOrders)
+    dao._supabase_client = type("C", (), {"table": lambda self, t: Q()})()
+    got = dao.read_delivery_history("order-1")
+    assert [r["status"] for r in got] == expected
+    assert got == rows[len(rows) - len(expected):]
+

@@ -218,7 +218,7 @@
             "label_tax_code": "MST",
             "label_address": "Địa chỉ",
             "label_email": "Email",
-            "label_partners": "Thanh toán: VNPAY · Giao hàng: Lalamove",
+            "label_partners": "Thanh toán: VNPAY · Giao hàng: đối tác giao hàng của SariKo",
             "link_sell": "Bán hàng trên SariKo"
         },
         "missing_banner": {
@@ -308,7 +308,7 @@
             "title_estimated_delivery_fee": "Phí giao hàng (ước tính)",
             "title_total_amount": "Tổng cộng",
             "button_label_checkout": "Đặt hàng",
-            "partners_note": "Thanh toán qua VNPAY · Giao hàng bởi Lalamove",
+            "partners_note": "Thanh toán qua VNPAY · Giao hàng bởi đối tác giao hàng",
             "agree_order": "Tôi đã kiểm tra đơn hàng và đồng ý với {policy}",
             "agree_order_policy": "Chính sách giao hàng và hoàn tiền"
         },
@@ -1083,7 +1083,7 @@
         "button_retry": "Gửi lại",
         "welcome_title": "Trước khi bắt đầu",
         "welcome_point_1": "Bán món nhà nấu cho cộng đồng người Philippines tại TP. Hồ Chí Minh.",
-        "welcome_point_2": "SariKo lo phần đặt hàng, thanh toán trực tuyến (VNPAY) và giao hàng qua Lalamove.",
+        "welcome_point_2": "SariKo lo phần đặt hàng, thanh toán trực tuyến (VNPAY) và giao hàng qua đối tác giao hàng.",
         "welcome_point_3": "Bạn chỉ trả phí dịch vụ trên đơn hoàn tất. Gói có phí tháng có tỷ lệ phí thấp hơn.",
         "welcome_point_4": "Tiền được chuyển vào tài khoản ngân hàng Việt Nam đứng tên bạn, kèm bảng kê mỗi kỳ.",
         "welcome_point_5": "SariKo khấu trừ và nộp thuế trên doanh thu bán hàng thay bạn theo quy định pháp luật Việt Nam.",
