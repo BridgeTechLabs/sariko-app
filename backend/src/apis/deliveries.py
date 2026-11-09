@@ -114,7 +114,7 @@ def cancel_trip(trip: dict, lalamove) -> bool:
     return lalamove().cancel_order(trip["lalamove_order_id"])
 
 
-def order_follows_trip(dao_orders, order_id: str, trip_status: str):
+def order_follows_trip(dao_orders, order_id: str, trip_status: str, background_tasks: BackgroundTasks):
     """A webhook's effect on the ORDER, decided by the order's own status, not by whether the trip row just
     changed: a retried event finishes what a failed run began. The push goes with the order change, so once."""
     if trip_status == "COMPLETED":
@@ -331,7 +331,7 @@ async def delivery_webhook(request: Request, background_tasks: BackgroundTasks):
             if order:
                 push_service.notify_seller_driver_assigned(order)
 
-        order_follows_trip(dao_orders, delivery["order_id"], new_status)
+        order_follows_trip(dao_orders, delivery["order_id"], new_status, background_tasks)
 
         return {"success": True}
 
@@ -380,7 +380,7 @@ def booking_in_flight(dao_orders, dao_deliveries, order_id) -> bool:
 # Errors answer 5xx on purpose (unlike Lalamove's 200): AllinGo resends up to 8 times over 44 hours.
 # --------------------------------------------------------------------------
 @router.post("/webhook/allingo")
-async def allingo_webhook(request: Request):
+async def allingo_webhook(request: Request, background_tasks: BackgroundTasks):
     raw_body = await request.body()
     secret = os.getenv("ALLINGO_WEBHOOK_SECRET", "")
     if not secret:
@@ -430,7 +430,7 @@ async def allingo_webhook(request: Request):
             order = dao_orders.read_order_by_id_raw(delivery["order_id"])
             if order:
                 push_service.notify_seller_driver_assigned(order)
-        order_follows_trip(dao_orders, delivery["order_id"], status)
+        order_follows_trip(dao_orders, delivery["order_id"], status, background_tasks)
         return {"success": True}
 
     except HTTPException:
