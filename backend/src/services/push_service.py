@@ -84,6 +84,27 @@ MESSAGES = {
         "en": ("New complaint {code}", "{category}. Tap to open it."),
         "vi": ("Khiếu nại mới {code}", "{category}. Nhấn để xem."),
     },
+    # T176 A4: an admin cancelled the order (Admin Gateway, apis/admin_gateway.py)
+    "admin_cancelled_paid": {
+        "en": ("Order cancelled", "Order #{code} was cancelled by Sariko. Your payment will be refunded."),
+        "vi": ("Đơn hàng đã bị hủy", "Đơn #{code} đã bị Sariko hủy. Tiền sẽ được hoàn lại cho bạn."),
+    },
+    "admin_cancelled": {
+        "en": ("Order cancelled", "Order #{code} was cancelled."),
+        "vi": ("Đơn hàng đã bị hủy", "Đơn #{code} đã bị hủy."),
+    },
+    "seller_admin_cancelled": {
+        "en": ("Order cancelled by Sariko", "Order #{code} was cancelled by Sariko. Tap to see details."),
+        "vi": ("Sariko đã hủy đơn", "Đơn #{code} đã bị Sariko hủy. Nhấn để xem chi tiết."),
+    },
+    "seller_admin_cancelled_done": {
+        "en": ("Order cancelled by Sariko", "Order #{code} was cancelled by Sariko and does not count in your earnings."),
+        "vi": ("Sariko đã hủy đơn", "Đơn #{code} đã bị Sariko hủy, không tính vào thu nhập."),
+    },
+    "seller_admin_cancelled_charged": {
+        "en": ("Order cancelled by Sariko", "Order #{code} was cancelled by Sariko. Its amount will be taken from your next payout."),
+        "vi": ("Sariko đã hủy đơn", "Đơn #{code} đã bị Sariko hủy, số tiền của đơn sẽ được trừ ở kỳ chi trả tới."),
+    },
     "admin_order_expiring": {
         "en": ("Order #{code} not accepted", "{minutes} min left before it auto-cancels. Call the seller."),
         "vi": ("Đơn #{code} chưa được nhận", "Còn {minutes} phút trước khi tự hủy. Hãy gọi người bán."),
@@ -193,6 +214,21 @@ def notify_seller_complaint(seller_user_id, order_id: str):
     _send_async(seller_user_id, "seller_complaint", f"/seller/orders/{order_id}")
 
 
+def notify_admin_cancelled(order: dict, was_done: bool, charged: bool):
+    """T176 A4: an admin cancelled the order. Buyer: refunded if paid. Seller (paid orders only, the others never reached
+    them): a done order with a "Charge to seller" deduction is taken from the next payout; a done order not paid out yet
+    does not count; otherwise (not done, or paid out with Sariko covering the refund) no money words."""
+    code = order["id"][:8].upper()
+    paid = order.get("payment_status") == "paid"
+    _send_async(order.get("user_id"), "admin_cancelled_paid" if paid else "admin_cancelled", f"/orders/{order['id']}", code=code)
+    if not paid:
+        return
+    event = ("seller_admin_cancelled_charged" if charged else
+             "seller_admin_cancelled_done" if was_done and order.get("payout_status") in (None, "pending") else
+             "seller_admin_cancelled")
+    _send_async(order.get("seller_user_id"), event, f"/seller/orders/{order['id']}", code=code)
+
+
 def notify_admins(event: str, url: str, **fields):
     """Admin panel: every admin-app subscription gets it (no admin roles), and the team's Zalo group.
     url is an admin-panel path."""
@@ -221,19 +257,19 @@ def _send_admins(event: str, url: str, fields: dict):
         logger.exception(f"push_service - _send_admins failed for event {event}: {repr(e)}")
 
 
-def _send_async(user_id, event: str, url: str):
+def _send_async(user_id, event: str, url: str, **fields):
     # Push services can take seconds to answer; never hold up the request
     # (or the VNPay IPN) that changed the order.
     if not user_id or not VAPID_PRIVATE_KEY:
         return
-    threading.Thread(target=_send, args=(user_id, event, url), daemon=True).start()
+    threading.Thread(target=_send, args=(user_id, event, url, fields), daemon=True).start()
 
 
-def _send(user_id: str, event: str, url: str):
+def _send(user_id: str, event: str, url: str, fields: dict):
     try:
         subscriptions = DAOPushSubscriptions().read_subscriptions_by_user_id(user_id)
         if subscriptions:
-            _deliver(user_id, subscriptions, event, url, {})
+            _deliver(user_id, subscriptions, event, url, fields)
     except Exception as e:
         logger.exception(f"push_service - _send failed for user {user_id}, event {event}: {repr(e)}")
 

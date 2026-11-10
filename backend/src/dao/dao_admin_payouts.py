@@ -44,3 +44,11 @@ class DAOAdminPayouts(DAOBase):
             return [d for d in result.data or [] if Decimal(str(d["applied_amount"])) < Decimal(str(d["amount"]))]
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_open_deductions: {e}")
+
+    def has_deduction_for_order(self, order_id: str) -> bool:
+        """T176: a "Charge to seller" deduction exists for this order (the admin made it when cancelling)."""
+        try:
+            result = self._supabase_client.table("admin_payout_deductions").select("id").eq("order_id", order_id).limit(1).execute()
+            return bool(result.data)
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - has_deduction_for_order: {e}")

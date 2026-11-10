@@ -358,7 +358,7 @@ class DAOOrders(DAOBase):
         """Read order by ID without user scoping (for IPN server-to-server)."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_user_id, payment_status, status, total_amount, transaction_ref, delivery_appointment, seller_profiles(store_name)") \
+                .select("id, user_id, seller_user_id, payment_status, payout_status, status, total_amount, transaction_ref, delivery_appointment, seller_profiles(store_name)") \
                 .eq("id", order_id) \
                 .maybe_single() \
                 .execute()
