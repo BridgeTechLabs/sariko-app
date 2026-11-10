@@ -59,18 +59,21 @@ export default {
     async mounted() {
         const orderStore = useOrderStore()
         await orderStore.getOrderDetail(this.orderId)
+        if (this.left) return   // A24a: the buyer left while it loaded; going on would empty the order they opened next
         orderStore.startWatchingOrderDetail(this.orderId)
 
         // Independent of the order fetch above, so it runs regardless of status —
         // an order can turn 'done' mid-visit via the 10s poll.
         useReviewStore().checkOrderReview(this.orderId)
 
-        if (this.shouldWatchDelivery) {
+        // B2b: a delivery_failed order loads its ended trip once (LOST = no rebook); the poller stops at an ended trip
+        if (this.shouldWatchDelivery || this.order?.status === 'delivery_failed') {
             useDeliveryStore().startWatching(this.orderId)
         }
     },
 
     beforeUnmount() {
+        this.left = true
         useOrderStore().stopWatchingOrderDetail()
         useDeliveryStore().stopWatching()
         useDeliveryStore().currentDelivery = null   // T180 A24: coming back never flashes this order's trip
