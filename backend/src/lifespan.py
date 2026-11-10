@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import asyncio
+import os
 
 from clients.supabase import get_supabase_client
 from services.order_expiry import run_order_expiry
@@ -14,13 +15,10 @@ async def lifespan(app: FastAPI):
     print("Supabase client is ready.")
     app.state.supabase = get_supabase_client()
     
-    expiry = asyncio.create_task(run_order_expiry())
-    reconcile = asyncio.create_task(run_payment_reconcile())
-    metrics = asyncio.create_task(run_api_metrics())
-    wallet = asyncio.create_task(run_allingo_wallet())
+    # A dev machine (ENV local) shares the DEV database with the DEV server: its jobs would compete (L53). RUN_JOBS=1 runs them.
+    run = os.environ.get("ENV", "local") != "local" or os.environ.get("RUN_JOBS") == "1"
+    jobs = [asyncio.create_task(job()) for job in (run_order_expiry, run_payment_reconcile, run_api_metrics, run_allingo_wallet)] if run else []
 
     yield
-    expiry.cancel()
-    reconcile.cancel()
-    metrics.cancel()
-    wallet.cancel()
+    for task in jobs:
+        task.cancel()

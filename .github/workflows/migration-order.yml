@@ -1,0 +1,30 @@
+# A migration added by a PR must come after every migration already on the target branch: a lower number makes
+# supabase db push stop (PROD) or apply out of order (DEV). Only a warning until develop / main get branch protection
+# with this job as a required check.
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+jobs:
+  migration-order:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: New migrations come after the target branch's newest
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          newest=$(git ls-tree --name-only "$BASE" backend/supabase/migrations/ | sed 's|.*/||' | sort | tail -1 | cut -c1-14)
+          bad=0
+          for f in $(git diff --name-only --diff-filter=A "$BASE"...HEAD -- backend/supabase/migrations); do
+            n=$(basename "$f" | cut -c1-14)
+            if [[ ! "$n" > "$newest" ]]; then
+              echo "::error file=$f::$f: number $n is not after $newest, the newest migration on $BASE. Rename it to the current UTC time ($(date -u +%Y%m%d%H%M%S)_<name>.sql)."
+              bad=1
+            fi
+          done
+          exit $bad
