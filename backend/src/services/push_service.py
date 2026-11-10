@@ -96,6 +96,10 @@ MESSAGES = {
         "en": ("Delivery wallet is empty", "No rider booked for order #{code}. Top up the delivery wallet."),
         "vi": ("Ví giao hàng hết tiền", "Chưa đặt được xe cho đơn #{code}. Hãy nạp tiền vào ví giao hàng."),
     },
+    "admin_delivery_wallet_low": {
+        "en": ("Delivery wallet running low", "AllinGo wallet: {balance} (alert below {threshold}). Top up before trips start failing."),
+        "vi": ("Ví giao hàng sắp hết tiền", "Ví AllinGo còn {balance} (báo khi dưới {threshold}). Hãy nạp tiền trước khi đặt xe bị lỗi."),
+    },
 }
 
 # The same admin events in the team's Zalo groups (T136): kind + English text (Q4), {category} translated like above.
@@ -104,6 +108,7 @@ ZALO_ADMIN = {
     "admin_order_expiring": ("ops", "⏰ Order #{code} not accepted by the seller, auto-cancels in {minutes} min. Call the seller."),
     "admin_delivery_failed": ("ops", "🚚 Order #{code}: delivery failed, the delivery company could not deliver it."),
     "admin_delivery_wallet_empty": ("ops", "💸 Delivery wallet is empty: no rider booked for order #{code}. Top up the wallet."),
+    "admin_delivery_wallet_low": ("ops", "🪫 AllinGo wallet low: {balance} (alert below {threshold}). Top up before trips start failing."),
 }
 
 # Complaint types (apis/complaints.py CATEGORIES), same words as the app's complaint form.

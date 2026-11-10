@@ -169,6 +169,18 @@ class AllingoService:
                 "deliverable_payment_method": "prepaid", "external_reference": order_id}
         return self._request("POST", "/orders", body, idempotency_key=f"sariko-{order_id}-{uuid.uuid4().hex}")
 
+    def wallet_balance(self) -> int:
+        """GET /wallet delivery_credit in whole đồng (VND has no minor unit; the test key answered an int + "VND"
+        on 10/11, T162). A missing / non-numeric balance or another currency is an error, never 0."""
+        data = self._request("GET", "/wallet")
+        try:
+            if data["currency"] != "VND":
+                raise ValueError(data["currency"])
+            return int(Decimal(str(data["delivery_credit"])))
+        except (KeyError, TypeError, ValueError, ArithmeticError):
+            logger.error(f"[ALLINGO] GET /wallet: unexpected answer {sorted(data) if isinstance(data, dict) else type(data)}")
+            raise AllingoError("allingo_bad_answer") from None
+
     def cancel_order(self, allingo_order_id: str) -> bool:
         """POST /orders/{id}/cancel; cancelling twice is harmless, so every call has its own key.
         The answer has refunded_amount (docs) or refund + canceled_at null (sandbox, Q20): only the status matters."""
