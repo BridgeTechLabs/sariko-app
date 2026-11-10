@@ -67,7 +67,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("id, store_name, slug, avatar_url, address, phone, lat, lon, rating_avg, rating_count, is_open, weekly_hours, opened_at")
+                .select("id, store_name, slug, avatar_url, address, phone, lat, lon, rating_avg, rating_count, is_open, weekly_hours, opened_at, description")
                 .eq("user_id", user_id)
                 .maybe_single()
                 .execute()
@@ -133,7 +133,7 @@ class DAOSellerProfiles(DAOBase):
 
     def update_seller_profile_info(self, user_id: str, data: dict):
         try:
-            allowed = {"phone", "address", "lat", "lon", "store_name", "is_open", "weekly_hours"}
+            allowed = {"phone", "address", "lat", "lon", "store_name", "description", "is_open", "weekly_hours"}
             update_fields = {k: v for k, v in data.items() if k in allowed}
             if not update_fields:
                 return None

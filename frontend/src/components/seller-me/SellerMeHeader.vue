@@ -1,8 +1,9 @@
 <script>
 import { Camera } from 'lucide-vue-next';
-import { mapState } from 'pinia';
+import { mapState, mapActions } from 'pinia';
 import { useAuthStore } from '@/stores/auth/authStore';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
+import { useProfileCompletionStore } from '@/stores/seller/profileCompletionStore';
 
 export default {
     name: 'SellerMeHeader',
@@ -12,6 +13,7 @@ export default {
     computed: {
         ...mapState(useAuthStore, ['user']),
         ...mapState(useDashboardStore, ['sellerInfo']),
+        ...mapState(useProfileCompletionStore, ['missing']),   // badge = the "Missing" rows of Store profile
 
         initials() {
             if (!this.user?.fullName) return '?'
@@ -25,11 +27,14 @@ export default {
 
     mounted() {
         if (!this.sellerInfo) useDashboardStore().fetchSellerInfo()
+        this.fetchProfileCompletion()
     },
 
     methods: {
+        ...mapActions(useProfileCompletionStore, { fetchProfileCompletion: 'fetch' }),
+
         goEditProfile() {
-            this.$router.push('/account/profile')
+            this.$router.push('/seller/me/profile')
         },
     }
 }
@@ -60,6 +65,7 @@ export default {
         <!-- Edit profile button -->
         <button class="edit-profile-btn" @click="goEditProfile">
             {{ $t('seller_me.edit_profile') }}
+            <span v-if="missing.length" class="missing-badge" :aria-label="$t('seller_profile.menu_missing', { n: missing.length })">{{ missing.length }}</span>
         </button>
 
     </div>
@@ -138,6 +144,7 @@ export default {
 }
 
 .edit-profile-btn {
+    position: relative;
     font-size: 13px;
     font-weight: 600;
     color: var(--color-accent);
@@ -146,5 +153,22 @@ export default {
     border-radius: 20px;
     padding: 6px 20px;
     cursor: pointer;
+}
+.missing-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    border: 2px solid var(--bg-main);
+    background: var(--color-error);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 </style>

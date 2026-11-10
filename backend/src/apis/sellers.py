@@ -123,6 +123,7 @@ def get_seller_info(user=Depends(verify_token)):
             "seller_id": profile["id"],
             "slug": profile.get("slug"),
             "store_name": profile.get("store_name"),
+            "description": profile.get("description"),
             "address": profile.get("address"),
             "lat": profile.get("lat"),
             "lon": profile.get("lon"),

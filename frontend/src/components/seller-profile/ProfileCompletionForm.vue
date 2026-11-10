@@ -174,7 +174,7 @@ export default {
                     position: 'bottom',
                     timeout: 1500,
                 })
-                this.$router.push('/seller/me')
+                this.$router.push('/seller/me/profile')   // Store profile reloads the missing rows
             } catch (e) {
                 this.showError(e)
             } finally {

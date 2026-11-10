@@ -2,6 +2,8 @@ import { defineStore } from "pinia";
 import apiSellerDashboard from "@/apis/sellers/apiSellerDashboard";
 import apiDeliveries from "@/apis/deliveries/apiDeliveries";
 import { createPoller } from "@/composables/createPoller";
+import { useAuthStore } from "@/stores/auth/authStore";
+import { useProfileCompletionStore } from "@/stores/seller/profileCompletionStore";
 
 const ORDER_LIST_POLL_MS = 10_000
 const ORDER_DETAIL_POLL_MS = 10_000
@@ -12,6 +14,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
         return {
             sellerId: null,
             sellerInfo: null,
+            earnings: null,
             orders: [],
             historyDays: null,   // done / cancelled orders older than this are only found by search
             orderDetails: null,
@@ -73,6 +76,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
                 this.sellerInfo = {
                     slug: res.slug,
                     store_name: res.store_name,
+                    description: res.description,
                     address: res.address,
                     lat: res.lat,
                     lon: res.lon,
@@ -88,6 +92,22 @@ export const useDashboardStore = defineStore("dashboardStore", {
             } catch (e) {
                 console.error('dashboardStore - fetchSellerInfo -', e)
             }
+        },
+
+        // GET /sellers/me/earnings: kept here so the Me preview and the Earnings page show it at once. Throws.
+        async fetchEarnings() {
+            this.earnings = await apiSellerDashboard.getEarnings()
+        },
+
+        async fetchReviews(limit, offset) {
+            return apiSellerDashboard.getReviews(limit, offset)
+        },
+
+        // One Store profile field (store_name, description, phone, name, avatar_url) through PATCH
+        // /users/me/profile. Throws. Then the header, the store page and the missing rows follow at once.
+        async saveStoreProfile(fields) {
+            await useAuthStore().updateProfile(fields)
+            await Promise.all([this.fetchSellerInfo(), useProfileCompletionStore().fetch()])
         },
 
         async setStoreOpen(isOpen) {
