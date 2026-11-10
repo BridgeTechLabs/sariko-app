@@ -241,6 +241,7 @@
             "label_sold_out": "Bán hết",
             "label_sold_out_today": "Bán hết hôm nay",
             "label_portions_left": "Còn {n} suất",
+            "label_portions_left_on": "Còn {n} suất cho ngày {date}",
             "label_item_instant": "Giao ngay",
             "lable_item_pre_order": "Cần đặt trước",
             "lable_item_pre_order_unit_day": "ngày"
@@ -863,6 +864,7 @@
         "item_daily_portions": "Số suất mỗi ngày",
         "item_daily_portions_placeholder": "Để trống = không giới hạn",
         "portions_left_today": "Hôm nay còn {left} / {total}",
+        "portions_left_on": "Ngày {date} còn {left} / {total}",
         "item_preorder": "Đặt trước",
         "item_preorder_day": "Đặt trước (ngày)",
         "item_available": "Đang bán",
@@ -1373,7 +1375,8 @@
             "seller_reject_too_busy": "Quán từ chối: đang quá tải",
             "seller_reject_store_closing": "Quán từ chối: quán sắp đóng cửa",
             "seller_reject_other": "Quán đã từ chối đơn",
-            "admin_cancel": "Sariko đã huỷ đơn"
+            "admin_cancel": "Sariko đã huỷ đơn",
+            "payment_timeout": "Hết thời gian thanh toán"
         },
         "seller": {
             "seller_timeout": "Không xác nhận kịp (tự huỷ)",
@@ -1386,7 +1389,8 @@
             "seller_reject_too_busy": "Bạn đã từ chối: quá tải",
             "seller_reject_store_closing": "Bạn đã từ chối: quán sắp đóng cửa",
             "seller_reject_other": "Bạn đã từ chối: {note}",
-            "admin_cancel": "Sariko đã huỷ đơn"
+            "admin_cancel": "Sariko đã huỷ đơn",
+            "payment_timeout": "Khách không thanh toán kịp"
         }
     }
 }

@@ -13,6 +13,7 @@ from services import push_service, zalo
 
 logger = logging.getLogger(__name__)
 
+PAYMENT_TIMEOUT_REASON = "payment_timeout"   # T181 A28: nobody paid in time
 SOLD_OUT_REASON = "sold_out"  # orders.cancellation_reason code, translated by each viewer's app (T178)
 
 
@@ -523,6 +524,29 @@ class DAOOrders(DAOBase):
                 .execute().data or []
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_unpaid_vnpay_orders: {e}")
+
+    def read_expirable_unpaid_orders(self, created_before: datetime):
+        """T181 A28: orders still waiting for payment, created before `created_before` (UTC); the expiry job
+        checks each against its last pay link."""
+        try:
+            return self._supabase_client.table(self._table_name).select("id, created_at, payment_create_date") \
+                .eq("status", "pending").in_("payment_status", ["pending", "failed"]) \
+                .lt("created_at", created_before.astimezone(timezone.utc).replace(tzinfo=None).isoformat()) \
+                .execute().data or []
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_expirable_unpaid_orders: {e}")
+
+    def expire_unpaid_order(self, order_id: str) -> bool:
+        """Cancel an order nobody paid (cancellation_reason payment_timeout, T178 code), only while it is still
+        pending and unpaid: a payment landing at the same moment wins. Unpaid, so no push, refund or portions."""
+        try:
+            result = self._supabase_client.table(self._table_name) \
+                .update({"status": "cancelled", "cancellation_reason": PAYMENT_TIMEOUT_REASON}) \
+                .eq("id", order_id).eq("status", "pending").in_("payment_status", ["pending", "failed"]) \
+                .execute()
+            return bool(result.data)
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - expire_unpaid_order: {e}")
 
     def claim_vnpay_check(self, order_id: str, now: datetime, last_before: datetime) -> bool:
         """Take this order's turn to ask VNPay: true only for the caller whose conditional update set

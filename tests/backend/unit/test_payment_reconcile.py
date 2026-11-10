@@ -59,6 +59,9 @@ class FakeOrders:
         self.saved.append(check)
         self.order.update(vnpay_check=check, vnpay_checked_at=checked_at.isoformat())
 
+    def read_expirable_unpaid_orders(self, created_before):   # T181 A28: nothing to expire in these tests
+        return []
+
     def set_vnpay_fail_notified(self, order_id, at):
         self.order["vnpay_fail_notified_at"] = at.isoformat()
 

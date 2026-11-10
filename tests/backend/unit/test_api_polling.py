@@ -29,6 +29,7 @@ NO_INVALIDATE = {
     "claim_vnpay_check": "unpaid orders only (read_unpaid_vnpay_orders)",
     "save_vnpay_check": "unpaid orders only",
     "set_vnpay_fail_notified": "unpaid orders only",
+    "expire_unpaid_order": "unpaid orders only (T181 A28)",
 }
 
 

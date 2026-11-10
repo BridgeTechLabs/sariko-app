@@ -248,3 +248,20 @@ def test_remaining_today(monkeypatch):
     assert asked == [("portions_left", {"p_food_item_ids": ["a", "b"], "p_sale_date": datetime.now(VN_TZ).date().isoformat()})]
     dao.add_remaining_today([{"id": "c"}])
     assert len(asked) == 1                                    # no limited dish: no DB call
+
+
+def test_t181_a34_preorder_dish_counts_its_first_delivery_day(monkeypatch):   # TC-A34a
+    asked = []
+
+    def rpc(name, params):
+        asked.append(params["p_sale_date"])
+        return _Result([{"food_item_id": f, "remaining": 1} for f in params["p_food_item_ids"]])
+    dao = DAOFoodItems.__new__(DAOFoodItems)
+    dao._supabase_client = type("C", (), {"rpc": lambda self, n, p: rpc(n, p)})()
+    today = datetime.now(VN_TZ).date()
+    items = [{"id": "a", "daily_portions": 5, "preorder_day": 0}, {"id": "p", "daily_portions": 9, "preorder_day": 2}]
+    dao.add_remaining_today(items)
+    assert sorted(asked) == sorted([today.isoformat(), (today + timedelta(days=2)).isoformat()])
+    assert items[0] == {"id": "a", "daily_portions": 5, "preorder_day": 0, "remaining_today": 1}        # same-day: as before
+    assert (items[1]["remaining_preorder"], items[1]["portions_date"]) == (1, (today + timedelta(days=2)).isoformat())
+    assert "remaining_today" not in items[1]   # a pre-order dish has no "today" number (buyers are never blocked by it)

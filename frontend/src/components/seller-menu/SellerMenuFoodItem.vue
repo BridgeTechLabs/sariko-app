@@ -3,6 +3,7 @@ import { useMenuStore } from '@/stores/seller/menuStore'
 import { Pencil } from 'lucide-vue-next'
 import ModalEditItem from './ModalEditItem.vue'
 import { foodPriceDisplay, hasVariants } from '@/utils/priceDisplay';
+import { dayMonth } from '@/utils/portions';
 
 export default {
     name: 'SellerMenuFoodItem',
@@ -21,7 +22,7 @@ export default {
     },
 
     methods: {
-        foodPriceDisplay, hasVariants,
+        foodPriceDisplay, hasVariants, dayMonth,
         async onToggleAvailable(val) {
             this.toggling = true
             try {
@@ -48,8 +49,10 @@ export default {
             <div class="food-name">{{ item.name }}</div>
             <div class="food-price">{{ foodPriceDisplay(item) }}</div>
             <div v-if="item.unit_label && !hasVariants(item)" class="food-unit">/ {{ item.unit_label }}</div>
-            <div v-if="item.daily_portions" class="food-portions" :class="{ 'food-portions--out': item.remaining_today === 0 }">
-                {{ $t('seller_menu.portions_left_today', { left: item.remaining_today ?? item.daily_portions, total: item.daily_portions }) }}
+            <div v-if="item.daily_portions" class="food-portions" :class="{ 'food-portions--out': (item.portions_date ? item.remaining_preorder : item.remaining_today) === 0 }">
+                <!-- a pre-order dish counts its first delivery day, not today (T181 A34) -->
+                <template v-if="item.portions_date">{{ $t('seller_menu.portions_left_on', { left: item.remaining_preorder, total: item.daily_portions, date: dayMonth(item.portions_date) }) }}</template>
+                <template v-else>{{ $t('seller_menu.portions_left_today', { left: item.remaining_today ?? item.daily_portions, total: item.daily_portions }) }}</template>
             </div>
         </div>
         <div class="food-actions">

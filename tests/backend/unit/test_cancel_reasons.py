@@ -88,7 +88,7 @@ def test_a41b_no_rider_cancel_of_a_failed_delivery(seller):
 # ── TC-A40b: every code has the buyer's and the seller's words in both languages ────────────────────────────
 FRONTEND = Path(__file__).resolve().parents[3] / "frontend" / "src"   # CI mounts it at /frontend/src (T172)
 CODES = {orders.SELLER_LATE_REASON, orders.DELIVERY_FAILED_REASON, orders.BUYER_CANCELLED_REASON, order_expiry.TIMEOUT_REASON,
-         dao_orders.SOLD_OUT_REASON, *sellers.SELLER_CANCEL_REASONS, "admin_cancel"}   # admin_cancel: the admin app writes it
+         dao_orders.SOLD_OUT_REASON, dao_orders.PAYMENT_TIMEOUT_REASON, *sellers.SELLER_CANCEL_REASONS, "admin_cancel"}   # admin_cancel: the admin app writes it
 
 
 @pytest.mark.parametrize("locale", ["en-PH", "vi"])

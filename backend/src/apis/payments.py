@@ -134,6 +134,9 @@ def create_vnpay_payment(order_id: str, request: Request, user=Depends(verify_to
 
     if order["payment_status"] == "paid":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order already paid")
+    if order["status"] != "pending":   # e.g. cancelled because nobody paid in time (T181 A28): no new pay link
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail={"code": "order_cancelled", "message": "This order can no longer be paid."})
 
     # T125: the previous pay link may have been paid with the IPN late or lost: ask VNPay before a new
     # link, or the buyer pays twice.
@@ -159,7 +162,7 @@ def create_vnpay_payment(order_id: str, request: Request, user=Depends(verify_to
     # Timestamps (GMT+7)
     now = datetime.utcnow() + timedelta(hours=7)
     create_date = now.strftime("%Y%m%d%H%M%S")
-    expire_date = (now + timedelta(minutes=15)).strftime("%Y%m%d%H%M%S")
+    expire_date = (now + vnpay_query.LINK_LIFETIME).strftime("%Y%m%d%H%M%S")
 
     # Unique txn ref: full order UUID (no dashes) + vnp_CreateDate. A refund / querydr must
     # send this URL's vnp_CreateDate as vnp_TransactionDate; the admin app reads it from here.

@@ -53,6 +53,11 @@ export default {
         portionsLeft: {
             type: Number,
             default: null
+        },
+        // Pre-order dish: { n, date } of its first delivery day (utils/portions.js preorderPortions), null = not shown
+        preorderPortions: {
+            type: Object,
+            default: null
         }
     },
 
@@ -151,6 +156,9 @@ export default {
                 </q-badge>
                 <q-badge v-if="portionsLeft > 0" class="preorder-badge" color="grey-8">
                     {{ $t('seller_page.section_food_cards.label_portions_left', { n: portionsLeft }) }}
+                </q-badge>
+                <q-badge v-else-if="preorderPortions" class="preorder-badge" color="grey-8">
+                    {{ $t('seller_page.section_food_cards.label_portions_left_on', preorderPortions) }}
                 </q-badge>
             </div>
 

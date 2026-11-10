@@ -241,6 +241,7 @@
             "label_sold_out": "Sold out",
             "label_sold_out_today": "Sold out today",
             "label_portions_left": "{n} left",
+            "label_portions_left_on": "{n} left for {date}",
             "label_item_instant": "Same-day",
             "lable_item_pre_order": "Pre-order",
             "lable_item_pre_order_unit_day": "days"
@@ -860,6 +861,7 @@
         "item_daily_portions": "Portions per day",
         "item_daily_portions_placeholder": "Empty = no limit",
         "portions_left_today": "Left today: {left} / {total}",
+        "portions_left_on": "Left for {date}: {left} / {total}",
         "item_preorder": "Pre-order",
         "item_preorder_day": "Preorder (days)",
         "item_available": "On sale",
@@ -1370,7 +1372,8 @@
             "seller_reject_too_busy": "The seller declined: too busy right now",
             "seller_reject_store_closing": "The seller declined: the store is closing",
             "seller_reject_other": "The seller declined the order",
-            "admin_cancel": "Cancelled by Sariko"
+            "admin_cancel": "Cancelled by Sariko",
+            "payment_timeout": "Payment time ran out"
         },
         "seller": {
             "seller_timeout": "Not confirmed in time (cancelled automatically)",
@@ -1383,7 +1386,8 @@
             "seller_reject_too_busy": "You declined: too busy",
             "seller_reject_store_closing": "You declined: the store is closing",
             "seller_reject_other": "You declined: {note}",
-            "admin_cancel": "Sariko cancelled the order"
+            "admin_cancel": "Sariko cancelled the order",
+            "payment_timeout": "Not paid in time"
         }
     }
 }
