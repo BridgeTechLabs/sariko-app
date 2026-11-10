@@ -120,9 +120,8 @@ class DAOOrders(DAOBase):
     def read_orders_by_user_id(self, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), review_stores(id), deliveries(status), order_items(food_items(preorder_day))") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refund_state, review_stores(id), deliveries(status), order_items(food_items(preorder_day))") \
                 .eq("user_id", user_id) \
-                .neq("refunds.reason", "duplicate_payment") \
                 .order("created_at", desc=True) \
                 .execute()
 
@@ -136,10 +135,9 @@ class DAOOrders(DAOBase):
     def read_order_by_id(self, order_id: str, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url, preorder_day)), refunds(status)") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url, preorder_day)), refund_state") \
                 .eq("id", order_id) \
                 .eq("user_id", user_id) \
-                .neq("refunds.reason", "duplicate_payment") \
                 .maybe_single() \
                 .execute()
 
@@ -251,7 +249,7 @@ class DAOOrders(DAOBase):
     def read_order_by_id_for_seller(self, order_id: str, seller_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, cancellation_reason, created_at, paid_at, status_changed_at, users(name, email, phone), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), payments(method, type)") \
+                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, cancellation_reason, created_at, paid_at, status_changed_at, users(name, email, phone), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), payments(method, type), refund_state") \
                 .eq("id", order_id) \
                 .eq("seller_id", seller_id) \
                 .maybe_single() \

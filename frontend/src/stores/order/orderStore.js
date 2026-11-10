@@ -6,10 +6,10 @@ const ORDER_LIST_POLL_MS = 15_000
 const ORDER_DETAIL_POLL_MS = 10_000
 
 // Nothing left to change on the buyer's screen: done, or cancelled and either never paid or refunded.
-// A paid cancel gets its refund row just after the status change, and a failed refund can be retried,
-// so only 'processed' ends it.
+// A paid cancel gets its refund just after the status change, and a failed refund can be retried,
+// so only refund_state 'refunded' (T172) ends it.
 const isSettled = (order) => order?.status === 'done'
-    || (order?.status === 'cancelled' && (order.payment_status !== 'paid' || order.refunds?.[0]?.status === 'processed'))
+    || (order?.status === 'cancelled' && (order.payment_status !== 'paid' || order.refund_state === 'refunded'))
 
 export const useOrderStore = defineStore("orderStore", {
     state() {

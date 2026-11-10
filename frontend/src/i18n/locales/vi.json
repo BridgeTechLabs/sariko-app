@@ -516,9 +516,7 @@
         "error_payment_failed": "Thanh toán thất bại. Vui lòng thử lại.",
         "error_cancel_failed": "Hủy đơn thất bại",
         "refund_pending": "Hoàn tiền đang xử lý",
-        "refund_processed": "Đã hoàn tiền",
-        "refund_failed": "Hoàn tiền thất bại",
-        "refund_failed_subtext": "Hoàn tiền không thành công. Vui lòng liên hệ hỗ trợ để được xử lý."
+        "refund_processed": "Đã hoàn tiền"
     },
     "order_review": {
         "title": "Đánh giá đơn hàng",
@@ -708,6 +706,8 @@
         "label_placed": "Đặt lúc",
         "payment_paid": "Đã thanh toán",
         "payment_pending": "Chờ thanh toán",
+        "payment_refunded": "Đã hoàn tiền",
+        "payment_refund_in_progress": "Đang hoàn tiền",
         "status_new": "Đơn mới",
         "status_preparing": "Đang làm",
         "status_ready": "Sẵn sàng giao",

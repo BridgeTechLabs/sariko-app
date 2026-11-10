@@ -516,9 +516,7 @@
         "error_payment_failed": "Payment failed. Please try again.",
         "error_cancel_failed": "Failed to cancel order",
         "refund_pending": "Refund Processing",
-        "refund_processed": "Refund Completed",
-        "refund_failed": "Refund Failed",
-        "refund_failed_subtext": "Your refund was unsuccessful. Please contact support."
+        "refund_processed": "Refund Completed"
     },
     "order_review": {
         "title": "Rate Your Order",
@@ -708,6 +706,8 @@
         "label_placed": "Placed",
         "payment_paid": "Paid",
         "payment_pending": "Pending",
+        "payment_refunded": "Refunded",
+        "payment_refund_in_progress": "Refund in progress",
         "status_new": "New Order",
         "status_preparing": "Preparing",
         "status_ready": "Ready for Delivery",

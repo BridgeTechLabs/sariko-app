@@ -66,6 +66,16 @@ export default {
         },
 
         // From the charge row in payments; force-paid DEV orders have none, so the row hides.
+        // refund_state (backend, T172) before paid / pending; a failed refund is retried, so still in progress
+        paymentStatus() {
+            const state = this.order.refund_state
+            if (state === 'refunded') return { text: this.$t('seller_order_detail.payment_refunded'), color: 'var(--text-secondary)' }
+            if (state) return { text: this.$t('seller_order_detail.payment_refund_in_progress'), color: 'var(--color-warning)' }
+            return this.order.payment_status === 'paid'
+                ? { text: this.$t('seller_order_detail.payment_paid'), color: 'var(--color-success)' }
+                : { text: this.$t('seller_order_detail.payment_pending'), color: 'var(--color-warning)' }
+        },
+
         paymentMethod() {
             const method = (this.order.payments || []).find(p => p.type === 'charge')?.method
             return method ? (PAYMENT_METHOD_LABEL[method] || method) : null
@@ -290,9 +300,7 @@ export default {
             </div>
             <div class="info-row">
                 <span class="info-key">{{ $t('seller_order_detail.label_status') }}</span>
-                <span class="info-val" :style="{ color: order.payment_status === 'paid' ? 'var(--color-success)' : 'var(--color-warning)' }">
-                    {{ order.payment_status === 'paid' ? $t('seller_order_detail.payment_paid') : $t('seller_order_detail.payment_pending') }}
-                </span>
+                <span class="info-val" :style="{ color: paymentStatus.color }">{{ paymentStatus.text }}</span>
             </div>
         </div>
 

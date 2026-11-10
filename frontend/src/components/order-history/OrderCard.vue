@@ -48,11 +48,8 @@ export default {
             }
             return map[this.order.status] || this.order.status
         },
-        refundStatus() {
-            return this.order.refunds?.[0]?.status || null
-        },
-        showRefundChip() {
-            return this.refundStatus === 'pending'
+        showRefundChip() {   // refund_state (backend, T172); a failed refund is retried, still on its way
+            return ['in_progress', 'failed'].includes(this.order.refund_state)
         },
         // review_stores(id) is embedded by the orders query, so this costs no extra request.
         // order_id is unique there, so PostgREST returns an object (null until reviewed);

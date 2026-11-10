@@ -91,16 +91,15 @@ export default {
             }
             return map[this.order?.status] || '#ffffff'
         },
-        refundStatus() {
-            return this.order?.refunds?.[0]?.status || null
-        },
+        // refund_state (backend, T172). A failed refund shows as in progress: the team retries it.
         refundChip() {
+            const pending = { label: this.$t('order_detail.refund_pending'), cls: 'refund-pending' }
             const map = {
-                pending:   { label: this.$t('order_detail.refund_pending'),   cls: 'refund-pending' },
-                processed: { label: this.$t('order_detail.refund_processed'), cls: 'refund-processed' },
-                failed:    { label: this.$t('order_detail.refund_failed'),    cls: 'refund-failed' },
+                in_progress: pending,
+                failed: pending,
+                refunded: { label: this.$t('order_detail.refund_processed'), cls: 'refund-processed' },
             }
-            return this.refundStatus ? map[this.refundStatus] : null
+            return map[this.order?.refund_state] || null
         }
     }
 }
@@ -116,14 +115,9 @@ export default {
         <div class="status-title">{{ statusTitle }}</div>
         <div class="status-subtext">{{ statusSubtext }}</div>
 
-        <template v-if="refundChip">
-            <div class="refund-chip" :class="refundChip.cls">
-                {{ refundChip.label }}
-            </div>
-            <div v-if="refundStatus === 'failed'" class="refund-failed-subtext">
-                {{ $t('order_detail.refund_failed_subtext') }}
-            </div>
-        </template>
+        <div v-if="refundChip" class="refund-chip" :class="refundChip.cls">
+            {{ refundChip.label }}
+        </div>
     </div>
 
     <div v-else class="loading-state">
@@ -166,15 +160,6 @@ export default {
 
 .refund-pending   { background: rgba(245, 166, 35, 0.12); color: #f5a623; }
 .refund-processed { background: rgba(34, 197, 94, 0.12);  color: #22c55e; }
-.refund-failed    { background: rgba(239, 68, 68, 0.12);   color: #ef4444; }
-
-.refund-failed-subtext {
-    margin-top: 8px;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.45);
-    text-align: center;
-    line-height: 1.5;
-}
 
 .loading-state {
     display: flex;
