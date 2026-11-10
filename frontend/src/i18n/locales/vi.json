@@ -384,10 +384,8 @@
         "validation_name_required": "Vui lòng nhập tên",
         "validation_phone_invalid": "Số điện thoại không hợp lệ",
         "label_store_name": "Tên cửa hàng",
-        "placeholder_store_name": "VD: Bếp nhà Rosa",
         "helper_store_name": "Đường link cửa hàng giữ nguyên khi đổi tên",
-        "validation_store_name_required": "Vui lòng nhập tên cửa hàng",
-        "validation_store_name_too_long": "Tối đa 50 ký tự"
+        "validation_store_name_required": "Vui lòng nhập tên cửa hàng"
     },
     "change_password_page": {
         "label_new": "Mật khẩu mới",
@@ -1234,7 +1232,20 @@
     },
     "seller_profile": {
         "page_title": "Hoàn thiện hồ sơ người bán",
-        "menu_label": "Hồ sơ người bán",
+        "store_page_title": "Hồ sơ quán",
+        "section_store": "Quán",
+        "section_owner": "Chủ quán",
+        "section_tax_bank": "Thuế và ngân hàng",
+        "section_signature": "Chữ ký",
+        "row_photo": "Ảnh quán",
+        "row_description": "Mô tả",
+        "row_contact_name": "Tên liên hệ",
+        "hint_contact_name": "Tên người mua và tài xế thấy",
+        "hint_description": "Hiện dưới tên quán. Người mua thấy 2 dòng đầu, bấm ⓘ để xem đủ.",
+        "description_empty": "Thêm mô tả ngắn",
+        "missing": "Còn thiếu",
+        "signed": "Đã ký",
+        "load_error": "Không tải được hồ sơ quán",
         "menu_missing": "Còn thiếu {n} mục",
         "banner_title": "Hồ sơ người bán còn thiếu",
         "banner_missing": "Còn thiếu: {items}",

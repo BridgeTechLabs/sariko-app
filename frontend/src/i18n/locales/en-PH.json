@@ -384,10 +384,8 @@
         "validation_name_required": "Please enter your name",
         "validation_phone_invalid": "Invalid phone number format",
         "label_store_name": "Store name",
-        "placeholder_store_name": "e.g. Rosa's Home Kitchen",
         "helper_store_name": "Your shop link stays the same after renaming",
-        "validation_store_name_required": "Please enter your store name",
-        "validation_store_name_too_long": "Max 50 characters"
+        "validation_store_name_required": "Please enter your store name"
     },
     "change_password_page": {
         "label_new": "New password",
@@ -1231,7 +1229,20 @@
     },
     "seller_profile": {
         "page_title": "Complete your seller profile",
-        "menu_label": "Seller profile",
+        "store_page_title": "Store profile",
+        "section_store": "Store",
+        "section_owner": "Owner",
+        "section_tax_bank": "Tax & bank",
+        "section_signature": "Signature",
+        "row_photo": "Store photo",
+        "row_description": "Description",
+        "row_contact_name": "Contact name",
+        "hint_contact_name": "The name buyers and riders see",
+        "hint_description": "Shown under your store name. Buyers see the first 2 lines; tap ⓘ for the full text.",
+        "description_empty": "Add a short description",
+        "missing": "Missing",
+        "signed": "Signed",
+        "load_error": "Couldn't load your store profile",
         "menu_missing": "{n} item(s) missing",
         "banner_title": "Your seller profile is incomplete",
         "banner_missing": "Still missing: {items}",
