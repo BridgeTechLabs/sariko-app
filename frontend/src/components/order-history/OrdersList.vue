@@ -29,7 +29,7 @@ export default {
                 return this.orders.filter(o => o.payment_status === 'pending' && o.status !== 'cancelled')
             }
             if (this.selectedFilter === 'active') {
-                return this.orders.filter(o => o.payment_status === 'paid' && ['pending', 'confirmed', 'ready'].includes(o.status))
+                return this.orders.filter(o => o.payment_status === 'paid' && ['pending', 'confirmed', 'ready', 'delivery_failed'].includes(o.status))
             }
             if (this.selectedFilter === 'completed') {
                 return this.orders.filter(o => o.status === 'done')

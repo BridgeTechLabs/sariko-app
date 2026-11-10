@@ -191,8 +191,15 @@ def test_five_confirmed_orders_read_the_setting_once(settings):  # TC-9
 
 
 def test_no_confirmed_order_reads_nothing(settings):  # TC-22
-    sellers._with_deadlines([{"status": s, "payment_status": "paid"} for s in ("ready", "done", "delivery_failed")], SELLER)
+    sellers._with_deadlines([{"status": s, "payment_status": "paid"} for s in ("ready", "done", "cancelled")], SELLER)
     assert settings.reads == []
+
+
+def test_confirmed_and_failed_deliveries_read_each_setting_once(settings):  # T177 TC-A30a: one read per key
+    failed = {**confirmed(40), "status": "delivery_failed"}
+    out = sellers._with_deadlines([confirmed(5), dict(failed), confirmed(9), dict(failed)], SELLER)
+    assert sorted(settings.reads) == ["buyer_cancel_late_confirmed_minutes", "buyer_cancel_late_delivery_failed_minutes"]
+    assert datetime.fromisoformat(out[1]["deadline"]) == datetime.fromisoformat(failed["status_changed_at"]) + timedelta(minutes=30)
 
 
 def test_deadlines_match_the_single_order_path(settings):  # TC-10, TC-22 (appointment), TC-23

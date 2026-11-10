@@ -13,7 +13,7 @@ const STATUS_NEXT = {
 const REJECT_REASONS = ['out_of_ingredients', 'too_busy', 'store_closing', 'other']
 
 // Trip over: before that the Lalamove COMPLETED webhook closes the order, not the seller.
-const DELIVERY_ENDED = ['COMPLETED', 'REJECTED', 'CANCELLED', 'CANCELED', 'EXPIRED']
+const DELIVERY_ENDED = ['COMPLETED', 'REJECTED', 'CANCELLED', 'CANCELED', 'EXPIRED', 'LOST']
 
 export default {
     components: { AlertTriangle },
@@ -60,8 +60,8 @@ export default {
         },
         rebookCount() { return this.delivery?.rebook_count || 0 },
         rebookMax() { return this.delivery?.rebook_max || 3 },  // admin_settings.seller_rebook_max
-        canRebook() {
-            return this.order.status === 'delivery_failed' && this.rebookCount < this.rebookMax
+        canRebook() {   // a lost / damaged delivery is not re-booked: the team handles it (T177 A22)
+            return this.order.status === 'delivery_failed' && this.rebookCount < this.rebookMax && this.delivery?.status !== 'LOST'
         },
         maxRebookReached() {
             return this.order.status === 'delivery_failed' && this.rebookCount >= this.rebookMax

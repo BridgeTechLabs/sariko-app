@@ -469,6 +469,8 @@
         "reason_seller_timeout": "Người bán không xác nhận đơn kịp thời",
         "reason_seller_late": "Người bán trễ hạn",
         "reason_sold_out": "Món đã hết suất trong lúc bạn thanh toán",
+        "reason_no_driver": "Không đặt được tài xế cho đơn này.",
+        "reason_delivery_failed": "Giao hàng không thành công",
         "late_cancel_hint": "Dự kiến trước {time}. Quá giờ này bạn có thể hủy và được hoàn tiền.",
         "cancel_until_hint": "Bạn có thể hủy đơn này trước {time}.",
         "btn_late_cancel": "Đơn đang chậm: Hủy và hoàn tiền",
@@ -480,7 +482,7 @@
         "status_title_ready": "Đơn hàng sẵn sàng!",
         "status_title_done": "Đơn hàng hoàn thành",
         "status_title_cancelled": "Đơn hàng đã hủy",
-        "status_title_delivery_failed": "Đang tìm tài xế",
+        "status_title_delivery_failed": "Chưa giao được, quán đang xử lý",
         "status_subtext_awaiting_payment": "Hoàn tất thanh toán để gửi đơn đến người bán.",
         "status_subtext_pending": "Đơn hàng đã gửi. Người bán sẽ xác nhận sớm.",
         "status_subtext_confirmed": "Người bán đang chuẩn bị đơn hàng.",
@@ -488,7 +490,7 @@
         "status_subtext_ready_pickup": "Đơn hàng sẵn sàng! Đến cửa hàng nhận nhé.",
         "status_subtext_done": "Chúc ngon miệng!",
         "status_subtext_cancelled": "Đơn hàng này đã bị hủy.",
-        "status_subtext_delivery_failed": "Chúng tôi đang tìm tài xế cho đơn hàng của bạn. Vui lòng chờ!",
+        "status_subtext_delivery_failed": "Quán sẽ đặt lại tài xế hoặc tự giao.",
         "label_status": "Trạng thái",
         "label_seller": "Người bán",
         "label_delivery": "Giao hàng",
@@ -588,6 +590,7 @@
         "status_PICKED_UP": "Đã lấy hàng",
         "status_COMPLETED": "Đã giao",
         "status_CANCELLED": "Không tìm được tài xế — seller đang đặt lại",
+        "status_LOST": "Đơn bị thất lạc / hư hỏng khi giao, Sariko đang xử lý",
         "status_subtext_ready": "Đang tìm tài xế để giao đơn hàng của bạn.",
         "driver_label": "Tài xế của bạn",
         "track_rider": "Theo dõi tài xế"
@@ -751,9 +754,10 @@
         "delivery_step_pickedup": "Đã lấy hàng",
         "delivery_step_completed": "Đã giao",
         "delivery_cancelled_error": "Không tìm được tài xế. Vui lòng đặt lại hoặc hủy đơn.",
-        "delivery_rejected_error": "2 tài xế đã từ chối đơn này. Vui lòng đặt lại hoặc hủy đơn.",
+        "delivery_rejected_error": "Tài xế đã từ chối đơn này. Vui lòng đặt lại hoặc hủy đơn.",
         "delivery_expired_error": "Không có tài xế nhận đơn trong thời hạn. Vui lòng đặt lại hoặc hủy đơn.",
-        "delivery_canceled_error": "Đơn giao hàng đã bị hủy. Vui lòng đặt lại hoặc hủy đơn."
+        "delivery_canceled_error": "Đơn giao hàng đã bị hủy. Vui lòng đặt lại hoặc hủy đơn.",
+        "delivery_lost_error": "Hàng bị thất lạc / hư hỏng khi giao. Không đặt lại được, đội Sariko sẽ liên hệ."
     },
     "seller_me": {
         "seller_badge": "Người bán",

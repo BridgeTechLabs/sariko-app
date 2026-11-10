@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { createPoller } from "@/composables/createPoller";
 import apiDeliveries from "@/apis/deliveries/apiDeliveries";
 
-const DELIVERY_TERMINAL = ['COMPLETED', 'CANCELED', 'CANCELLED', 'REJECTED', 'EXPIRED']
+const DELIVERY_TERMINAL = ['COMPLETED', 'CANCELED', 'CANCELLED', 'REJECTED', 'EXPIRED', 'LOST']
 const DELIVERY_POLL_MS = 10_000
 
 export const useDeliveryStore = defineStore("deliveryStore", {
@@ -26,7 +26,7 @@ export const useDeliveryStore = defineStore("deliveryStore", {
         },
         isDeliveryActive(state) {
             const s = state.currentDelivery?.status
-            return s && s !== 'COMPLETED' && !['CANCELED', 'REJECTED', 'EXPIRED'].includes(s)
+            return s && s !== 'COMPLETED' && !['CANCELED', 'REJECTED', 'EXPIRED', 'LOST'].includes(s)
         },
     },
 

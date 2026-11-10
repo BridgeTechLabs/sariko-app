@@ -58,6 +58,11 @@ def test_scheduled_confirmed_counts_from_appointment():
     assert deadline(order) == appointment + timedelta(hours=1)
 
 
+def test_delivery_failed_counts_to_buyer_cancel():   # T177 TC-A30a
+    failed = NOW - timedelta(minutes=10)
+    assert deadline({"status": "delivery_failed", "status_changed_at": iso(failed)}) == failed + timedelta(minutes=30)
+
+
 def test_other_statuses_show_nothing():
-    for status in ("ready", "done", "cancelled", "delivery_failed"):
+    for status in ("ready", "done", "cancelled"):
         assert deadline({"status": status, "status_changed_at": iso(NOW), "paid_at": iso(NOW)}) is None

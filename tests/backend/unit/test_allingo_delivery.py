@@ -428,6 +428,39 @@ def test_tc29_rebook_takes_a_running_trip_not_an_ended_one(seller):
         {"allingo_order_id": "ord_live", "status": "ON_GOING", "share_link": "https://business.allingo.vn/track/ord_live"}
 
 
+def test_a22c_lost_trip_cannot_be_rebooked(seller):   # T177 TC-A22c
+    Orders.row["status"] = "delivery_failed"
+    Deliveries.row = {"id": "d1", "provider": "allingo", "allingo_order_id": "ord_0", "status": "LOST", "rebook_count": 0}
+    with pytest.raises(HTTPException) as e:
+        rebook()
+    assert e.value.status_code == 409 and e.value.detail["code"] == "delivery_lost"
+    assert seller.http.made("POST", "/orders") == [] and Deliveries.updates == [] and Orders.writes == []
+
+
+@pytest.mark.parametrize("status, reason", [("delivery_failed", "driver_booking_failed"),   # T177 TC-A32a: no rider
+                                            ("confirmed", "seller_cancel"), ("pending", "seller_cancel")])
+def test_a32a_seller_cancel_reason(seller, status, reason):
+    Orders.row["status"] = status
+    sellers.update_seller_order_status(OID, Schema.RequestUpdateOrderStatus(status="cancelled", cancellation_reason="No rider"),
+                                       user={"id": "s"})
+    assert Orders.row["status"] == "cancelled" and refunds == [reason]
+
+
+def test_a32b_auto_cancel_does_not_overwrite_another_cancel(seller, monkeypatch):   # T177 TC-A32b
+    seller.http.routes[("POST", "/orders")] = reply(422, {"error": {"code": "validation_failed"}})
+    real = Orders.read_order_by_id_for_seller
+
+    def read_then_buyer_cancels(self, order_id, seller_id):
+        snapshot = real(self, order_id, seller_id)
+        Orders.row = {**Orders.row, "status": "cancelled"}   # the buyer cancelled while the booking ran
+        return snapshot
+    monkeypatch.setattr(Orders, "read_order_by_id_for_seller", read_then_buyer_cancels)
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert e.value.status_code == 409
+    assert Orders.row["status"] == "cancelled" and Orders.writes == [] and refunds == []
+
+
 @pytest.mark.parametrize("provider", ["allingo", "lalamove", None])
 def test_tc9_tc18_buyer_cancel_goes_to_the_trip_company(seller, monkeypatch, provider):
     cancelled = []
@@ -506,6 +539,18 @@ def test_tc8_completed_done_once_and_canceled_fails_the_order(hook):
     assert Orders.row["status"] == "delivery_failed"
     assert [a[0] for a in hook.admin] == ["admin_delivery_failed"]
     assert Deliveries.row["driver_phone"] is None and Deliveries.row["share_link"] is None
+
+
+@pytest.mark.parametrize("leg", ["failed", "return_active", "return_finished", "lost", "damaged"])
+def test_a22_failure_after_pickup_is_lost(hook, leg):   # T177 TC-A22a / A22b
+    Deliveries.row = {**Deliveries.row, "status": "PICKED_UP", "driver_phone": "+849", "driver_plate": "59A"}
+    for _ in range(2):   # AllinGo retries the event: one order change, one push
+        assert post_event(hook.client, event(leg)).status_code == 200
+    assert Deliveries.row["status"] == "LOST" and Deliveries.row["driver_phone"] is None
+    assert Orders.row["status"] == "delivery_failed"
+    assert [a[0] for a in hook.admin] == ["admin_delivery_lost"]
+    post_event(hook.client, event("in_transit"))   # an older event arriving late does not reopen the trip
+    assert Deliveries.row["status"] == "LOST"
 
 
 def test_tc8_older_event_does_not_win(hook):

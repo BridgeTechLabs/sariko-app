@@ -44,7 +44,7 @@ def _with_preorder_days(order: dict) -> dict:
     return order
 
 
-TRIP_ENDED = {"REJECTED", "CANCELLED", "CANCELED", "EXPIRED"}   # Lalamove statuses after which a rebook may follow
+TRIP_ENDED = {"REJECTED", "CANCELLED", "CANCELED", "EXPIRED", "LOST"}   # failed ends; a rebook may follow (not after LOST)
 
 
 class DAOOrders(DAOBase):

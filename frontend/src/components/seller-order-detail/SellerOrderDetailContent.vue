@@ -24,10 +24,11 @@ const STATUS_CLASS = {
 const PAYMENT_METHOD_LABEL = { vnpay: 'VNPay' }
 
 const DELIVERY_STATUS_ORDER = ['ASSIGNING_DRIVER', 'ON_GOING', 'PICKED_UP', 'COMPLETED']
-const DELIVERY_CANCELLED_STATUSES = ['CANCELLED', 'CANCELED', 'REJECTED', 'EXPIRED']
+const DELIVERY_CANCELLED_STATUSES = ['CANCELLED', 'CANCELED', 'REJECTED', 'EXPIRED', 'LOST']
 const DELIVERY_CANCEL_ERROR_KEY = {
     REJECTED: 'seller_order_detail.delivery_rejected_error',
     EXPIRED:  'seller_order_detail.delivery_expired_error',
+    LOST:     'seller_order_detail.delivery_lost_error',
     CANCELED: 'seller_order_detail.delivery_canceled_error',
     CANCELLED: 'seller_order_detail.delivery_canceled_error',
 }
@@ -139,11 +140,13 @@ export default {
                 if (deliveryCancelled) {
                     // Show assigning rider as the failed step, hide the rest
                     const errorKey = DELIVERY_CANCEL_ERROR_KEY[this.delivery.status] || 'seller_order_detail.delivery_cancelled_error'
+                    // An order that ended anyway (delivered by the seller, or cancelled) has nothing left to re-book (T177 A46)
+                    const open = !['done', 'cancelled'].includes(this.order.status)
                     steps.push({
                         key: 'ASSIGNING_DRIVER',
                         label: this.$t('seller_order_detail.delivery_step_assigning'),
-                        done: false, current: false, error: true,
-                        errorMessage: this.$t(errorKey),
+                        done: false, current: false, error: open,
+                        errorMessage: open ? this.$t(errorKey) : null,
                     })
                 } else {
                     const deliveryStepDefs = [

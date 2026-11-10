@@ -7,8 +7,9 @@ import { cookingDay, isScheduled } from '@/utils/orderStage';
 // show those translated. Reasons a seller picked or typed are shown as written.
 const SYSTEM_REASON_KEYS = {
     'Seller did not confirm in time': 'order_detail.reason_seller_timeout',                      // services/order_expiry.py
-    'Driver booking failed': 'seller_order_detail.cancel_reason_no_driver',                    // apis/sellers.py
-    'Driver booking failed after 3 attempts': 'seller_order_detail.cancel_reason_no_driver',   // same, orders before 2026-10-15
+    'Driver booking failed': 'order_detail.reason_no_driver',                                 // apis/sellers.py
+    'Driver booking failed after 3 attempts': 'order_detail.reason_no_driver',                // same, orders before 2026-10-15
+    'Delivery failed': 'order_detail.reason_delivery_failed',                                 // apis/orders.py (T177 A13)
     'Seller was late': 'order_detail.reason_seller_late',                                     // apis/orders.py
     'Sold out': 'order_detail.reason_sold_out',                                               // dao/dao_orders.py
 }

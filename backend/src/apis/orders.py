@@ -273,6 +273,7 @@ def get_orders(user=Depends(verify_token)):
 
 
 SELLER_LATE_REASON = "Seller was late"  # the buyer UI translates this exact text (OrderStatusHeader.vue)
+DELIVERY_FAILED_REASON = "Delivery failed"  # same; the delivery company failed, not the seller (T177 A13)
 
 
 def _ts(value):
@@ -330,7 +331,7 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
     now = datetime.now(timezone.utc)
-    reason = None
+    reason, refund_reason = None, "buyer_cancel"
     if order["status"] == "pending":
         last = cancel_before(order)
         if last and now > last:
@@ -343,6 +344,8 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
         if not deadline or now < deadline:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This order can't be cancelled now")
         reason = SELLER_LATE_REASON
+        if order["status"] == "delivery_failed":   # no rider: the seller's cancel of it gets the same refund reason (A32)
+            reason, refund_reason = DELIVERY_FAILED_REASON, "driver_booking_failed"
 
     # Conditional: the seller may have moved the order on (e.g. tapped Ready) since we read it
     updated = dao_orders.update_order_status(order_id=order_id, status="cancelled", cancellation_reason=reason,
@@ -352,6 +355,6 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
     push_service.notify_buyer_cancelled(updated)
 
     from dao.dao_refunds import DAORefunds
-    DAORefunds().create_refund_for_order(order, "buyer_cancel")
+    DAORefunds().create_refund_for_order(order, refund_reason)
 
     return {"success": True}

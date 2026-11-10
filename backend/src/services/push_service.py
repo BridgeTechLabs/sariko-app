@@ -92,6 +92,10 @@ MESSAGES = {
         "en": ("Order #{code}: delivery failed", "The delivery company could not deliver it. Tap to open the order."),
         "vi": ("Đơn #{code} giao thất bại", "Hãng giao hàng không giao được. Nhấn để mở đơn."),
     },
+    "admin_delivery_lost": {
+        "en": ("Order #{code}: food lost on the way", "Lost, damaged or sent back after pickup. Contact the buyer and the seller."),
+        "vi": ("Đơn #{code} thất lạc khi giao", "Hàng mất, hỏng hoặc bị trả lại sau khi lấy. Hãy liên hệ người mua và người bán."),
+    },
     "admin_delivery_wallet_empty": {
         "en": ("Delivery wallet is empty", "No rider booked for order #{code}. Top up the delivery wallet."),
         "vi": ("Ví giao hàng hết tiền", "Chưa đặt được xe cho đơn #{code}. Hãy nạp tiền vào ví giao hàng."),
@@ -107,6 +111,7 @@ ZALO_ADMIN = {
     "admin_new_complaint": ("support", "📣 New complaint {code} · {category}"),
     "admin_order_expiring": ("ops", "⏰ Order #{code} not accepted by the seller, auto-cancels in {minutes} min. Call the seller."),
     "admin_delivery_failed": ("ops", "🚚 Order #{code}: delivery failed, the delivery company could not deliver it."),
+    "admin_delivery_lost": ("ops", "📦 Order #{code}: food lost, damaged or sent back after pickup. Contact the buyer and the seller."),
     "admin_delivery_wallet_empty": ("ops", "💸 Delivery wallet is empty: no rider booked for order #{code}. Top up the wallet."),
     "admin_delivery_wallet_low": ("ops", "🪫 AllinGo wallet low: {balance} (alert below {threshold}). Top up before trips start failing."),
 }

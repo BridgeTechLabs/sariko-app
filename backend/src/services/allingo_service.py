@@ -38,6 +38,9 @@ STATUS = {
     **dict.fromkeys(("canceled", "failed", "return_active", "return_finished", "lost", "damaged"), "CANCELED"),
 }
 
+# A failure once the courier has the food (stored PICKED_UP): lost / damaged / sent back, not a trip to book again (T177 A22).
+LOST_AFTER_PICKUP = {"failed", "return_active", "return_finished", "lost", "damaged"}
+
 WALLET_EMPTY = "allingo_wallet_empty"
 
 

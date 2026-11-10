@@ -469,6 +469,8 @@
         "reason_seller_timeout": "The seller didn't confirm your order in time",
         "reason_seller_late": "Seller was late",
         "reason_sold_out": "A dish sold out while you were paying",
+        "reason_no_driver": "No rider could be booked for this order.",
+        "reason_delivery_failed": "The delivery failed",
         "late_cancel_hint": "Expected by {time}. After that you can cancel for a full refund.",
         "cancel_until_hint": "You can cancel this order until {time}.",
         "btn_late_cancel": "Order is late: Cancel and refund",
@@ -480,7 +482,7 @@
         "status_title_ready": "Order Ready!",
         "status_title_done": "Order Completed",
         "status_title_cancelled": "Order Cancelled",
-        "status_title_delivery_failed": "Finding a Driver",
+        "status_title_delivery_failed": "Delivery failed - the seller is handling it",
         "status_subtext_awaiting_payment": "Complete your payment to send this order to the seller.",
         "status_subtext_pending": "Your order has been sent. The seller will confirm shortly.",
         "status_subtext_confirmed": "The seller is preparing your order.",
@@ -488,7 +490,7 @@
         "status_subtext_ready_pickup": "Your order is ready! Head to the store.",
         "status_subtext_done": "Enjoy your meal!",
         "status_subtext_cancelled": "This order has been cancelled.",
-        "status_subtext_delivery_failed": "We're trying to find a driver for your order. Sit tight!",
+        "status_subtext_delivery_failed": "The seller will book another rider or deliver it themselves.",
         "label_status": "Status",
         "label_seller": "Seller",
         "label_delivery": "Delivery",
@@ -588,6 +590,7 @@
         "status_PICKED_UP": "Picked up",
         "status_COMPLETED": "Delivered",
         "status_CANCELLED": "No rider found — seller is arranging",
+        "status_LOST": "The food was lost or damaged on the way - Sariko is handling it",
         "status_subtext_ready": "A rider is being assigned to deliver your order.",
         "driver_label": "Your Rider",
         "track_rider": "Track Rider"
@@ -751,9 +754,10 @@
         "delivery_step_pickedup": "Order picked up",
         "delivery_step_completed": "Delivered",
         "delivery_cancelled_error": "No rider could be assigned. Please re-book or cancel the order.",
-        "delivery_rejected_error": "2 riders declined this order. Please re-book or cancel.",
+        "delivery_rejected_error": "Riders declined this order. Please re-book or cancel.",
         "delivery_expired_error": "No riders accepted within the time limit. Please re-book or cancel.",
-        "delivery_canceled_error": "The delivery was cancelled. Please re-book or cancel the order."
+        "delivery_canceled_error": "The delivery was cancelled. Please re-book or cancel the order.",
+        "delivery_lost_error": "The food was lost or damaged on the way. It can't be re-booked; the Sariko team will contact you."
     },
     "seller_me": {
         "seller_badge": "Seller",

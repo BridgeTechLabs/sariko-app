@@ -127,7 +127,8 @@ def order_follows_trip(dao_orders, order_id: str, trip_status: str):
         order = dao_orders.read_order_by_id_raw(order_id)
         if order and order["status"] == "ready":
             if dao_orders.update_order_status(order_id, "delivery_failed"):
-                push_service.notify_admins("admin_delivery_failed", f"/orders?open={order['id']}", code=order["id"][:8])
+                event = "admin_delivery_lost" if trip_status == "LOST" else "admin_delivery_failed"
+                push_service.notify_admins(event, f"/orders?open={order['id']}", code=order["id"][:8])
             logger.warning(f"[Webhook] order={order_id} → delivery_failed (trip={trip_status})")
 
 
@@ -402,7 +403,8 @@ async def allingo_webhook(request: Request):
 
         leg = trip.get("delivery") or {}
         current = delivery.get("status")
-        new = allingo_service.STATUS.get(leg.get("status"))
+        new = "LOST" if current == "PICKED_UP" and leg.get("status") in allingo_service.LOST_AFTER_PICKUP \
+            else allingo_service.STATUS.get(leg.get("status"))
         update = {"status": new} if new and trip_rank(new) > trip_rank(current) else {}
         status = update.get("status", current)
 
@@ -501,6 +503,9 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
 
         dao_deliveries = DAODeliveries()
         delivery = dao_deliveries.read_delivery_by_order_id(order_id)
+        if delivery and delivery["status"] == "LOST":   # the food is gone: the team handles it, no new trip (T177 A22)
+            raise HTTPException(status_code=409, detail={"code": "delivery_lost",
+                                                         "message": "The food was lost or damaged on the way. Sariko will contact you."})
         if not delivery or delivery["status"] not in ("CANCELLED", "CANCELED", "REJECTED", "EXPIRED"):
             raise HTTPException(status_code=400, detail="No cancelled delivery to rebook")
 

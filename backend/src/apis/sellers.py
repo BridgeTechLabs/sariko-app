@@ -48,7 +48,7 @@ VALID_STATUS_TRANSITIONS = {
 
 # A Lalamove trip is over once it reaches one of these; before that the COMPLETED
 # webhook closes the order, so the seller can't mark it done (P0-6).
-DELIVERY_ENDED_STATUSES = {"COMPLETED", "REJECTED", "CANCELLED", "CANCELED", "EXPIRED"}
+DELIVERY_ENDED_STATUSES = {"COMPLETED", "REJECTED", "CANCELLED", "CANCELED", "EXPIRED", "LOST"}
 
 # Rows one order search returns (a page size, not a business rule).
 SEARCH_LIMIT = 20
@@ -94,7 +94,7 @@ def _get_seller_id(user):
 def _with_deadlines(orders: list, seller: dict) -> list:
     """`deadline` shown under the seller's Accept / Ready buttons.
     pending (paid): when it auto-cancels; None while the store is closed, that clock is paused.
-    confirmed: when the buyer may cancel it for a full refund (R4)."""
+    confirmed / delivery_failed: when the buyer may cancel it for a full refund (R4, R6)."""
     now = datetime.now(timezone.utc)
     hours = seller.get("weekly_hours")
     window = None
@@ -108,7 +108,7 @@ def _with_deadlines(orders: list, seller: dict) -> list:
             order["deadline"] = confirm_deadline(datetime.fromisoformat(order["paid_at"]), hours,
                                                  datetime.fromisoformat(opened_at) if opened_at else None,
                                                  now, window, seller.get("id")).isoformat()
-        elif order["status"] == "confirmed" and order.get("status_changed_at"):
+        elif order["status"] in ("confirmed", "delivery_failed") and order.get("status_changed_at"):
             order["deadline"] = cancel_after(order, get_minutes).isoformat()
     return orders
 
@@ -391,7 +391,10 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
             if booking_result is None:
                 logger.error(f"[Delivery] All {attempts} booking attempts failed for order={order_id}: {last_booking_error}")
                 # The buyer UI translates this exact text (OrderStatusHeader.vue); no count in it, it's a setting
-                dao_orders.update_order_status(order_id, "cancelled", "Driver booking failed")
+                # Conditional: the buyer may have cancelled (and been refunded) while the booking ran (T177 A32)
+                if not dao_orders.update_order_status(order_id, "cancelled", "Driver booking failed",
+                                                      expected_status=order["status"]):
+                    raise HTTPException(status_code=409, detail="Order status changed, please refresh")
                 from dao.dao_refunds import DAORefunds
                 DAORefunds().create_refund_for_order(order, "driver_booking_failed")
                 raise HTTPException(status_code=503, detail="Unable to book a delivery driver. Your order has been cancelled.")
@@ -432,7 +435,8 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
 
         if body.status == "cancelled":
             from dao.dao_refunds import DAORefunds
-            DAORefunds().create_refund_for_order(order, "seller_cancel")
+            # Cancelling a failed delivery = no rider, not the seller's choice (T177 A32)
+            DAORefunds().create_refund_for_order(order, "driver_booking_failed" if order["status"] == "delivery_failed" else "seller_cancel")
 
         return {"success": True, "order": updated}
     except HTTPException:

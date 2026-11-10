@@ -227,9 +227,12 @@ def test_r6_1_delivery_failed_29_min_refused():
     assert assert_refused() == "delivery_failed"
 
 
-def test_r6_2_delivery_failed_31_min_cancels_with_refund():
+def test_r6_2_delivery_failed_31_min_cancels_with_refund():   # T177 TC-A13d: the delivery failed, not the seller
     order("delivery_failed", status_changed_at=ago(minutes=31))
-    assert_late_cancel()
+    assert buyer_cancel()["success"]
+    assert FakeOrders.row["status"] == "cancelled"
+    assert FakeOrders.row["cancellation_reason"] == orders.DELIVERY_FAILED_REASON == "Delivery failed"
+    assert refunds == [("o1", "driver_booking_failed", 125000)]   # same reason as a seller cancel of it (A32)
 
 
 def test_r6_4_rebooked_order_has_no_cancel_deadline():
