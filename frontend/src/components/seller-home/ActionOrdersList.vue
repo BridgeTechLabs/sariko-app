@@ -4,7 +4,7 @@ import { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin } from 'l
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
 import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '@/utils/readyWindow';
-import { formatVnTime } from '@/utils/vnTime';
+import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
 import { orderCode } from '@/utils/orderCode';
 
@@ -65,29 +65,29 @@ export default {
             return useDashboardStore().deliveryStatuses
         },
 
-        todayStr() {
-            return new Date().toDateString()
+        todayStr() {   // Vietnam day, like the buyer's app, whatever the phone's time zone (T178 A47)
+            return vnDay(new Date())
         },
         hasUpcoming() {
-            return this.orders.some(o => o.delivery_appointment && new Date(o.delivery_appointment).toDateString() !== this.todayStr)
+            return this.orders.some(o => o.delivery_appointment && vnDay(o.delivery_appointment) !== this.todayStr)
         },
         todayCount() {
             return this.orders.filter(o => {
-                const isToday = !o.delivery_appointment || new Date(o.delivery_appointment).toDateString() === this.todayStr
+                const isToday = !o.delivery_appointment || vnDay(o.delivery_appointment) === this.todayStr
                 return isToday && ['pending', 'confirmed', 'delivery_failed'].includes(o.status)
             }).length
         },
         upcomingCount() {
             return this.orders.filter(o => {
                 if (!o.delivery_appointment) return false
-                if (new Date(o.delivery_appointment).toDateString() === this.todayStr) return false
+                if (vnDay(o.delivery_appointment) === this.todayStr) return false
                 return ['pending', 'confirmed', 'delivery_failed'].includes(o.status)
             }).length
         },
         filteredByTab() {
             return this.orders.filter(order => {
                 if (!order.delivery_appointment) return this.activeTab === 'today'
-                const apptDay = new Date(order.delivery_appointment).toDateString()
+                const apptDay = vnDay(order.delivery_appointment)
                 return this.activeTab === 'today' ? apptDay === this.todayStr : apptDay !== this.todayStr
             })
         },

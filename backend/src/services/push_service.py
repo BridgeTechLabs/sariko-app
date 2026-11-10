@@ -2,11 +2,13 @@ import json
 import logging
 import os
 import threading
+from datetime import datetime
 
 from pywebpush import webpush, WebPushException
 
 from dao.dao_push_subscriptions import DAOPushSubscriptions
 from dao.dao_users import DAOUsers
+from core.store_hours import VN_TZ
 from services import zalo
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,18 @@ MESSAGES = {
     "confirmed": {
         "en": ("Order confirmed", "The seller accepted your order and is preparing it."),
         "vi": ("Đơn hàng đã được xác nhận", "Người bán đã nhận đơn và đang chuẩn bị."),
+    },
+    "confirmed_scheduled": {   # T178 A47: a pre-order, cooked for its day
+        "en": ("Order confirmed", "The seller accepted your order and will cook it for your delivery day."),
+        "vi": ("Đơn hàng đã được xác nhận", "Người bán đã nhận đơn và sẽ làm cho ngày giao bạn đã hẹn."),
+    },
+    "ready_pickup": {
+        "en": ("Order ready", "Your order is ready for pickup at the store."),
+        "vi": ("Đơn hàng đã sẵn sàng", "Món đã xong, bạn có thể tới quán lấy."),
+    },
+    "done_pickup": {
+        "en": ("Order picked up", "Enjoy your meal! Tap to leave a review."),
+        "vi": ("Đã nhận món", "Chúc ngon miệng! Nhấn để đánh giá món."),
     },
     "ready": {
         "en": ("Order ready", "Your order is ready — delivery is being arranged."),
@@ -168,9 +182,21 @@ def notify_order_status(order: dict):
 
     status = order.get("status")
     if status in MESSAGES:
-        _send_async(order.get("user_id"), status, f"/orders/{order['id']}")
+        _send_async(order.get("user_id"), _buyer_event(order, status), f"/orders/{order['id']}")
     if status == "delivery_failed":
         _send_async(order.get("seller_user_id"), "seller_delivery_failed", f"/seller/orders/{order['id']}")
+
+
+def _buyer_event(order: dict, status: str) -> str:
+    """T178 A47: the buyer's text follows the kind of order: a pre-order is not "being prepared" days ahead, a pickup is
+    not delivered."""
+    appointment = order.get("delivery_appointment")
+    if status == "confirmed" and appointment and \
+            datetime.fromisoformat(appointment).astimezone(VN_TZ).date() > datetime.now(VN_TZ).date():
+        return "confirmed_scheduled"
+    if status in ("ready", "done") and order.get("delivery_method") == "pickup":
+        return f"{status}_pickup"
+    return status
 
 
 def notify_buyer_cancelled(order: dict):

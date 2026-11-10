@@ -458,19 +458,18 @@
         "status_done": "Completed",
         "status_cancelled": "Cancelled",
         "status_delivery_failed": "Delivery Failed",
-        "refund_pending": "Refund Pending",
         "needs_review": "Needs review",
         "empty_title": "No orders yet",
-        "empty_subtitle": "Your orders will appear here once you place one."
+        "empty_subtitle": "Your orders will appear here once you place one.",
+        "toast_confirmed": "The seller accepted your order",
+        "toast_ready": "Your order is ready",
+        "toast_done": "Your order is complete",
+        "toast_cancelled": "Your order was cancelled",
+        "toast_delivery_failed": "Delivery failed - the seller is handling it"
     },
     "order_detail": {
         "label_order_code": "Order code",
         "cancelled_reason": "Reason",
-        "reason_seller_timeout": "The seller didn't confirm your order in time",
-        "reason_seller_late": "Seller was late",
-        "reason_sold_out": "A dish sold out while you were paying",
-        "reason_no_driver": "No rider could be booked for this order.",
-        "reason_delivery_failed": "The delivery failed",
         "extra_payment_in_progress": "Extra payment {amount}: being refunded",
         "extra_payment_refunded": "Extra payment {amount}: refunded",
         "late_cancel_hint": "Expected by {time}. After that you can cancel for a full refund.",
@@ -588,7 +587,7 @@
         "status_PREPARING": "Preparing",
         "status_SCHEDULED": "Scheduled",
         "status_ASSIGNING_DRIVER": "Finding rider",
-        "status_ON_GOING": "On the way",
+        "status_ON_GOING": "Rider heading to the store",
         "status_PICKED_UP": "Picked up",
         "status_COMPLETED": "Delivered",
         "status_CANCELLED": "No rider found — seller is arranging",
@@ -742,7 +741,6 @@
         "action_cancel_order": "Cancel Order",
         "action_self_deliver": "Mark as Complete",
         "no_driver_notice": "No rider found after several attempts",
-        "cancel_reason_no_driver": "Unable to book delivery after several attempts — no rider available in your area",
         "contact_admin_notice": "There was an error with the delivery. If this keeps happening, email Sariko support: {email}",
         "toast_rebook_success": "Delivery re-booked!",
         "toast_rebook_failed": "Failed to re-book delivery",
@@ -752,7 +750,7 @@
         "toast_reject_failed": "Failed to reject order",
         "delivery_step_created": "Delivery order created",
         "delivery_step_assigning": "Assigning rider",
-        "delivery_step_ongoing": "Rider on the way",
+        "delivery_step_ongoing": "Rider heading to the store",
         "delivery_step_pickedup": "Order picked up",
         "delivery_step_completed": "Delivered",
         "delivery_cancelled_error": "No rider could be assigned. Please re-book or cancel the order.",
@@ -1357,6 +1355,34 @@
             "description_too_long": "The description is too long (max {max} characters).",
             "file_too_large": "A photo is larger than {mb} MB.",
             "generic": "Could not send. Check your connection and try again."
+        }
+    },
+    "cancel_reason": {
+        "buyer": {
+            "seller_timeout": "The seller did not confirm in time",
+            "no_driver": "No rider could be booked for this order",
+            "delivery_failed": "The delivery failed",
+            "seller_late": "You cancelled: the order was late",
+            "buyer_cancelled": "You cancelled this order",
+            "sold_out": "A dish sold out while you were paying",
+            "seller_reject_out_of_ingredients": "The seller declined: out of ingredients",
+            "seller_reject_too_busy": "The seller declined: too busy right now",
+            "seller_reject_store_closing": "The seller declined: the store is closing",
+            "seller_reject_other": "The seller declined the order",
+            "admin_cancel": "Cancelled by Sariko"
+        },
+        "seller": {
+            "seller_timeout": "Not confirmed in time (cancelled automatically)",
+            "no_driver": "No rider could be booked",
+            "delivery_failed": "The delivery failed",
+            "seller_late": "The customer cancelled: the order was late",
+            "buyer_cancelled": "The customer cancelled the order",
+            "sold_out": "A dish sold out (cancelled before you saw it)",
+            "seller_reject_out_of_ingredients": "You declined: out of ingredients",
+            "seller_reject_too_busy": "You declined: too busy",
+            "seller_reject_store_closing": "You declined: the store is closing",
+            "seller_reject_other": "You declined: {note}",
+            "admin_cancel": "Sariko cancelled the order"
         }
     }
 }

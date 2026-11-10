@@ -22,16 +22,14 @@ def test_trip_errors_carry_no_count(messages):
 
 
 def test_buyer_has_its_own_failed_delivery_texts(messages):
-    buyer = messages["order_detail"]
-    for key in ("reason_no_driver", "reason_delivery_failed", "status_title_delivery_failed", "status_subtext_delivery_failed"):
-        assert buyer.get(key), key
-    assert not re.search(r"your area|khu vực|Finding a Driver|tìm tài xế", " ".join(
-        buyer[k] for k in ("reason_no_driver", "status_title_delivery_failed", "status_subtext_delivery_failed")), re.I)
+    buyer, reasons = messages["order_detail"], messages["cancel_reason"]["buyer"]   # T178: reasons are codes
+    texts = [reasons["no_driver"], reasons["delivery_failed"],
+             buyer["status_title_delivery_failed"], buyer["status_subtext_delivery_failed"]]
+    assert all(texts)
+    assert not re.search(r"your area|khu vực|Finding a Driver|tìm tài xế", " ".join(texts), re.I)
     assert messages["delivery_tracker"].get("status_LOST")
 
 
 def test_buyer_reasons_use_buyer_keys():
     header = (FRONTEND / "components" / "order-details" / "OrderStatusHeader.vue").read_text(encoding="utf-8")
-    keys = re.findall(r"^\s*'[^']+':\s*'([\w.]+)'", header.split("SYSTEM_REASON_KEYS", 1)[1].split("}", 1)[0], re.M)
-    assert keys and all(k.startswith("order_detail.") for k in keys), keys
-    assert "'Delivery failed':" in header   # backend apis/orders.py DELIVERY_FAILED_REASON, translated
+    assert "cancelReasonText(this, this.order, 'buyer')" in header   # utils/cancelReason.js, the buyer's own texts

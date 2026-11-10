@@ -458,19 +458,18 @@
         "status_done": "Hoàn thành",
         "status_cancelled": "Đã huỷ",
         "status_delivery_failed": "Giao hàng thất bại",
-        "refund_pending": "Chờ hoàn tiền",
         "needs_review": "Cần đánh giá",
         "empty_title": "Chưa có đơn hàng",
-        "empty_subtitle": "Đơn hàng của bạn sẽ hiện ở đây sau khi đặt."
+        "empty_subtitle": "Đơn hàng của bạn sẽ hiện ở đây sau khi đặt.",
+        "toast_confirmed": "Quán đã nhận đơn của bạn",
+        "toast_ready": "Đơn của bạn đã sẵn sàng",
+        "toast_done": "Đơn của bạn đã hoàn tất",
+        "toast_cancelled": "Đơn của bạn đã bị huỷ",
+        "toast_delivery_failed": "Chưa giao được, quán đang xử lý"
     },
     "order_detail": {
         "label_order_code": "Mã đơn",
         "cancelled_reason": "Lý do",
-        "reason_seller_timeout": "Người bán không xác nhận đơn kịp thời",
-        "reason_seller_late": "Người bán trễ hạn",
-        "reason_sold_out": "Món đã hết suất trong lúc bạn thanh toán",
-        "reason_no_driver": "Không đặt được tài xế cho đơn này.",
-        "reason_delivery_failed": "Giao hàng không thành công",
         "extra_payment_in_progress": "Khoản trả thừa {amount}: đang hoàn",
         "extra_payment_refunded": "Khoản trả thừa {amount}: đã hoàn",
         "late_cancel_hint": "Dự kiến trước {time}. Quá giờ này bạn có thể hủy và được hoàn tiền.",
@@ -588,7 +587,7 @@
         "status_PREPARING": "Đang chuẩn bị",
         "status_SCHEDULED": "Đã lên lịch",
         "status_ASSIGNING_DRIVER": "Tìm tài xế",
-        "status_ON_GOING": "Đang đến",
+        "status_ON_GOING": "Tài xế đang tới quán",
         "status_PICKED_UP": "Đã lấy hàng",
         "status_COMPLETED": "Đã giao",
         "status_CANCELLED": "Không tìm được tài xế — seller đang đặt lại",
@@ -734,7 +733,6 @@
         "action_cancel_order": "Hủy đơn hàng",
         "action_self_deliver": "Tự giao xong",
         "no_driver_notice": "Không tìm được tài xế sau nhiều lần thử",
-        "cancel_reason_no_driver": "Không thể đặt giao hàng sau nhiều lần thử — không có tài xế trong khu vực",
         "contact_admin_notice": "Có lỗi khi đặt đơn giao hàng. Nếu lỗi tiếp tục xảy ra, gửi email cho hỗ trợ Sariko: {email}",
         "toast_rebook_success": "Đã đặt lại giao hàng!",
         "toast_rebook_failed": "Đặt lại giao hàng thất bại",
@@ -752,7 +750,7 @@
         "toast_reject_failed": "Từ chối thất bại",
         "delivery_step_created": "Đã tạo đơn giao hàng",
         "delivery_step_assigning": "Đang tìm tài xế",
-        "delivery_step_ongoing": "Tài xế đang trên đường",
+        "delivery_step_ongoing": "Tài xế đang tới quán",
         "delivery_step_pickedup": "Đã lấy hàng",
         "delivery_step_completed": "Đã giao",
         "delivery_cancelled_error": "Không tìm được tài xế. Vui lòng đặt lại hoặc hủy đơn.",
@@ -1360,6 +1358,34 @@
             "description_too_long": "Mô tả quá dài (tối đa {max} ký tự).",
             "file_too_large": "Có ảnh lớn hơn {mb} MB.",
             "generic": "Không gửi được. Kiểm tra kết nối rồi thử lại."
+        }
+    },
+    "cancel_reason": {
+        "buyer": {
+            "seller_timeout": "Quán chưa xác nhận kịp",
+            "no_driver": "Không đặt được tài xế cho đơn này",
+            "delivery_failed": "Giao hàng không thành công",
+            "seller_late": "Bạn đã huỷ vì đơn trễ",
+            "buyer_cancelled": "Bạn đã huỷ đơn",
+            "sold_out": "Món đã hết suất trong lúc bạn thanh toán",
+            "seller_reject_out_of_ingredients": "Quán từ chối: hết nguyên liệu",
+            "seller_reject_too_busy": "Quán từ chối: đang quá tải",
+            "seller_reject_store_closing": "Quán từ chối: quán sắp đóng cửa",
+            "seller_reject_other": "Quán đã từ chối đơn",
+            "admin_cancel": "Sariko đã huỷ đơn"
+        },
+        "seller": {
+            "seller_timeout": "Không xác nhận kịp (tự huỷ)",
+            "no_driver": "Không đặt được tài xế",
+            "delivery_failed": "Giao hàng không thành công",
+            "seller_late": "Khách huỷ vì đơn trễ",
+            "buyer_cancelled": "Khách đã huỷ đơn",
+            "sold_out": "Hết món (huỷ trước khi quán thấy)",
+            "seller_reject_out_of_ingredients": "Bạn đã từ chối: hết nguyên liệu",
+            "seller_reject_too_busy": "Bạn đã từ chối: quá tải",
+            "seller_reject_store_closing": "Bạn đã từ chối: quán sắp đóng cửa",
+            "seller_reject_other": "Bạn đã từ chối: {note}",
+            "admin_cancel": "Sariko đã huỷ đơn"
         }
     }
 }

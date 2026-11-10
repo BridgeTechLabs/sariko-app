@@ -3,14 +3,6 @@ import { mapState } from 'pinia';
 import { useOrderStore } from '@/stores/order/orderStore';
 import OrderCard from '@/components/order-history/OrderCard.vue';
 
-const STATUS_DISPLAY = {
-    pending: 'Waiting for seller',
-    confirmed: 'Seller is preparing your order',
-    ready: 'Your order is on the way',
-    done: 'Delivered',
-    cancelled: 'Cancelled by seller',
-}
-
 export default {
     components: {
         OrderCard
@@ -44,8 +36,9 @@ export default {
     methods: {
         notifyStatusChange(newStatus, oldStatus) {
             if (newStatus === oldStatus) return
-            const message = STATUS_DISPLAY[newStatus]
-            if (!message) return
+            const key = `orders_page.toast_${newStatus}`   // i18n, a neutral cancel line (T178 A43)
+            if (!this.$te(key)) return
+            const message = this.$t(key)
 
             const isCancelled = newStatus === 'cancelled'
             this.$q.notify({

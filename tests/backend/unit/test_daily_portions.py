@@ -117,7 +117,7 @@ def test_tc8_sold_out_while_paying(ipn):
     body, client, pushes, refunds, params = ipn(reserve=False)
     assert body["RspCode"] == "00"
     order = client.order
-    assert (order["status"], order["cancellation_reason"], order["payment_status"]) == ("cancelled", "Sold out", "paid")
+    assert (order["status"], order["cancellation_reason"], order["payment_status"]) == ("cancelled", "sold_out", "paid")
     [refund] = refunds
     assert (refund["order_id"], refund["amount"], refund["reason"]) == (ORDER_ID, Decimal("100000"), "sold_out")
     assert refund["original_txn_ref"] == params["vnp_TxnRef"]

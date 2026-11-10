@@ -270,11 +270,11 @@ export const useDashboardStore = defineStore("dashboardStore", {
             this.orderDelivery = null
         },
 
-        async setOrderStatus(orderId, newStatus, reason = null) {
-            await apiSellerDashboard.updateOrderStatus(orderId, newStatus, reason)
+        async setOrderStatus(orderId, newStatus, reason = null, note = null) {
+            await apiSellerDashboard.updateOrderStatus(orderId, newStatus, reason, note)
             if (this.orderDetails?.id === orderId) {
                 this.orderDetails.status = newStatus
-                if (reason) this.orderDetails.cancellation_reason = reason
+                if (reason) Object.assign(this.orderDetails, { cancellation_reason: reason, cancellation_note: note })
             }
             this.updateOrderLocally(orderId, newStatus)
         },

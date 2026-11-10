@@ -2,17 +2,9 @@
 import { CircleCheckBig, Clock, CircleX } from 'lucide-vue-next';
 import { useOrderStore } from '@/stores/order/orderStore.js';
 import { cookingDay, isScheduled } from '@/utils/orderStage';
+import { cancelReasonText } from '@/utils/cancelReason';
+import { refundChip } from '@/utils/refundChip';
 
-// Cancels made by the system store a fixed English text (backend constants);
-// show those translated. Reasons a seller picked or typed are shown as written.
-const SYSTEM_REASON_KEYS = {
-    'Seller did not confirm in time': 'order_detail.reason_seller_timeout',                      // services/order_expiry.py
-    'Driver booking failed': 'order_detail.reason_no_driver',                                 // apis/sellers.py
-    'Driver booking failed after 3 attempts': 'order_detail.reason_no_driver',                // same, orders before 2026-10-15
-    'Delivery failed': 'order_detail.reason_delivery_failed',                                 // apis/orders.py (T177 A13)
-    'Seller was late': 'order_detail.reason_seller_late',                                     // apis/orders.py
-    'Sold out': 'order_detail.reason_sold_out',                                               // dao/dao_orders.py
-}
 
 export default {
     components: {
@@ -50,9 +42,7 @@ export default {
             return key ? this.$t(`order_detail.${key}`) : this.$t('order_detail.title')
         },
         cancellationReason() {
-            const reason = this.order?.cancellation_reason
-            if (!reason) return null
-            return SYSTEM_REASON_KEYS[reason] ? this.$t(SYSTEM_REASON_KEYS[reason]) : reason
+            return cancelReasonText(this, this.order, 'buyer')
         },
         statusSubtext() {
             if (this.isPaymentPending) return this.$t('order_detail.status_subtext_awaiting_payment')
@@ -94,13 +84,8 @@ export default {
         },
         // refund_state (backend, T172). A failed refund shows as in progress: the team retries it.
         refundChip() {
-            const pending = { label: this.$t('order_detail.refund_pending'), cls: 'refund-pending' }
-            const map = {
-                in_progress: pending,
-                failed: pending,
-                refunded: { label: this.$t('order_detail.refund_processed'), cls: 'refund-processed' },
-            }
-            return map[this.order?.refund_state] || null
+            const chip = refundChip(this.order)
+            return chip && { label: this.$t(chip.key), cls: chip.cls }
         },
         // A second payment of this order, being returned (backend duplicate_refund, T175 A6)
         extraPayment() {

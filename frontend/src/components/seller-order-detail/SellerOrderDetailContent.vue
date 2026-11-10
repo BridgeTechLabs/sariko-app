@@ -2,6 +2,7 @@
 import { Phone } from 'lucide-vue-next';
 import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { orderCode } from '@/utils/orderCode';
+import { cancelReasonText } from '@/utils/cancelReason';
 
 const STATUS_DISPLAY_KEY = {
     pending:   'seller_order_detail.status_new',
@@ -68,6 +69,10 @@ export default {
 
         // From the charge row in payments; force-paid DEV orders have none, so the row hides.
         // refund_state (backend, T172) before paid / pending; a failed refund is retried, so still in progress
+        cancelReason() {   // a code in the seller's language (T178)
+            return cancelReasonText(this, this.order, 'seller')
+        },
+
         paymentStatus() {
             const state = this.order.refund_state
             if (state === 'refunded') return { text: this.$t('seller_order_detail.payment_refunded'), color: 'var(--text-secondary)' }
@@ -220,7 +225,7 @@ export default {
                 <span class="status-badge" :class="statusClass">{{ displayStatus }}</span>
             </div>
             <div v-if="order.status === 'cancelled' && order.cancellation_reason" class="cancellation-reason">
-                {{ $t('seller_order_detail.label_reason') }}: {{ order.cancellation_reason }}
+                {{ $t('seller_order_detail.label_reason') }}: {{ cancelReason }}
             </div>
             <div class="order-time-text">
                 {{ code }} · {{ $t('seller_order_detail.label_placed') }} {{ placedAt }}

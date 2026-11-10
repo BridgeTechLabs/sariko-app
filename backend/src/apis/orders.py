@@ -272,8 +272,10 @@ def get_orders(user=Depends(verify_token)):
     return {"success": True, "orders": orders}
 
 
-SELLER_LATE_REASON = "Seller was late"  # the buyer UI translates this exact text (OrderStatusHeader.vue)
-DELIVERY_FAILED_REASON = "Delivery failed"  # same; the delivery company failed, not the seller (T177 A13)
+# orders.cancellation_reason codes (T178): each viewer's app translates them (frontend utils/cancelReason.js)
+SELLER_LATE_REASON = "seller_late"            # the buyer cancelled a late order
+DELIVERY_FAILED_REASON = "delivery_failed"    # the buyer cancelled a failed delivery: the company failed, not the seller (T177)
+BUYER_CANCELLED_REASON = "buyer_cancelled"    # the buyer cancelled an order still pending (A31)
 
 
 def _ts(value):
@@ -331,7 +333,7 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
     now = datetime.now(timezone.utc)
-    reason, refund_reason = None, "buyer_cancel"
+    reason, refund_reason = BUYER_CANCELLED_REASON, "buyer_cancel"
     if order["status"] == "pending":
         last = cancel_before(order)
         if last and now > last:

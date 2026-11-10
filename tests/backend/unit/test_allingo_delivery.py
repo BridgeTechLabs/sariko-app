@@ -223,7 +223,7 @@ class Orders:
     def read_order_by_id_raw(self, order_id):
         return dict(Orders.row) if Orders.row and Orders.row["id"] == order_id else None
 
-    def update_order_status(self, order_id, status, cancellation_reason=None, expected_status=None):
+    def update_order_status(self, order_id, status, cancellation_reason=None, expected_status=None, cancellation_note=None):
         if expected_status and Orders.row["status"] != expected_status:
             return None
         Orders.row = {**Orders.row, "status": status}
@@ -441,7 +441,8 @@ def test_a22c_lost_trip_cannot_be_rebooked(seller):   # T177 TC-A22c
                                             ("confirmed", "seller_cancel"), ("pending", "seller_cancel")])
 def test_a32a_seller_cancel_reason(seller, status, reason):
     Orders.row["status"] = status
-    sellers.update_seller_order_status(OID, Schema.RequestUpdateOrderStatus(status="cancelled", cancellation_reason="No rider"),
+    code = "no_driver" if status == "delivery_failed" else "seller_reject_too_busy"   # a reason code (T178)
+    sellers.update_seller_order_status(OID, Schema.RequestUpdateOrderStatus(status="cancelled", cancellation_reason=code),
                                        user={"id": "s"})
     assert Orders.row["status"] == "cancelled" and refunds == [reason]
 

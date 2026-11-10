@@ -13,7 +13,7 @@ from services import push_service, zalo
 
 logger = logging.getLogger(__name__)
 
-SOLD_OUT_REASON = "Sold out"  # the buyer UI translates this exact text (OrderStatusHeader.vue)
+SOLD_OUT_REASON = "sold_out"  # orders.cancellation_reason code, translated by each viewer's app (T178)
 
 
 def seller_orders_key(seller_id: str) -> str:
@@ -250,7 +250,7 @@ class DAOOrders(DAOBase):
     def read_order_by_id_for_seller(self, order_id: str, seller_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, cancellation_reason, created_at, paid_at, status_changed_at, users(name, email, phone), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), payments(method, type), refund_state") \
+                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, cancellation_reason, cancellation_note, created_at, paid_at, status_changed_at, users(name, email, phone), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), payments(method, type), refund_state") \
                 .eq("id", order_id) \
                 .eq("seller_id", seller_id) \
                 .maybe_single() \
@@ -303,7 +303,7 @@ class DAOOrders(DAOBase):
             raise Exception(f"error read_delivery_history: {e}")
 
     def update_order_status(self, order_id: str, status: str, cancellation_reason: Optional[str] = None,
-                            expected_status: Optional[str] = None):
+                            expected_status: Optional[str] = None, cancellation_note: Optional[str] = None):
         """expected_status makes the write conditional: if someone else changed the
         status first (seller vs the confirm-timeout job), nothing is written and
         None comes back."""
@@ -311,6 +311,8 @@ class DAOOrders(DAOBase):
             update_data = {"status": status}
             if cancellation_reason:
                 update_data["cancellation_reason"] = cancellation_reason
+            if cancellation_note:   # text a seller typed for "other" (T178); the buyer's reads never select it
+                update_data["cancellation_note"] = cancellation_note
 
             query = self._supabase_client.table(self._table_name) \
                 .update(update_data) \

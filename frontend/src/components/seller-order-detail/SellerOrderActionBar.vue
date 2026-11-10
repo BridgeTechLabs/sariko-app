@@ -94,10 +94,7 @@ export default {
             }))
         },
 
-        rejectReasonText() {
-            if (this.selectedReason === 'other') return this.customReason
-            return this.rejectReasonOptions.find(o => o.key === this.selectedReason)?.label || ''
-        },
+
 
         canConfirmReject() {
             if (!this.selectedReason) return false
@@ -164,8 +161,7 @@ export default {
         async onCancelDueToNoDriver() {
             this.rejecting = true
             try {
-                const reason = this.$t('seller_order_detail.cancel_reason_no_driver')
-                await useDashboardStore().setOrderStatus(this.order.id, 'cancelled', reason)
+                await useDashboardStore().setOrderStatus(this.order.id, 'cancelled', 'no_driver')   // a code (T178)
                 this.$q.notify({ classes: 'quasar-notify-positive', message: this.$t('seller_order_detail.toast_order_rejected'), position: 'bottom', timeout: 1500 })
             } catch (e) {
                 console.error('SellerOrderActionBar - onCancelDueToNoDriver -', e)
@@ -194,7 +190,9 @@ export default {
             if (!this.canConfirmReject) return
             this.rejecting = true
             try {
-                await useDashboardStore().setOrderStatus(this.order.id, 'cancelled', this.rejectReasonText)
+                // a code; "other" carries the seller's own words as a note (T178)
+                await useDashboardStore().setOrderStatus(this.order.id, 'cancelled', `seller_reject_${this.selectedReason}`,
+                    this.selectedReason === 'other' ? this.customReason.trim() : null)
                 this.showRejectDialog = false
                 this.$q.notify({ classes: 'quasar-notify-positive', message: this.$t('seller_order_detail.toast_order_rejected'), position: 'bottom', timeout: 1500 })
             } catch (e) {

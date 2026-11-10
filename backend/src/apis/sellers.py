@@ -46,6 +46,13 @@ VALID_STATUS_TRANSITIONS = {
     "delivery_failed":  ["done", "cancelled"],
 }
 
+# What a seller may give as the cancel reason (T178): codes, translated per viewer; "other" carries the seller's
+# own words in cancellation_note. NO_DRIVER_REASON is also the automatic cancel after every booking attempt failed.
+NO_DRIVER_REASON = "no_driver"
+OTHER_REASON = "seller_reject_other"
+SELLER_CANCEL_REASONS = {"seller_reject_out_of_ingredients", "seller_reject_too_busy", "seller_reject_store_closing",
+                         OTHER_REASON, NO_DRIVER_REASON}
+
 # A Lalamove trip is over once it reaches one of these; before that the COMPLETED
 # webhook closes the order, so the seller can't mark it done (P0-6).
 DELIVERY_ENDED_STATUSES = {"COMPLETED", "REJECTED", "CANCELLED", "CANCELED", "EXPIRED", "LOST"}
@@ -259,6 +266,8 @@ def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
         order = dao.read_order_by_id_for_seller(order_id, seller["id"])
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        if order.get("cancellation_reason") != OTHER_REASON:   # the seller gets only its own words, not an admin's (T178)
+            order.pop("cancellation_note", None)
         order["status_history"] = dao.read_status_history(order_id)
         order["delivery_history"] = dao.read_delivery_history(order_id)   # BUGS #39: times of the delivery steps
         order |= complaints_for_order(order, user["id"], "seller")   # T35
@@ -303,8 +312,13 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     "message": "The rider is still delivering; the order completes itself when the delivery is done.",
                 })
 
-        # Pass cancellation_reason when rejecting
-        cancellation_reason = body.cancellation_reason if body.status == "cancelled" else None
+        # Rejecting: a listed code; "other" needs the seller's own words (kept apart, never shown to the buyer)
+        cancellation_reason = cancellation_note = None
+        if body.status == "cancelled":
+            cancellation_reason = body.cancellation_reason
+            cancellation_note = (body.cancellation_note or "").strip() or None
+            if cancellation_reason not in SELLER_CANCEL_REASONS or (cancellation_reason == OTHER_REASON and not cancellation_note):
+                raise HTTPException(status_code=400, detail={"code": "invalid_reason", "message": "Pick a reason (write it for Other)"})
 
         # For "ready" + delivery: book Lalamove FIRST, only update status if booking succeeds
         booking_result = None
@@ -392,7 +406,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                 logger.error(f"[Delivery] All {attempts} booking attempts failed for order={order_id}: {last_booking_error}")
                 # The buyer UI translates this exact text (OrderStatusHeader.vue); no count in it, it's a setting
                 # Conditional: the buyer may have cancelled (and been refunded) while the booking ran (T177 A32)
-                if not dao_orders.update_order_status(order_id, "cancelled", "Driver booking failed",
+                if not dao_orders.update_order_status(order_id, "cancelled", NO_DRIVER_REASON,
                                                       expected_status=order["status"]):
                     raise HTTPException(status_code=409, detail="Order status changed, please refresh")
                 from dao.dao_refunds import DAORefunds
@@ -425,7 +439,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
         # Conditional on the status read above: the confirm-timeout job or a buyer
         # cancelling a late order may have cancelled (and refunded) it in between.
         updated = dao_orders.update_order_status(order_id, body.status, cancellation_reason,
-                                                 expected_status=order["status"])
+                                                 expected_status=order["status"], cancellation_note=cancellation_note)
         if not updated:
             # The trip was booked for an order that is no longer ours to send (R4.6).
             # It is still ASSIGNING_DRIVER, which the company lets us cancel.
