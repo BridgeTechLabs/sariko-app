@@ -25,7 +25,7 @@ from core.auth import verify_token
 from core.payout_cycle import expected_payout_date
 from core.phone import to_e164_vn
 from core.sariko_cache import cache
-from dao.dao_orders import DAOOrders, seller_orders_key
+from dao.dao_orders import DAOOrders, TRIP_ENDED, seller_orders_key
 from schemas import Schema
 from services import allingo_service
 from services.allingo_service import AllingoError
@@ -55,7 +55,7 @@ SELLER_CANCEL_REASONS = {"seller_reject_out_of_ingredients", "seller_reject_too_
 
 # A Lalamove trip is over once it reaches one of these; before that the COMPLETED
 # webhook closes the order, so the seller can't mark it done (P0-6).
-DELIVERY_ENDED_STATUSES = {"COMPLETED", "REJECTED", "CANCELLED", "CANCELED", "EXPIRED", "LOST"}
+DELIVERY_ENDED_STATUSES = TRIP_ENDED | {"COMPLETED"}
 
 # Rows one order search returns (a page size, not a business rule).
 SEARCH_LIMIT = 20

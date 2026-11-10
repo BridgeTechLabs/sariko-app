@@ -4,6 +4,7 @@ import { useOrderStore } from '@/stores/order/orderStore.js';
 import { cookingDay, isScheduled } from '@/utils/orderStage';
 import { cancelReasonText } from '@/utils/cancelReason';
 import { refundChip } from '@/utils/refundChip';
+import { formatVnd } from '@/utils/priceDisplay';
 
 
 export default {
@@ -90,7 +91,7 @@ export default {
         // A second payment of this order, being returned (backend duplicate_refund, T175 A6)
         extraPayment() {
             const d = this.order?.duplicate_refund
-            return d ? { text: this.$t(`order_detail.extra_payment_${d.state}`, { amount: new Intl.NumberFormat('vi-VN').format(d.amount) + ' ₫' }),
+            return d ? { text: this.$t(`order_detail.extra_payment_${d.state}`, { amount: formatVnd(d.amount) }),
                          cls: d.state === 'refunded' ? 'refund-processed' : 'refund-pending' } : null
         }
     }

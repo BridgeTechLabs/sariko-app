@@ -1,8 +1,7 @@
 import { defineStore } from "pinia";
 import { createPoller } from "@/composables/createPoller";
 import apiDeliveries from "@/apis/deliveries/apiDeliveries";
-
-const DELIVERY_TERMINAL = ['COMPLETED', 'CANCELED', 'CANCELLED', 'REJECTED', 'EXPIRED', 'LOST']
+import { DELIVERY_TERMINAL, isTripActive } from "@/utils/deliveryBadge";
 const DELIVERY_POLL_MS = 10_000
 
 export const useDeliveryStore = defineStore("deliveryStore", {
@@ -25,8 +24,7 @@ export const useDeliveryStore = defineStore("deliveryStore", {
             return new Intl.NumberFormat('vi-VN').format(state.quotation.total_fee) + ' ₫'
         },
         isDeliveryActive(state) {
-            const s = state.currentDelivery?.status
-            return s && s !== 'COMPLETED' && !['CANCELED', 'REJECTED', 'EXPIRED', 'LOST'].includes(s)
+            return isTripActive(state.currentDelivery?.status)
         },
     },
 

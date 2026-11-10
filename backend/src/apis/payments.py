@@ -381,7 +381,6 @@ def get_payment_status(order_id: str, user=Depends(verify_token)):
         "payment_status": order["payment_status"],
         # T175 A50: a cancelled order (paid too late) sends the result page to the order and its refund
         "status": order["status"],
-        "refund_state": order.get("refund_state"),
         # T125: how long the result page waits before "waiting for VNPay" (never "failed")
         "wait_seconds": DAOAdminConfig().get_positive_int("payment_result_wait_seconds", 90),
     }

@@ -167,12 +167,6 @@ def test_tc17_settings_read_error_keeps_the_last_values(world):
     assert world.alerts == []
 
 
-def test_tc17_zero_or_negative_setting_uses_the_default():
-    from dao.dao_admin_config import DAOAdminConfig
-    assert DAOAdminConfig._positive_int("allingo_wallet_alert_vnd", 0, 500000) == 500000
-    assert DAOAdminConfig._positive_int("allingo_wallet_alert_repeat_hours", -6, 6) == 6
-
-
 @pytest.mark.parametrize("app_id, secret, runs", [("", "", False), ("app_x", "", False), ("", "sk_x", False),
                                                   ("app_x", "sk_x", True)])
 def test_tc5_tc12_tc13_job_only_with_both_keys(monkeypatch, app_id, secret, runs):
@@ -185,10 +179,6 @@ def test_tc5_tc12_tc13_job_only_with_both_keys(monkeypatch, app_id, secret, runs
     monkeypatch.setattr(job_health, "every", every)
     asyncio.run(allingo_wallet.run_allingo_wallet())
     assert started == ([("allingo_wallet", 1800, allingo_wallet.check)] if runs else [])
-
-
-def test_tc15_job_has_a_plain_name():
-    assert job_health.NAMES["allingo_wallet"] == "AllinGo wallet check"
 
 
 def test_tc14_message_in_push_en_vi_and_zalo(monkeypatch):

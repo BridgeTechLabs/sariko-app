@@ -94,8 +94,6 @@ export default {
             }))
         },
 
-
-
         canConfirmReject() {
             if (!this.selectedReason) return false
             if (this.selectedReason === 'other' && !this.customReason.trim()) return false

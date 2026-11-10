@@ -160,7 +160,7 @@ def test_t175_a50a_payment_status_tells_a_cancelled_order(env, monkeypatch):
     monkeypatch.setattr(payments, "DAOAdminConfig", lambda: type("C", (), {"get_positive_int": lambda self, k, d: d})())
     env.orders.order.update(status="cancelled", refund_state="in_progress")
     assert payments.get_payment_status(OID, user={"id": "buyer-1"}) == {
-        "payment_status": "pending", "status": "cancelled", "refund_state": "in_progress", "wait_seconds": 90}
+        "payment_status": "pending", "status": "cancelled", "wait_seconds": 90}
 
 
 def test_tc5_failed_link_tells_the_buyer_once(env):

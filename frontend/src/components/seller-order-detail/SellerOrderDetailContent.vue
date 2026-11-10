@@ -67,12 +67,12 @@ export default {
             return this.order.receiver_phone || this.order.users?.phone || null
         },
 
-        // From the charge row in payments; force-paid DEV orders have none, so the row hides.
-        // refund_state (backend, T172) before paid / pending; a failed refund is retried, so still in progress
         cancelReason() {   // a code in the seller's language (T178)
             return cancelReasonText(this, this.order, 'seller')
         },
 
+        // From the charge row in payments; force-paid DEV orders have none, so the row hides.
+        // refund_state (backend, T172) before paid / pending; a failed refund is retried, so still in progress
         paymentStatus() {
             const state = this.order.refund_state
             if (state === 'refunded') return { text: this.$t('seller_order_detail.payment_refunded'), color: 'var(--text-secondary)' }
