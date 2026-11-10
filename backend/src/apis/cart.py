@@ -33,7 +33,9 @@ logger = logging.getLogger(__name__)
 def get_current_cart(user=Depends(verify_token)):
         
     dao_cart_items = DAOCartItems()
-    cart = dao_cart_items.read_cart_items_by_user_id(user_id=user["id"])    
+    cart = dao_cart_items.read_cart_items_by_user_id(user_id=user["id"])
+    if cart:   # T181 A49: the portions left, so the cart can show a dish that has fewer than the buyer wants
+        DAOFoodItems().add_remaining_today([ci["food_items"] for ci in cart["cart_items"]])
     return {"success": True, "cart": cart}
 
 

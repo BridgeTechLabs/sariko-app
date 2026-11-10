@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth/authStore';
 import { useChatStore } from '@/stores/chat/chatStore';
 import SellerInfoSheet from './SellerInfoSheet.vue';
 import { vnWeekdayKey } from '@/utils/vnTime';
+import { ratingText } from '@/utils/rating';
 
 const DEFAULT_COVER = '/images/defaullt-kitchen-bg.jpg';
 
@@ -64,6 +65,7 @@ export default {
     },
 
     methods: {
+        ratingText,
         goBack() {
             if (window.history.length > 1) this.$router.back();
             else this.$router.push({ name: 'home' });
@@ -155,7 +157,7 @@ export default {
                             <span class="dot-sep"></span>
                             <span class="rating">
                                 <Star :size="13" fill="#f5A623" color="#f5A623" />
-                                {{ seller.rating_avg }}
+                                {{ ratingText(seller.rating_avg) }}
                                 <span class="rating-count">
                                     ({{ $t('common.rating_count', seller.rating_count, { count: seller.rating_count }) }})
                                 </span>

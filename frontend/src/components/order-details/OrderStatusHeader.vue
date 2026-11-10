@@ -1,10 +1,12 @@
 <script>
 import { CircleCheckBig, Clock, CircleX } from 'lucide-vue-next';
 import { useOrderStore } from '@/stores/order/orderStore.js';
+import { useDeliveryStore } from '@/stores/delivery/deliveryStore';
 import { cookingDay, isScheduled } from '@/utils/orderStage';
 import { cancelReasonText } from '@/utils/cancelReason';
 import { refundChip } from '@/utils/refundChip';
 import { formatVnd } from '@/utils/priceDisplay';
+import { formatVnTime } from '@/utils/vnTime';
 
 
 export default {
@@ -28,9 +30,14 @@ export default {
         isDeliveryFailed() {
             return this.order?.status === 'delivery_failed'
         },
+        // The trip was lost after pickup: the seller cannot book another one (T177)
+        isTripLost() {
+            return this.isDeliveryFailed && useDeliveryStore().currentDelivery?.status === 'LOST'
+        },
         statusTitle() {
             if (this.isPaymentPending) return this.$t('order_detail.status_title_awaiting_payment')
             if (isScheduled(this.order)) return this.$t('order_detail.status_title_scheduled')
+            if (this.isTripLost) return this.$t('order_detail.status_delivery_failed')
             const map = {
                 pending: 'status_title_pending',
                 confirmed: 'status_title_confirmed',
@@ -55,6 +62,14 @@ export default {
             }
             if (this.isCancelled && this.cancellationReason) {
                 return `${this.$t('order_detail.cancelled_reason')}: ${this.cancellationReason}`
+            }
+            if (this.isTripLost) return this.$t('delivery_tracker.status_LOST')
+            if (this.isPending) {   // paid and waiting for the seller (A29)
+                if (this.order.confirm_by) {
+                    const time = formatVnTime(this.order.confirm_by, { hour: '2-digit', minute: '2-digit' })
+                    return this.$t('order_detail.status_subtext_pending_by', { time })
+                }
+                return this.$t('order_detail.status_subtext_pending_closed')
             }
             const map = {
                 pending: 'status_subtext_pending',

@@ -5,6 +5,8 @@ import StarRating from '@/components/shared/StarRating.vue';
 import SectionTitle from '@/components/shared/SectionTitle.vue';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import { formatVnTime } from '@/utils/vnTime';
+import { ratingText } from '@/utils/rating';
+import { orderCode } from '@/utils/orderCode';
 
 const PAGE_SIZE = 10
 
@@ -34,7 +36,7 @@ export default {
 
         ratingAvg() {
             const avg = this.sellerInfo?.rating_avg
-            return avg == null ? null : Number(avg).toFixed(1)
+            return avg == null ? null : ratingText(avg)
         },
 
         ratingCount() {
@@ -48,6 +50,8 @@ export default {
     },
 
     methods: {
+        ratingText,
+        orderCode,
         async load() {
             this.loading = true
             this.error = false
@@ -115,6 +119,7 @@ export default {
             </div>
 
             <template v-else>
+                <p class="reviews-note">{{ $t('seller_me.reviews_only_you') }}</p>
                 <div v-if="ratingAvg" class="reviews-summary">
                     <span class="reviews-avg">{{ ratingAvg }}</span>
                     <Star :size="18" class="reviews-avg-star" />
@@ -130,7 +135,7 @@ export default {
                     <div class="review-body">
                         <div class="review-head">
                             <span class="review-name">{{ displayName(review) }}</span>
-                            <span class="review-date">{{ dateText(review.created_at) }}</span>
+                            <span class="review-date">{{ orderCode(review.order_id) }} · {{ dateText(review.created_at) }}</span>
                         </div>
                         <StarRating :model-value="review.rating" :size="13" :gap="2" readonly />
                         <p v-if="review.comment" class="review-comment">{{ review.comment }}</p>
@@ -196,6 +201,12 @@ export default {
     align-self: center;
     color: var(--color-accent);
     font-weight: 600;
+}
+
+.reviews-note {
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .reviews-summary {

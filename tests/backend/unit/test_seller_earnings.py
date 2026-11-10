@@ -234,7 +234,7 @@ def test_a7_each_order_shows_what_the_seller_gets(earnings):  # TC-A7a
 
 def test_a9a_open_deductions_come_off_awaiting(earnings):  # TC-A9a, TC-A9c
     res, asked = earnings(orders=[_order(1), _order(2), _order(3), _order(4, payout_hold=True)],
-                          deductions=[{"amount": "50000", "applied_amount": "10000.00"}, {"amount": "1000", "applied_amount": "0"}])
+                          deductions=[{"amount": "50000", "applied_amount": "10000.00", "order_id": "o1", "refund_id": "r1"}, {"amount": "1000", "applied_amount": "0", "order_id": "o2", "refund_id": None}])
     body = res.json()
     assert asked["deductions_seller"] == "seller-1"
     assert (body["awaiting_total"], body["deductions_total"], body["deductions_carry"]) == (147180 - 41000, 41000, 0)
@@ -246,7 +246,7 @@ def test_a9a_open_deductions_come_off_awaiting(earnings):  # TC-A9a, TC-A9c
     (500, 0, 147180, 52820),         # above 100 = 100, like admin_generate_payout_for_seller
 ])
 def test_a9b_deductions_above_awaiting(earnings, percent, awaiting, taken, carry):  # TC-A9b
-    res, _ = earnings(orders=[_order(1), _order(2), _order(3)], deductions=[{"amount": "200000", "applied_amount": "0"}],
+    res, _ = earnings(orders=[_order(1), _order(2), _order(3)], deductions=[{"amount": "200000", "applied_amount": "0", "order_id": "o1", "refund_id": "r1"}],
                       settings={"payout_deduction_max_percent": percent})
     body = res.json()
     assert (body["awaiting_total"], body["deductions_total"], body["deductions_carry"]) == (awaiting, taken, carry)
@@ -277,3 +277,14 @@ def test_a18a_endpoint_uses_now(earnings):
     res, _ = earnings(orders=[_order(1, status_changed_at="2026-10-20T05:00:00+00:00")],
                       now=datetime(2026, 11, 10, 3, 0, tzinfo=timezone.utc))
     assert res.json()["orders"][0]["expected_payout_date"] == "2026-11-17"
+
+
+def test_t181_a51_deductions_listed_and_hold_names_the_complaint(earnings):
+    res, _ = earnings(orders=[_order(1, payout_hold=True, payout_hold_note="complaint KN000012"), _order(2)],
+                      deductions=[{"amount": "50000", "applied_amount": "10000.00", "order_id": "o9", "refund_id": "r1"},
+                                  {"amount": "1000", "applied_amount": "0", "order_id": "o8", "refund_id": None}])
+    body = res.json()
+    assert body["deductions"] == [{"order_id": "o9", "kind": "refund", "amount": 40000},
+                                  {"order_id": "o8", "kind": "fee", "amount": 1000}]
+    held, waiting = body["orders"]
+    assert (held["payout_state"], held["hold_complaint"]) == ("held", "KN000012") and waiting["hold_complaint"] is None

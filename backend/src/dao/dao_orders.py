@@ -144,7 +144,7 @@ class DAOOrders(DAOBase):
     def read_order_by_id(self, order_id: str, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url, preorder_day)), refund_state, duplicate_refund") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, paid_at, seller_profiles(store_name, slug, avatar_url, is_open, weekly_hours, opened_at), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url, preorder_day)), refund_state, duplicate_refund") \
                 .eq("id", order_id) \
                 .eq("user_id", user_id) \
                 .maybe_single() \
@@ -184,7 +184,7 @@ class DAOOrders(DAOBase):
         their age (T174 A9), with their money split."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, subtotal, commission_amount, vat_amount, payout_amount, payout_status, payout_hold, status_changed_at, wh_vat_amount, wh_pit_amount") \
+                .select("id, subtotal, commission_amount, vat_amount, payout_amount, payout_status, payout_hold, payout_hold_note, status_changed_at, wh_vat_amount, wh_pit_amount") \
                 .eq("seller_id", seller_id) \
                 .eq("payment_status", "paid") \
                 .eq("status", "done") \

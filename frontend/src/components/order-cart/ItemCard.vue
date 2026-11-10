@@ -46,6 +46,11 @@ export default {
             require: true,
             type: String
         },
+        portionsLeft: {
+            required: false,
+            type: Number,
+            default: null
+        },
         itemUnavailable: {
             type: Boolean,
             default: false
@@ -112,6 +117,7 @@ export default {
                                 {{ itemName }}
                                 <span v-if="itemVariantName" class="item-variant">{{ itemVariantName }}</span>
                                 <span v-if="itemUnavailable" class="item-sold-out">{{ $t('cart_page.sold_out_label') }}</span>
+                                <span v-else-if="portionsLeft !== null && itemQuantity > portionsLeft" class="item-sold-out">{{ $t('cart_page.only_left', { n: portionsLeft }) }}</span>
                             </div>
                             <div class="item-category">
                                 <div>{{ itemCategory }}</div>
