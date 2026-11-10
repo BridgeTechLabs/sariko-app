@@ -4,12 +4,13 @@ import { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt, Mes
 import { useAccountV2Store } from '@/stores/v2/account/accountStore';
 import { useProfileCompletionStore } from '@/stores/seller/profileCompletionStore';
 import BaseSwitch from '@/components/v2/shared/BaseSwitch.vue';
+import SectionTitle from '@/components/shared/SectionTitle.vue';
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
 
 export default {
     name: 'SellerMeSettings',
 
-    components: { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt, MessageCircle, ExternalLink, UserCheck, MessageSquareWarning, BaseSwitch },
+    components: { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt, MessageCircle, ExternalLink, UserCheck, MessageSquareWarning, BaseSwitch, SectionTitle },
 
     data() {
         return { supportEmail: SUPPORT_EMAIL, supportMailto: SUPPORT_MAILTO }
@@ -34,7 +35,7 @@ export default {
 
 <template>
     <div>
-        <div class="section-title">{{ $t('seller_me.section_title_settings') }}</div>
+        <SectionTitle>{{ $t('seller_me.section_title_settings') }}</SectionTitle>
         <div class="menu-group">
 
             <div class="menu-item" @click="togglePush">
@@ -104,16 +105,6 @@ export default {
 </template>
 
 <style scoped>
-.section-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-    padding-left: 4px;
-}
-
 .menu-group {
     background: rgb(255, 255, 255, 0.08);
     border-radius: 12px;

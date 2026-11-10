@@ -184,6 +184,12 @@ const routes = [
         meta: { requiresAuth: true, requiresSeller: true }
     },
     {
+        path: '/seller/me/earnings',
+        name: 'seller-earnings',
+        component: () => import('@/pages/seller/SellerEarningsPage.vue'),
+        meta: { requiresAuth: true, requiresSeller: true }
+    },
+    {
         path: '/seller/me/opening-hours',
         name: 'seller-opening-hours',
         component: () => import('@/pages/seller/SellerHoursPage.vue'),

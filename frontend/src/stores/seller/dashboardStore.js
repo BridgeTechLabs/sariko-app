@@ -12,6 +12,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
         return {
             sellerId: null,
             sellerInfo: null,
+            earnings: null,
             orders: [],
             historyDays: null,   // done / cancelled orders older than this are only found by search
             orderDetails: null,
@@ -88,6 +89,15 @@ export const useDashboardStore = defineStore("dashboardStore", {
             } catch (e) {
                 console.error('dashboardStore - fetchSellerInfo -', e)
             }
+        },
+
+        // GET /sellers/me/earnings: kept here so the Me preview and the Earnings page show it at once. Throws.
+        async fetchEarnings() {
+            this.earnings = await apiSellerDashboard.getEarnings()
+        },
+
+        async fetchReviews(limit, offset) {
+            return apiSellerDashboard.getReviews(limit, offset)
         },
 
         async setStoreOpen(isOpen) {

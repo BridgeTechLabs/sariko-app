@@ -3,11 +3,12 @@ import { Copy, Check, Download } from 'lucide-vue-next'
 import { mapState } from 'pinia'
 import { useDashboardStore } from '@/stores/seller/dashboardStore'
 import QRCode from 'qrcode'
+import SectionTitle from '@/components/shared/SectionTitle.vue';
 
 export default {
     name: 'SellerMeShareCard',
 
-    components: { Copy, Check, Download },
+    components: { Copy, Check, Download, SectionTitle },
 
     data() {
         return {
@@ -69,7 +70,7 @@ export default {
 
 <template>
     <div>
-        <div class="section-title">{{ $t('seller_me.section_title_promote') }}</div>
+        <SectionTitle>{{ $t('seller_me.section_title_promote') }}</SectionTitle>
         <div class="promote-card">
 
             <p class="promote-subtitle">{{ $t('seller_me.promote_subtitle') }}</p>
@@ -96,16 +97,6 @@ export default {
 </template>
 
 <style scoped>
-.section-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-    padding-left: 4px;
-}
-
 .promote-card {
     background: rgba(255, 255, 255, 0.06);
     border-radius: 16px;
