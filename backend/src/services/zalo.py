@@ -69,6 +69,12 @@ def new_order_text(order: dict) -> str:
     return f"🛒 New order #{order['id'][:8].upper()} · {store} · {vnd(order['total_amount'])} · {when}\n{url}"
 
 
+def refund_not_created_text(order_id: str, reason: str) -> str:
+    """A cancelled paid order whose refund could not be written (T175 A2): the team creates it on the admin Orders page."""
+    return (f"⚠️ Refund NOT created · order #{order_id[:8].upper()} · {REFUND_REASONS.get(reason, reason)}: "
+            f"create it on the Orders page\n{link('/orders?open=' + order_id)}")
+
+
 def refund_text(refund: dict) -> str:
     return (f"💸 Refund to process · order #{refund['order_id'][:8].upper()} · {vnd(refund['amount'])} · "
             f"{REFUND_REASONS.get(refund['reason'], refund['reason'])}\n{link('/refunds')}")

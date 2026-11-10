@@ -16,7 +16,7 @@ from dao.dao_orders import DAOOrders
 from dao.dao_payments import DAOPayments
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_refunds import DAORefunds
-from services import vnpay_query
+from services import push_service, vnpay_query
 
 router = APIRouter(prefix="/payments")
 logger = logging.getLogger(__name__)
@@ -114,6 +114,8 @@ def _refund_extra_payment(order: dict, params: dict, txn_ref: str, reason: str) 
         )
     except Exception as e:   # the refund (with the IPN data) is what matters; keep the ack
         logger.error(f"VNPay IPN: late payment row not saved for order {order_id}: {type(e).__name__}")
+    if reason == "late_payment":   # IPN or the reconcile job, whichever comes first: one refund, one push (T175 A5)
+        push_service.notify_payment_after_cancel(order)
     logger.warning(f"VNPay IPN: {reason}: order {order_id} ({order.get('status')}, {order.get('payment_status')}) unchanged, "
                    f"refund {(refund or {}).get('id')} queued, txn_ref={txn_ref}")
     return JSONResponse(content={"RspCode": "00", "Message": "Confirm Success"})
@@ -377,6 +379,9 @@ def get_payment_status(order_id: str, user=Depends(verify_token)):
 
     return {
         "payment_status": order["payment_status"],
+        # T175 A50: a cancelled order (paid too late) sends the result page to the order and its refund
+        "status": order["status"],
+        "refund_state": order.get("refund_state"),
         # T125: how long the result page waits before "waiting for VNPay" (never "failed")
         "wait_seconds": DAOAdminConfig().get_positive_int("payment_result_wait_seconds", 90),
     }

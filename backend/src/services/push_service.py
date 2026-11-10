@@ -67,6 +67,10 @@ MESSAGES = {
         "en": ("Payment confirmed", "VNPay confirmed your payment. Your order is with the seller."),
         "vi": ("Đã xác nhận thanh toán", "VNPay đã xác nhận thanh toán. Đơn hàng đã được gửi tới người bán."),
     },
+    "payment_after_cancel": {
+        "en": ("Payment received after the order was cancelled", "The money will be refunded to you."),
+        "vi": ("Đã nhận tiền sau khi đơn bị huỷ", "Số tiền sẽ được hoàn lại cho bạn."),
+    },
     "payment_failed": {
         "en": ("Payment not completed", "VNPay did not take the payment for your order. You can pay again."),
         "vi": ("Thanh toán không thành công", "VNPay không ghi nhận thanh toán cho đơn hàng. Bạn có thể thanh toán lại."),
@@ -202,6 +206,11 @@ def notify_seller_delivered(order: dict):
 def notify_payment_confirmed(order: dict):
     """Buyer side: the reconcile job found the payment at VNPay after the IPN did not come (T125)."""
     _send_async(order.get("user_id"), "payment_confirmed", f"/orders/{order['id']}")
+
+
+def notify_payment_after_cancel(order: dict):
+    """Buyer side: VNPay took the money after the order was cancelled; a late_payment refund is queued (T175 A5)."""
+    _send_async(order.get("user_id"), "payment_after_cancel", f"/orders/{order['id']}")
 
 
 def notify_payment_failed(order: dict):

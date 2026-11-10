@@ -105,6 +105,17 @@ def env(monkeypatch):
     monkeypatch.setattr(payment_reconcile, "DAOAdminConfig", cfg)
     monkeypatch.setattr(payment_reconcile.push_service, "notify_payment_confirmed", lambda o: e.pushes.append("confirmed"))
     monkeypatch.setattr(payment_reconcile.push_service, "notify_payment_failed", lambda o: e.pushes.append("failed"))
+    monkeypatch.setattr(payment_reconcile.push_service, "notify_payment_after_cancel", lambda o: e.pushes.append("after_cancel"))
+    e.refunds = []
+
+    class Refunds:   # T175: the late payment's refund (apis.payments._refund_extra_payment)
+        def read_txn_refs(self, order_id):
+            return {r["original_txn_ref"] for r in e.refunds}
+
+        def create_refund(self, **kw):
+            e.refunds.append(kw)
+            return {"id": f"rf{len(e.refunds)}", **kw}
+    monkeypatch.setattr(payments, "DAORefunds", Refunds)
     e.txn = f"{OID.replace('-', '')}_{e.orders.order['payment_create_date']}"
     return e
 
@@ -117,6 +128,39 @@ def test_tc4_paid_at_vnpay_goes_through_the_ipn_handling(env):
     assert env.orders.order["ipn_data"]["source"] == "querydr" and env.pushes == ["confirmed"]
     q = env.calls[0]
     assert (q["vnp_Command"], q["vnp_TxnRef"], q["vnp_TransactionDate"]) == ("querydr", env.txn, env.orders.order["payment_create_date"])
+
+
+def test_t175_a5a_paid_after_the_cancel_is_refunded_and_told_once(env):
+    env.orders.order["status"] = "cancelled"   # the order expired while the buyer paid; the IPN never came
+    env.answers = [answer(env.txn)]
+    payment_reconcile.reconcile_payments(NOW)
+    assert [(r["reason"], r["amount"]) for r in env.refunds] == [("late_payment", 60000)]
+    assert env.pushes == ["after_cancel"] and env.orders.paid == []   # not "Your order is with the seller"
+    # the IPN arrives after the job: same TxnRef -> no second refund, no second push
+    assert b'"02"' in payments.apply_vnpay_result(payments.querydr_params(answer(env.txn))).body
+    assert len(env.refunds) == 1 and env.pushes == ["after_cancel"]
+
+
+def test_t175_a5_second_payment_of_a_paid_order_is_not_after_cancel(env):   # QA nên sửa 1
+    env.orders.order.update(payment_status="paid", transaction_ref=env.txn)   # paid, running, not cancelled
+    other = f"{OID.replace('-', '')}_20261021150000"                          # the buyer paid a second link too
+    assert b'"00"' in payments.apply_vnpay_result(payments.querydr_params(answer(other))).body
+    assert [r["reason"] for r in env.refunds] == ["duplicate_payment"] and env.pushes == []
+
+
+def test_t175_a5b_failed_link_of_a_cancelled_order_no_pay_again(env):
+    env.orders = FakeOrders(minutes_ago=20, status="cancelled")
+    env.txn = f"{OID.replace('-', '')}_{env.orders.order['payment_create_date']}"
+    env.answers = [answer(env.txn, status="01")]
+    payment_reconcile.reconcile_payments(NOW)
+    assert env.pushes == [] and env.orders.order["vnpay_fail_notified_at"]
+
+
+def test_t175_a50a_payment_status_tells_a_cancelled_order(env, monkeypatch):
+    monkeypatch.setattr(payments, "DAOAdminConfig", lambda: type("C", (), {"get_positive_int": lambda self, k, d: d})())
+    env.orders.order.update(status="cancelled", refund_state="in_progress")
+    assert payments.get_payment_status(OID, user={"id": "buyer-1"}) == {
+        "payment_status": "pending", "status": "cancelled", "refund_state": "in_progress", "wait_seconds": 90}
 
 
 def test_tc5_failed_link_tells_the_buyer_once(env):

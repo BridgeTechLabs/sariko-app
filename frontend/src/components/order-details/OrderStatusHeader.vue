@@ -101,6 +101,12 @@ export default {
                 refunded: { label: this.$t('order_detail.refund_processed'), cls: 'refund-processed' },
             }
             return map[this.order?.refund_state] || null
+        },
+        // A second payment of this order, being returned (backend duplicate_refund, T175 A6)
+        extraPayment() {
+            const d = this.order?.duplicate_refund
+            return d ? { text: this.$t(`order_detail.extra_payment_${d.state}`, { amount: new Intl.NumberFormat('vi-VN').format(d.amount) + ' ₫' }),
+                         cls: d.state === 'refunded' ? 'refund-processed' : 'refund-pending' } : null
         }
     }
 }
@@ -118,6 +124,9 @@ export default {
 
         <div v-if="refundChip" class="refund-chip" :class="refundChip.cls">
             {{ refundChip.label }}
+        </div>
+        <div v-if="extraPayment" class="refund-chip" :class="extraPayment.cls">
+            {{ extraPayment.text }}
         </div>
     </div>
 

@@ -471,6 +471,8 @@
         "reason_sold_out": "A dish sold out while you were paying",
         "reason_no_driver": "No rider could be booked for this order.",
         "reason_delivery_failed": "The delivery failed",
+        "extra_payment_in_progress": "Extra payment {amount}: being refunded",
+        "extra_payment_refunded": "Extra payment {amount}: refunded",
         "late_cancel_hint": "Expected by {time}. After that you can cancel for a full refund.",
         "cancel_until_hint": "You can cancel this order until {time}.",
         "btn_late_cancel": "Order is late: Cancel and refund",

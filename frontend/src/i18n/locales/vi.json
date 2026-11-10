@@ -471,6 +471,8 @@
         "reason_sold_out": "Món đã hết suất trong lúc bạn thanh toán",
         "reason_no_driver": "Không đặt được tài xế cho đơn này.",
         "reason_delivery_failed": "Giao hàng không thành công",
+        "extra_payment_in_progress": "Khoản trả thừa {amount}: đang hoàn",
+        "extra_payment_refunded": "Khoản trả thừa {amount}: đã hoàn",
         "late_cancel_hint": "Dự kiến trước {time}. Quá giờ này bạn có thể hủy và được hoàn tiền.",
         "cancel_until_hint": "Bạn có thể hủy đơn này trước {time}.",
         "btn_late_cancel": "Đơn đang chậm: Hủy và hoàn tiền",
