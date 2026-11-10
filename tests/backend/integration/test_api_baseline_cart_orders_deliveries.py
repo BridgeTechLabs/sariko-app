@@ -170,7 +170,8 @@ def delivery_rows(monkeypatch):
     Rows.updates = []
     monkeypatch.setattr(deliveries, "DAODeliveries", Deliveries)
     monkeypatch.setattr(deliveries, "DAOOrders", lambda: SimpleNamespace(read_order_by_id=lambda oid, uid: Rows.order,
-                                                                         read_order_by_id_for_seller=lambda oid, sid: Rows.order))
+                                                                         read_order_by_id_for_seller=lambda oid, sid: Rows.order,
+                                                                         touch_order=lambda oid: None))
     monkeypatch.setattr(deliveries, "DAOSellerProfiles", lambda: SimpleNamespace(read_seller_profile_by_user_id=lambda uid: Rows.profile))
     monkeypatch.setattr(deliveries, "rebook_max", lambda: 3)
     return Rows

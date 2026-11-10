@@ -17,6 +17,7 @@ class FakeSettings:
 def fakes(monkeypatch):
     monkeypatch.setattr(sellers, "confirm_window", lambda: timedelta(minutes=30))
     monkeypatch.setattr(orders, "DAOAdminConfig", FakeSettings)
+    monkeypatch.setattr(sellers, "DAOAdminConfig", FakeSettings)   # the list reads settings through its own reader
 
 
 NOW = datetime.now(timezone.utc)

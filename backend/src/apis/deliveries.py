@@ -566,6 +566,8 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
                 logger.error(f"[Delivery] Rollback cancel also failed for {trip_id}: {cancel_err}")
             raise HTTPException(status_code=500, detail=f"Rebook DB update failed: {db_err}")
 
+        dao_orders.touch_order(order_id)   # the seller list shows the trip status: move its signature
+
         # Conditional: the buyer may have cancelled the late order meanwhile (R6) → drop the new trip
         if order["status"] == "delivery_failed" and not dao_orders.update_order_status(order_id, "ready", expected_status="delivery_failed"):
             if not keep_taken_trip(taken, dao_orders, order_id) and not cancel_trip(trip, get_lalamove_service):
@@ -614,6 +616,7 @@ def cancel_delivery(order_id: str, user=Depends(verify_token)):
             raise HTTPException(status_code=409, detail="Lalamove refused to cancel — delivery may already be in progress")
 
         dao_deliveries.update_delivery(delivery["id"], {"status": "CANCELLED"})
+        dao_orders.touch_order(order_id)   # the seller list shows the trip status: move its signature
 
         return {"success": True}
 

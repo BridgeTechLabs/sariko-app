@@ -432,7 +432,8 @@ def test_tc29_rebook_takes_a_running_trip_not_an_ended_one(seller):
 def test_tc9_tc18_buyer_cancel_goes_to_the_trip_company(seller, monkeypatch, provider):
     cancelled = []
     monkeypatch.setattr(deliveries, "get_lalamove_service", lambda: SimpleNamespace(cancel_order=lambda i: cancelled.append(i) or True))
-    monkeypatch.setattr(deliveries, "DAOOrders", lambda: SimpleNamespace(read_order_by_id=lambda oid, uid: {"id": OID}))
+    monkeypatch.setattr(deliveries, "DAOOrders", lambda: SimpleNamespace(read_order_by_id=lambda oid, uid: {"id": OID},
+                                                                         touch_order=lambda oid: None))
     Deliveries.row = {"id": "d1", "provider": provider, "allingo_order_id": "ord_1" if provider == "allingo" else None,
                       "lalamove_order_id": None if provider == "allingo" else "LM1", "status": "ASSIGNING_DRIVER"}
     assert deliveries.cancel_delivery(OID, user={"id": "buyer"}) == {"success": True}

@@ -1,3 +1,4 @@
+import functools
 import logging
 import re
 
@@ -97,6 +98,7 @@ def _with_deadlines(orders: list, seller: dict) -> list:
     now = datetime.now(timezone.utc)
     hours = seller.get("weekly_hours")
     window = None
+    get_minutes = functools.cache(DAOAdminConfig().get_minutes)   # each setting read once for the whole list
     for order in orders:
         order["deadline"] = None
         if (order["status"] == "pending" and order.get("payment_status") == "paid" and order.get("paid_at")
@@ -107,7 +109,7 @@ def _with_deadlines(orders: list, seller: dict) -> list:
                                                  datetime.fromisoformat(opened_at) if opened_at else None,
                                                  now, window, seller.get("id")).isoformat()
         elif order["status"] == "confirmed" and order.get("status_changed_at"):
-            order["deadline"] = cancel_after(order).isoformat()
+            order["deadline"] = cancel_after(order, get_minutes).isoformat()
     return orders
 
 

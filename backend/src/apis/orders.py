@@ -279,16 +279,18 @@ def _ts(value):
     return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
 
 
-def cancel_after(order: dict):
+def cancel_after(order: dict, get_minutes=None):
     """When the buyer may cancel a late order with a full refund (R4, R6 in
     docs/dev/order-cancel-refund.md), or None if this status has no such deadline.
-    Nothing auto-cancels: past the deadline the buyer chooses to wait or cancel."""
+    Nothing auto-cancels: past the deadline the buyer chooses to wait or cancel.
+    get_minutes: a list passes one cached settings reader, so each setting is read once per request."""
+    get_minutes = get_minutes or DAOAdminConfig().get_minutes
     changed = _ts(order.get("status_changed_at"))
     if order["status"] == "confirmed":
         appointment = _ts(order.get("delivery_appointment"))
-        return (appointment or changed) + DAOAdminConfig().get_minutes("buyer_cancel_late_confirmed_minutes", 60)
+        return (appointment or changed) + get_minutes("buyer_cancel_late_confirmed_minutes", 60)
     if order["status"] == "delivery_failed":
-        return changed + DAOAdminConfig().get_minutes("buyer_cancel_late_delivery_failed_minutes", 30)
+        return changed + get_minutes("buyer_cancel_late_delivery_failed_minutes", 30)
     return None
 
 
