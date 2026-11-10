@@ -686,9 +686,11 @@ def get_seller_earnings(user=Depends(verify_token)):
         weekday = config.get_int_in_range("payout_weekday", 2, 1, 7)
         hour = config.get_int_in_range("payout_generate_hour", 8, 0, 23)
         window_hours = config.get_positive_int("complaint_window_hours", 24)
-        since = datetime.now(timezone.utc) - timedelta(days=history_days)
+        max_percent = min(config.get_positive_int("payout_deduction_max_percent", 100), 100)
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(days=history_days)
 
-        orders, awaiting = [], Decimal(0)
+        orders, waiting = [], Decimal(0)
         for row in DAOOrders().read_done_orders_for_earnings(seller_id, since):
             # What reaches the seller: the order's payout minus the tax withheld from it
             payout = _money(row.get("payout_amount"))
@@ -698,11 +700,9 @@ def get_seller_earnings(user=Depends(verify_token)):
                 state = "held"
             expected = None
             if state == "pending":
-                awaiting += payout - withheld
+                waiting += payout - withheld
                 done_at = datetime.fromisoformat(row["status_changed_at"])
-                expected = expected_payout_date(done_at, weeks, weekday, hour, window_hours).isoformat()
-            elif state == "processing":
-                awaiting += payout - withheld
+                expected = expected_payout_date(done_at, weeks, weekday, hour, window_hours, now).isoformat()
             orders.append({
                 "id": row["id"],
                 "done_at": row.get("status_changed_at"),
@@ -712,15 +712,28 @@ def get_seller_earnings(user=Depends(verify_token)):
                 "payout_amount": _vnd(payout),
                 "wh_vat_amount": _vnd(_money(row.get("wh_vat_amount"))),   # 0 until computed
                 "wh_pit_amount": _vnd(_money(row.get("wh_pit_amount"))),
+                "net_amount": _vnd(payout - withheld),   # T174 A7: what the seller gets for it
                 "payout_state": state,
                 "expected_payout_date": expected,
             })
 
+        # T174 A9: open deductions come off what is waiting the way the next payout takes them
+        # (admin_generate_payout_for_seller step 7): at most payout_deduction_max_percent of it, the rest waits.
+        dao_payouts = DAOAdminPayouts()
+        open_deductions = sum((_money(d["amount"]) - _money(d["applied_amount"])
+                               for d in dao_payouts.read_open_deductions(seller_id)), Decimal(0))
+        taken = min(open_deductions, (waiting * max_percent / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+        # orders already in a payout (state processing) count at its net: their deductions are taken, not open
+        awaiting, deducted = waiting - taken, taken
+
         payouts, received = [], Decimal(0)
-        for row in DAOAdminPayouts().read_payouts_by_seller_id(seller_id, EARNINGS_PAYOUTS_LIMIT):
+        for row in dao_payouts.read_payouts_by_seller_id(seller_id, EARNINGS_PAYOUTS_LIMIT):
             net = _money(row.get("net_payout"))
             if row.get("status") == "completed":
                 received += net
+            elif row.get("status") in ("pending", "processing"):
+                awaiting += net
+                deducted += _money(row.get("total_deductions"))
             payouts.append({
                 **row,
                 "net_payout": _vnd(net),
@@ -732,6 +745,8 @@ def get_seller_earnings(user=Depends(verify_token)):
             "success": True,
             "history_days": history_days,
             "awaiting_total": _vnd(awaiting),
+            "deductions_total": _vnd(deducted),                    # comes off the orders awaiting payout
+            "deductions_carry": _vnd(open_deductions - taken),     # left for a later payout
             "received_total": _vnd(received),
             "payouts_limit": EARNINGS_PAYOUTS_LIMIT,   # received_total covers only these batches
             "orders": orders,

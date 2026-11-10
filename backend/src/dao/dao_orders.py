@@ -171,14 +171,15 @@ class DAOOrders(DAOBase):
             raise Exception(f"error read_orders_by_seller_id: {e}")
 
     def read_done_orders_for_earnings(self, seller_id: str, done_since: datetime):
-        """Seller's paid orders that became done since `done_since`, with their money split."""
+        """Seller's paid orders that became done since `done_since`, plus those still waiting for a payout whatever
+        their age (T174 A9), with their money split."""
         try:
             result = self._supabase_client.table(self._table_name) \
                 .select("id, subtotal, commission_amount, vat_amount, payout_amount, payout_status, payout_hold, status_changed_at, wh_vat_amount, wh_pit_amount") \
                 .eq("seller_id", seller_id) \
                 .eq("payment_status", "paid") \
                 .eq("status", "done") \
-                .gte("status_changed_at", done_since.isoformat()) \
+                .or_(f"status_changed_at.gte.{done_since.isoformat()},payout_status.in.(pending,processing)") \
                 .order("status_changed_at", desc=True) \
                 .execute()
 
