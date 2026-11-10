@@ -298,6 +298,14 @@ async def delivery_webhook(request: Request):
 
         TERMINAL_STATUSES = {"REJECTED", "CANCELLED", "CANCELED", "EXPIRED"}
 
+        current = delivery.get("status")
+        if new_status and not lalamove_status_moves(current, new_status):
+            # an event late or resent (an ON_GOING after PICKED_UP, anything after the trip ended): nothing changes;
+            # the order still follows the trip as stored, so a retried COMPLETED finishes its run (T180 A27)
+            logger.warning(f"[Webhook] {event_type} order={lalamove_order_id} {new_status} after {current}: ignored")
+            order_follows_trip(DAOOrders(), delivery["order_id"], current)
+            return {"success": True}
+
         update_data = {}
         if new_status:
             update_data["status"] = new_status
@@ -307,6 +315,9 @@ async def delivery_webhook(request: Request):
             update_data["driver_phone"] = None
             update_data["driver_plate"] = None
             update_data["share_link"] = None
+        elif new_status == "ASSIGNING_DRIVER" and current != new_status:
+            # the driver turned the trip down after accepting: Lalamove looks for another one on the same trip
+            update_data |= {"driver_name": None, "driver_phone": None, "driver_plate": None}
         else:
             # Driver info present in DRIVER_ASSIGNED and some ORDER_STATUS_CHANGED events
             if driver_data.get("name"):
@@ -350,6 +361,26 @@ TRIP_RANK = {"ASSIGNING_DRIVER": 1, "ON_GOING": 2, "PICKED_UP": 3}
 
 def trip_rank(status) -> int:
     return 4 if status == "COMPLETED" or status in TRIP_ENDED else TRIP_RANK.get(status, 0)
+
+
+def status_since(history: list, status):
+    """changed_at of the first row of the trailing run of `status` in the current trip's history (a driver update in
+    the same status adds a row but does not restart the clock); None without history (trips before 2026-10-16)."""
+    since = None
+    for row in reversed(history):
+        if row["status"] != status:
+            break
+        since = row["changed_at"]
+    return since
+
+
+def lalamove_status_moves(current, new) -> bool:
+    """T180 A27, Lalamove v3 "Driver Rejection": a driver who turns the trip down after accepting sends it from ON_GOING
+    or PICKED_UP back to ASSIGNING_DRIVER (Lalamove matches another one). So only an ended trip never moves; back to
+    ASSIGNING_DRIVER is taken; any other step back (late or resent events) is not."""
+    if trip_rank(current) == 4:
+        return False
+    return new == "ASSIGNING_DRIVER" or trip_rank(new) >= trip_rank(current)
 
 
 def allingo_signature_ok(secret: str, header: str, raw_body: bytes) -> bool:
@@ -469,6 +500,10 @@ def get_delivery_status_for_seller(order_id: str, user=Depends(verify_token)):
                 "driver_phone": delivery.get("driver_phone"),
                 "driver_plate": delivery.get("driver_plate"),
                 "share_link": delivery.get("share_link"),
+                # T180 A36: since when the current trip is in this status (history_delivery, current trip only), and the
+                # minutes after which no driver is "stuck" (the admin Stuck orders card's setting)
+                "status_since": status_since(dao_orders.read_delivery_history(order_id), delivery.get("status")),
+                "stuck_minutes": DAOAdminConfig().get_positive_int("stuck_no_driver_minutes", 15),
                 "rebook_count": delivery.get("rebook_count", 0),
                 "rebook_max": rebook_max(),
             }
@@ -550,7 +585,7 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
                 **recipient,
             )
             trip = {"provider": "lalamove", "status": result.status, "lalamove_order_id": result.lalamove_order_id,
-                    "allingo_order_id": None, "share_link": result.share_link or ""}
+                    "allingo_order_id": None, "share_link": result.share_link or "", "trip_fee": quotation.total_fee}
             taken = False
         trip_id = trip["allingo_order_id"] or trip["lalamove_order_id"]
 
@@ -587,46 +622,4 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
         raise
     except Exception as e:
         logger.exception(f"Exception in POST /deliveries/{order_id}/rebook: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# --------------------------------------------------------------------------
-# DELETE /deliveries/{order_id}/cancel — cancel delivery
-# --------------------------------------------------------------------------
-@router.delete("/{order_id}/cancel")
-def cancel_delivery(order_id: str, user=Depends(verify_token)):
-    try:
-        dao_orders = DAOOrders()
-        order = dao_orders.read_order_by_id(order_id, user["id"])
-        if not order:
-            raise HTTPException(status_code=404, detail="Order not found")
-
-        dao_deliveries = DAODeliveries()
-        delivery = dao_deliveries.read_delivery_by_order_id(order_id)
-        if not delivery:
-            raise HTTPException(status_code=404, detail="No delivery found for this order")
-
-        # Already cancelled — idempotent no-op
-        if delivery.get("status") in ("CANCELLED", "CANCELED", "REJECTED", "EXPIRED"):
-            return {"success": True}
-
-        # Don't allow cancel after pickup — driver is already en route with the food
-        if delivery.get("status") == "PICKED_UP":
-            raise HTTPException(status_code=409, detail="Driver has already picked up the order")
-
-        trip_id = delivery.get("allingo_order_id" if delivery.get("provider") == "allingo" else "lalamove_order_id")
-        if trip_id and not cancel_trip(delivery, get_lalamove_service):
-            # The company rejected the cancel (e.g. already in flight) — DO NOT mark CANCELLED in DB,
-            # otherwise UI lies about a delivery that's still happening.
-            raise HTTPException(status_code=409, detail="Lalamove refused to cancel — delivery may already be in progress")
-
-        dao_deliveries.update_delivery(delivery["id"], {"status": "CANCELLED"})
-        dao_orders.touch_order(order_id)   # the seller list shows the trip status: move its signature
-
-        return {"success": True}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception(f"Exception in DELETE /deliveries/{order_id}/cancel: {e}")
         raise HTTPException(status_code=500, detail=str(e))

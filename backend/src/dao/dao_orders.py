@@ -35,6 +35,14 @@ def _invalidate_seller_orders(seller_id: Optional[str]) -> None:
         cache.invalidate(seller_orders_key(seller_id))
 
 
+def with_current_trip(order: dict) -> dict:
+    """T180 A26: delivery_status = the status of the order's current trip, its newest deliveries row (the DB keeps at
+    most one live row per order; a rebook rewrites its row). Lists read this, never the first embedded row (unordered)."""
+    trips = order.get("deliveries") or []
+    order["delivery_status"] = max(trips, key=lambda d: d.get("created_at") or "")["status"] if trips else None
+    return order
+
+
 def _with_preorder_days(order: dict) -> dict:
     """Pre-order days of a buyer's order (the buyer UI shows "Scheduled" until the cooking day):
     the largest preorder_day of its dishes, read live from food_items since orders don't store it.
@@ -120,12 +128,12 @@ class DAOOrders(DAOBase):
     def read_orders_by_user_id(self, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refund_state, review_stores(id), deliveries(status), order_items(food_items(preorder_day))") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refund_state, review_stores(id), deliveries(status, created_at), order_items(food_items(preorder_day))") \
                 .eq("user_id", user_id) \
                 .order("created_at", desc=True) \
                 .execute()
 
-            return [_with_preorder_days(order) for order in result.data] if result and result.data else []
+            return [with_current_trip(_with_preorder_days(order)) for order in result.data] if result and result.data else []
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_orders_by_user_id: {e}")
@@ -148,7 +156,7 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_order_by_id: {e}")
 
-    _SELLER_LIST_SELECT = "id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, created_at, paid_at, status_changed_at, users{join}(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status)"
+    _SELLER_LIST_SELECT = "id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, created_at, paid_at, status_changed_at, users{join}(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status, created_at)"
 
     def read_orders_by_seller_id(self, seller_id: str, finished_since: datetime):
         """Running orders of any age + done / cancelled orders created since `finished_since` (UTC)."""
@@ -163,7 +171,7 @@ class DAOOrders(DAOBase):
                 .order("created_at", desc=True) \
                 .execute()
 
-            return result.data if result and result.data else []
+            return [with_current_trip(o) for o in result.data] if result and result.data else []
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_orders_by_seller_id: {e}")
@@ -214,7 +222,7 @@ class DAOOrders(DAOBase):
             if name:
                 rows = query("!inner").ilike("users.name", f"*{name}*").execute().data or []
                 found.update({r["id"]: r for r in rows})
-            return sorted(found.values(), key=lambda r: r["created_at"], reverse=True)[:limit]
+            return [with_current_trip(o) for o in sorted(found.values(), key=lambda r: r["created_at"], reverse=True)[:limit]]
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - search_orders_for_seller: {e}")

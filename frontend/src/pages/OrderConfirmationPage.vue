@@ -73,6 +73,7 @@ export default {
     beforeUnmount() {
         useOrderStore().stopWatchingOrderDetail()
         useDeliveryStore().stopWatching()
+        useDeliveryStore().currentDelivery = null   // T180 A24: coming back never flashes this order's trip
     }
 }
 </script>

@@ -741,6 +741,7 @@
         "action_cancel_order": "Cancel Order",
         "action_self_deliver": "Mark as Complete",
         "no_driver_notice": "No rider found after several attempts",
+        "delivery_stuck_notice": "No driver has taken this trip for {minutes} minutes. If it stays like this, email Sariko support: {email}",
         "contact_admin_notice": "There was an error with the delivery. If this keeps happening, email Sariko support: {email}",
         "toast_rebook_success": "Delivery re-booked!",
         "toast_rebook_failed": "Failed to re-book delivery",

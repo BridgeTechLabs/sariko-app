@@ -733,6 +733,7 @@
         "action_cancel_order": "Hủy đơn hàng",
         "action_self_deliver": "Tự giao xong",
         "no_driver_notice": "Không tìm được tài xế sau nhiều lần thử",
+        "delivery_stuck_notice": "Chuyến chưa có tài xế nhận sau {minutes} phút. Nếu vẫn vậy, gửi email cho hỗ trợ Sariko: {email}",
         "contact_admin_notice": "Có lỗi khi đặt đơn giao hàng. Nếu lỗi tiếp tục xảy ra, gửi email cho hỗ trợ Sariko: {email}",
         "toast_rebook_success": "Đã đặt lại giao hàng!",
         "toast_rebook_failed": "Đặt lại giao hàng thất bại",

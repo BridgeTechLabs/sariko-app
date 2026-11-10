@@ -18,11 +18,6 @@ export const apiDeliveries = {
         return response.data
     },
 
-    cancelDelivery: async (orderId) => {
-        const response = await apiClient.delete(`/v1/deliveries/${orderId}/cancel`)
-        return response.data
-    },
-
     getSellerDeliveryStatus: async (orderId) => {
         const response = await apiClient.get(`/v1/deliveries/${orderId}/seller-status`)
         return response.data

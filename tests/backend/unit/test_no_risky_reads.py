@@ -30,7 +30,7 @@ DUPLICATE_ALLOWED = {"apis/payments.py"}
 
 # Frozen per file; may only go down. TODO (T172): each line left here is a known case to fix later.
 BASELINE = {
-    "first row": {"frontend/utils/deliveryBadge.js": 1},
+    "first row": {},
     "raw enum": {
         "frontend/components/order-history/OrderCard.vue": 1,           # unknown status shown as is
         "frontend/components/seller-orders/SellerOrdersList.vue": 1,    # unknown status as an i18n key

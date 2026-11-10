@@ -75,8 +75,10 @@ def address(line: str, lat, lon, name: str = None, phone: str = None, note: str 
 def trip_fields(order: dict) -> dict:
     """deliveries columns for an AllinGo Order (POST /orders response or a GET /orders item)."""
     delivery = order.get("delivery") or {}
+    fee = (order.get("fee") or {}).get("total")   # sandbox 09/11: fee {cod, total}, VND
     return {
         "provider": "allingo",
+        "trip_fee": int(Decimal(str(fee))) if fee is not None else None,   # T180 A12
         "allingo_order_id": order["id"],
         "lalamove_order_id": None,
         "share_link": delivery.get("track_link") or "",

@@ -63,8 +63,8 @@ def test_every_delivery_write_moves_the_order_signature():  # TC-12
             if re.search(r"\.(update|create)_delivery\(", src):
                 writers.append(name)
                 assert re.search(r"touch_order\(|update_order_status\(", src), f"{module.__name__}.{name} writes deliveries without touching the order"
-    # the five known writers (README bước 0b); a new one must also pass the check above
-    assert {"delivery_webhook", "allingo_webhook", "rebook_delivery", "cancel_delivery", "update_seller_order_status"} <= set(writers)
+    # the known writers (README bước 0b; the buyer's cancel_delivery was removed in T180 A23); a new one must pass the check above
+    assert {"delivery_webhook", "allingo_webhook", "rebook_delivery", "update_seller_order_status"} <= set(writers)
 
 
 # ── TC-8 / TC-19..21: JWKS cached 1 hour, unknown kid refetches ───────────────────────────────────

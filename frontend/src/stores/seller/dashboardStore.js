@@ -282,6 +282,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
         async doRebookDelivery(orderId) {
             await apiDeliveries.rebookDelivery(orderId)
             await this._fetchDelivery(orderId)
+            await this.fetchDeliveryStatus(orderId)   // T180 A37: the home list's rebooks left, not only the detail's
             this.updateOrderLocally(orderId, 'ready')
             if (this.orderDetails?.id === orderId) this.orderDetails.status = 'ready'
         },

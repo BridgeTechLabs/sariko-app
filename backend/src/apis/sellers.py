@@ -395,7 +395,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                             sender_phone=sender_phone,
                             **recipient,
                         )
-                        booking_result = {"provider": "lalamove", "status": result.status,
+                        booking_result = {"provider": "lalamove", "status": result.status, "trip_fee": quotation.total_fee,
                                           "lalamove_order_id": result.lalamove_order_id, "share_link": result.share_link}
                         break
                     except Exception as e:
@@ -432,6 +432,9 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     cancel_trip(booking_result, get_lalamove_service)
                 except Exception as cancel_err:
                     logger.error(f"[Delivery] Rollback cancel failed for {trip_id}: {cancel_err} — MANUAL INTERVENTION NEEDED")
+                if "deliveries_one_live_trip_per_order" in str(db_err):
+                    # T180 A26: a second Ready at the same moment; the first one's trip is the order's (the DB keeps one)
+                    raise HTTPException(status_code=409, detail="Order status changed, please refresh")
                 raise HTTPException(status_code=500, detail=f"Failed to record delivery: {db_err}")
             logger.warning(f"[Delivery] Auto-booked order={order_id} {booking_result['provider']}={trip_id}")
 

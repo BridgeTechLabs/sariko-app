@@ -54,8 +54,10 @@ export const useDeliveryStore = defineStore("deliveryStore", {
         async _fetchDelivery(orderId) {
             try {
                 const res = await apiDeliveries.getDeliveryStatus(orderId)
-                if (res?.success && res.delivery) {
-                    this.currentDelivery = res.delivery
+                // T180 A24: an answer for an order no longer watched (slow network, the buyer moved on) is dropped;
+                // no trip yet = no trip, never the previous order's
+                if (res?.success && orderId === this._watchedOrderId) {
+                    this.currentDelivery = res.delivery || null
                 }
             } catch (e) {
                 console.error('deliveryStore - fetchDelivery -', e)
@@ -64,6 +66,7 @@ export const useDeliveryStore = defineStore("deliveryStore", {
 
         async startWatching(orderId) {
             this.stopWatching()
+            this.currentDelivery = null   // T180 A24: never show another order's trip, not even for a moment
             this._watchedOrderId = orderId
 
             await this._fetchDelivery(orderId)

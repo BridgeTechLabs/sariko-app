@@ -239,7 +239,7 @@ class Deliveries:
 
     def create_delivery(self, **kw):
         if Deliveries.fail_create:
-            raise RuntimeError("insert failed")
+            raise RuntimeError(Deliveries.fail_create if isinstance(Deliveries.fail_create, str) else "insert failed")
         Deliveries.created.append(kw)
         return kw
 
@@ -363,6 +363,21 @@ def test_tc9_insert_failure_cancels_the_allingo_trip(seller):
     assert e.value.status_code == 500 and len(seller.http.made("POST", "/orders/ord_1/cancel")) == 1
 
 
+def test_t180_a26b_second_ready_at_once_keeps_one_trip(seller):
+    """The DB keeps one live trip per order (deliveries_one_live_trip_per_order): the second Ready's row is refused,
+    its trip is cancelled at the company and the seller gets the usual "changed, refresh" (no 500)."""
+    Deliveries.fail_create = ('Supabase error - create_delivery: duplicate key value violates unique constraint '
+                              '"deliveries_one_live_trip_per_order"')
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert e.value.status_code == 409 and len(seller.http.made("POST", "/orders/ord_1/cancel")) == 1
+
+
+def test_t180_a12a_ready_records_the_trip_fee(seller):
+    mark_ready()
+    assert Deliveries.created[0]["trip_fee"] == 34800   # the AllinGo trip's fee.total, whole đồng
+
+
 def rebook():
     return deliveries.rebook_delivery(OID, user={"id": "s"})
 
@@ -375,7 +390,7 @@ def test_tc9_rebook_lalamove_row_to_allingo(seller):
     [update] = Deliveries.updates
     assert update == {"provider": "allingo", "allingo_order_id": "ord_1", "lalamove_order_id": None, "status": "ASSIGNING_DRIVER",
                       "share_link": "https://business.allingo.vn/track/ord_1", "driver_name": None, "driver_phone": None,
-                      "driver_plate": None, "rebook_count": 2}
+                      "driver_plate": None, "rebook_count": 2, "trip_fee": 34800}   # T180 A12: the new trip's fee
     assert Orders.row["status"] == "ready"
 
 
@@ -384,7 +399,7 @@ def test_tc9_rebook_allingo_row_to_lalamove(seller, monkeypatch):
     Orders.row["status"] = "delivery_failed"
     Deliveries.row = {"id": "d1", "provider": "allingo", "allingo_order_id": "ord_1", "status": "CANCELED", "rebook_count": 0}
     lalamove = SimpleNamespace(
-        get_quotation=lambda **kw: SimpleNamespace(quotation_id="Q", stop_id_0="a", stop_id_1="b"),
+        get_quotation=lambda **kw: SimpleNamespace(quotation_id="Q", stop_id_0="a", stop_id_1="b", total_fee=41000),
         place_order=lambda **kw: SimpleNamespace(status="ASSIGNING_DRIVER", lalamove_order_id="LM2", share_link="https://ll"))
     monkeypatch.setattr(deliveries, "get_lalamove_service", lambda: lalamove)
     rebook()
@@ -463,14 +478,13 @@ def test_a32b_auto_cancel_does_not_overwrite_another_cancel(seller, monkeypatch)
 
 
 @pytest.mark.parametrize("provider", ["allingo", "lalamove", None])
-def test_tc9_tc18_buyer_cancel_goes_to_the_trip_company(seller, monkeypatch, provider):
+def test_tc9_tc18_cancel_trip_goes_to_the_trip_company(seller, provider):
+    # T180 A23: the buyer's DELETE endpoint is gone (test_t180_a23_buyer_trip_cancel_is_gone); cancel_trip, used by the
+    # Ready rollback and the rebook, still cancels at the company that booked the trip
     cancelled = []
-    monkeypatch.setattr(deliveries, "get_lalamove_service", lambda: SimpleNamespace(cancel_order=lambda i: cancelled.append(i) or True))
-    monkeypatch.setattr(deliveries, "DAOOrders", lambda: SimpleNamespace(read_order_by_id=lambda oid, uid: {"id": OID},
-                                                                         touch_order=lambda oid: None))
-    Deliveries.row = {"id": "d1", "provider": provider, "allingo_order_id": "ord_1" if provider == "allingo" else None,
-                      "lalamove_order_id": None if provider == "allingo" else "LM1", "status": "ASSIGNING_DRIVER"}
-    assert deliveries.cancel_delivery(OID, user={"id": "buyer"}) == {"success": True}
+    trip = {"provider": provider, "allingo_order_id": "ord_1" if provider == "allingo" else None,
+            "lalamove_order_id": None if provider == "allingo" else "LM1"}
+    assert deliveries.cancel_trip(trip, lambda: SimpleNamespace(cancel_order=lambda i: cancelled.append(i) or True))
     assert len(seller.http.made("POST", "/orders/ord_1/cancel")) == (provider == "allingo")
     assert cancelled == ([] if provider == "allingo" else ["LM1"])
 

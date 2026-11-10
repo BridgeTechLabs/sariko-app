@@ -67,11 +67,11 @@ export default {
             return this.order.status === 'delivery_failed' && this.rebookCount >= this.rebookMax
         },
 
+        // T180 A36: no driver since status_since for more than stuck_minutes (admin_settings, from the API)
         isDeliveryStuck() {
             void this.tick
-            if (!this.delivery?.created_at) return false
-            if (this.delivery.status !== 'ASSIGNING_DRIVER') return false
-            return Date.now() - new Date(this.delivery.created_at).getTime() > 15 * 60 * 1000
+            if (this.delivery?.status !== 'ASSIGNING_DRIVER' || !this.delivery.status_since) return false
+            return Date.now() - new Date(this.delivery.status_since).getTime() > this.delivery.stuck_minutes * 60 * 1000
         },
 
         showContactAdmin() {
@@ -224,7 +224,9 @@ export default {
 
         <!-- Contact admin notice — infra errors requiring admin intervention -->
         <a v-if="showContactAdmin" :href="supportMailto" class="contact-admin-notice">
-            {{ $t('seller_order_detail.contact_admin_notice', { email: supportEmail }) }}
+            {{ isDeliveryStuck
+                ? $t('seller_order_detail.delivery_stuck_notice', { minutes: delivery.stuck_minutes, email: supportEmail })
+                : $t('seller_order_detail.contact_admin_notice', { email: supportEmail }) }}
         </a>
 
         <!-- Action buttons -->
