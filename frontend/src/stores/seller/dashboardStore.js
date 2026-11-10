@@ -6,8 +6,11 @@ import { useAuthStore } from "@/stores/auth/authStore";
 import { useProfileCompletionStore } from "@/stores/seller/profileCompletionStore";
 
 const ORDER_LIST_POLL_MS = 10_000
+const ORDER_LIST_CLOCK_MS = 60_000   // pending deadlines follow the clock and store hours, not the signature
 const ORDER_DETAIL_POLL_MS = 10_000
 const ORDER_TERMINAL = ['done', 'cancelled']
+
+const signature = (head) => head && `${head.latest}|${head.count}`
 
 export const useDashboardStore = defineStore("dashboardStore", {
     state() {
@@ -27,6 +30,8 @@ export const useDashboardStore = defineStore("dashboardStore", {
 
             _ordersPoller: null,
             _ordersWatchers: 0,
+            _ordersHead: null,       // signature the list was loaded at
+            _ordersLoadedAt: 0,
             _orderDetailPoller: null,
             _orderDetailWatchedId: null,
         }
@@ -120,13 +125,17 @@ export const useDashboardStore = defineStore("dashboardStore", {
             if (this.sellerInfo) Object.assign(this.sellerInfo, { weekly_hours: res.weekly_hours, open_now: res.open_now })
         },
 
-        async fetchOrders({ silent = false } = {}) {
+        async fetchOrders({ silent = false, head = null } = {}) {
             if (this.isLoading) return
             if (!silent) this.isLoading = true
             try {
+                // Signature BEFORE the list: a write landing in between costs one more load, never a missed one
+                head = head || await apiSellerDashboard.getOrdersHead().catch(() => null)
                 const res = await apiSellerDashboard.getOrders()
                 this.orders = res.orders || []
                 this.historyDays = res.history_days ?? null
+                this._ordersHead = signature(head)
+                this._ordersLoadedAt = Date.now()
             } catch (e) {
                 console.error('dashboardStore - fetchOrders -', e)
             } finally {
@@ -185,9 +194,17 @@ export const useDashboardStore = defineStore("dashboardStore", {
             this._ordersPoller = createPoller({
                 name: 'seller-orders',
                 intervalMs: ORDER_LIST_POLL_MS,
-                fetch: () => this.fetchOrders({ silent: true }),
+                fetch: () => this.pollOrders(),
             })
             this._ordersPoller.start()
+        },
+
+        // A tick asks only for the signature; the full list loads when it moved, or once a minute while a
+        // pending order shows its confirm deadline. An error keeps the list as it is until the next tick.
+        async pollOrders() {
+            const head = await apiSellerDashboard.getOrdersHead()
+            const clockDue = this.orders.some(o => o.status === 'pending') && Date.now() - this._ordersLoadedAt >= ORDER_LIST_CLOCK_MS
+            if (signature(head) !== this._ordersHead || clockDue) await this.fetchOrders({ silent: true, head })
         },
 
         stopWatchingOrders() {

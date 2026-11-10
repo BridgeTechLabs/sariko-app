@@ -23,6 +23,12 @@ export const apiSellerDashboard = {
         return response.data
     },
 
+    // { latest, count }: changes whenever the list would (cached on the server, cheap to poll)
+    getOrdersHead: async () => {
+        const response = await apiClient.get('/v1/sellers/me/orders/head')
+        return response.data
+    },
+
     searchOrders: async (q) => {
         const response = await apiClient.get('/v1/sellers/me/orders/search', { params: { q } })
         return response.data

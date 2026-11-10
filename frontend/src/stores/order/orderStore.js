@@ -5,6 +5,12 @@ import { createPoller } from "@/composables/createPoller";
 const ORDER_LIST_POLL_MS = 15_000
 const ORDER_DETAIL_POLL_MS = 10_000
 
+// Nothing left to change on the buyer's screen: done, or cancelled and either never paid or refunded.
+// A paid cancel gets its refund row just after the status change, and a failed refund can be retried,
+// so only 'processed' ends it.
+const isSettled = (order) => order?.status === 'done'
+    || (order?.status === 'cancelled' && (order.payment_status !== 'paid' || order.refunds?.[0]?.status === 'processed'))
+
 export const useOrderStore = defineStore("orderStore", {
     state() {
         return {
@@ -117,12 +123,16 @@ export const useOrderStore = defineStore("orderStore", {
                 this._orderDetailPoller = null
             }
             if (this._orderDetailPoller) return
+            if (this.currentOrder?.id === orderId && isSettled(this.currentOrder)) return
 
             this._orderDetailWatchedId = orderId
             this._orderDetailPoller = createPoller({
                 name: `buyer-order-${orderId}`,
                 intervalMs: ORDER_DETAIL_POLL_MS,
-                fetch: () => this.getOrderDetail(orderId, { silent: true }),
+                fetch: async () => {
+                    await this.getOrderDetail(orderId, { silent: true })
+                    if (isSettled(this.currentOrder)) this.stopWatchingOrderDetail()
+                },
             })
             this._orderDetailPoller.start()
         },
