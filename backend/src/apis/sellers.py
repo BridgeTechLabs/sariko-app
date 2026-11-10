@@ -731,14 +731,16 @@ def get_seller_earnings(user=Depends(verify_token)):
                 "wh_pit_amount": _vnd(_money(row.get("wh_pit_amount"))),
                 "net_amount": _vnd(payout - withheld),   # T174 A7: what the seller gets for it
                 "payout_state": state,
+                # T181 A51: the complaint that holds it ("complaint KN000012"), so the store knows which one to settle
+                "hold_complaint": (row.get("payout_hold_note") or "").removeprefix("complaint ") or None if state == "held" else None,
                 "expected_payout_date": expected,
             })
 
         # T174 A9: open deductions come off what is waiting the way the next payout takes them
         # (admin_generate_payout_for_seller step 7): at most payout_deduction_max_percent of it, the rest waits.
         dao_payouts = DAOAdminPayouts()
-        open_deductions = sum((_money(d["amount"]) - _money(d["applied_amount"])
-                               for d in dao_payouts.read_open_deductions(seller_id)), Decimal(0))
+        open_list = dao_payouts.read_open_deductions(seller_id)
+        open_deductions = sum((_money(d["amount"]) - _money(d["applied_amount"]) for d in open_list), Decimal(0))
         taken = min(open_deductions, (waiting * max_percent / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
         # orders already in a payout (state processing) count at its net: their deductions are taken, not open
         awaiting, deducted = waiting - taken, taken
@@ -764,6 +766,9 @@ def get_seller_earnings(user=Depends(verify_token)):
             "awaiting_total": _vnd(awaiting),
             "deductions_total": _vnd(deducted),                    # comes off the orders awaiting payout
             "deductions_carry": _vnd(open_deductions - taken),     # left for a later payout
+            # T181 A51: each open deduction: what kind (a refund charged to the store, or a fee), which order, what is left
+            "deductions": [{"order_id": d["order_id"], "kind": "refund" if d.get("refund_id") else "fee",
+                            "amount": _vnd(_money(d["amount"]) - _money(d["applied_amount"]))} for d in open_list],
             "received_total": _vnd(received),
             "payouts_limit": EARNINGS_PAYOUTS_LIMIT,   # received_total covers only these batches
             "orders": orders,

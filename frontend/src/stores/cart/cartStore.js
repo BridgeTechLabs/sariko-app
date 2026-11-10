@@ -3,6 +3,7 @@ import apiCarts from "@/apis/cart/apiCart";
 import { Notify } from "quasar";
 import { i18n } from "@/plugins/i18n";
 import { apiErrorMessage } from "@/lib/axiosPolicy.js";
+import { portionsLeftToday } from "@/utils/portions";
 
 export const useCartStore = defineStore("cartStore", {
     state() {
@@ -73,6 +74,8 @@ export const useCartStore = defineStore("cartStore", {
                             "sellerSlugName": this.cart?.seller_profiles?.slug,
                             "preorder_day": _cartItems[i]?.food_items?.preorder_day ?? 0,
                             // The seller can switch a dish or level off after it went into the cart
+                            // Same-day dish with a daily limit: portions left today (null = no number)
+                            "portionsLeft": portionsLeftToday(_cartItems[i]?.food_items),
                             "unavailable": _cartItems[i]?.food_items?.is_available === false || _variant?.is_available === false,
                         })
                     }

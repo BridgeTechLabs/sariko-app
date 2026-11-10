@@ -5,6 +5,7 @@ import { mapState } from 'pinia';
 import { useSellerStore } from '@/stores/seller/sellerStore';
 import { useCartStore } from '@/stores/cart/cartStore';
 import { useAuthStore } from '@/stores/auth/authStore';
+import { ratingText } from '@/utils/rating';
 
 export default {
     props: {
@@ -88,6 +89,7 @@ export default {
     },
 
     methods: {
+        ratingText,
         goToDetail() {
             if (!this.canOrder) return
             if (this.seller?.slug) {
@@ -142,7 +144,7 @@ export default {
                 <div class="food-name__label">{{ name }}</div>
                 <div v-if="hasRating" class="food-name__review">
                     <Star size="12px" fill="gold" color="gold" style="margin-right: 4px;"/>
-                    <div class="text-yellow">{{ ratingAvg }}</div>
+                    <div class="text-yellow">{{ ratingText(ratingAvg) }}</div>
                     <div class="review-count">({{ ratingCount }})</div>
                 </div>
             </div>

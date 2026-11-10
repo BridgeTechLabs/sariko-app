@@ -14,7 +14,7 @@ from apis.complaints import complaints_for_order
 from apis.deliveries import quote_trip
 from core.auth import verify_token
 from core.phone import to_e164_vn
-from core.store_hours import VN_TZ
+from core.store_hours import VN_TZ, confirm_deadline, is_open_now
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_carts import DAOCarts
 from dao.dao_cart_items import DAOCartItems
@@ -24,6 +24,7 @@ from dao.dao_order_items import DAOOrderItems
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
 from services import push_service
+from services.order_expiry import confirm_window
 from services.lalamove_service import get_lalamove_service
 from utils.pricing import order_amounts
 
@@ -306,6 +307,21 @@ def cancel_before(order: dict):
     return appointment - DAOAdminConfig().get_minutes("buyer_cancel_before_appointment_minutes", 1440)
 
 
+def confirm_by(order: dict):
+    """A paid order the seller has not accepted: when it auto-cancels, as the seller sees it (_with_deadlines).
+    None while the store is closed, that clock is paused. The store's hours are read here and not sent on."""
+    seller = order.get("seller_profiles") or {}
+    hours, opened_at = seller.pop("weekly_hours", None), seller.pop("opened_at", None)
+    switch = seller.pop("is_open", None)
+    if order["status"] != "pending" or order.get("payment_status") != "paid" or not order.get("paid_at"):
+        return None
+    now = datetime.now(timezone.utc)
+    if not is_open_now(switch, hours, now, order["seller_id"]):
+        return None
+    return confirm_deadline(_ts(order["paid_at"]), hours, _ts(opened_at) if opened_at else None, now, confirm_window(),
+                            order["seller_id"])
+
+
 @router.get("/{order_id}")
 def get_order_detail(order_id: str, user=Depends(verify_token)):
 
@@ -319,6 +335,8 @@ def get_order_detail(order_id: str, user=Depends(verify_token)):
     order["cancel_after"] = deadline.isoformat() if deadline else None
     last = cancel_before(order)
     order["cancel_before"] = last.isoformat() if last else None
+    confirm = confirm_by(order)
+    order["confirm_by"] = confirm.isoformat() if confirm else None   # A29
     order |= complaints_for_order(order, user["id"], "buyer")   # T35
     return {"success": True, "order": order}
 

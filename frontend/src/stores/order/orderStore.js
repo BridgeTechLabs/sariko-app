@@ -23,6 +23,7 @@ export const useOrderStore = defineStore("orderStore", {
             _ordersWatchers: 0,
             _orderDetailPoller: null,
             _orderDetailWatchedId: null,
+            _orderDetailId: null,   // the order the detail page last asked for
         }
     },
 
@@ -67,10 +68,14 @@ export const useOrderStore = defineStore("orderStore", {
         },
 
         async getOrderDetail(orderId, { silent = false } = {}) {
+            // A24a: never show another order here: drop it at once, and drop an older answer that lands later
+            // (the previous order's poll on a slow network).
+            this._orderDetailId = orderId
+            if (this.currentOrder?.id !== orderId) this.currentOrder = null
             try {
                 if (!silent) this.loading = true
                 const res = await apiOrders.getOrderDetail(orderId)
-                if (res?.data?.success) {
+                if (res?.data?.success && this._orderDetailId === orderId) {
                     this.currentOrder = res.data.order
                 }
             } catch (e) {

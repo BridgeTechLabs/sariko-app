@@ -31,7 +31,7 @@ def test_status_change_goes_to_buyer(sent):
 
 def test_t178_a47_scheduled_and_pickup_texts(sent):   # TC-A47a
     later = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
-    soon = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()
+    soon = datetime.now(timezone.utc).isoformat()   # now: today in Vietnam at any hour (+30 min crossed midnight at 23:30+)
     push_service.notify_order_status({**_order("confirmed"), "delivery_appointment": later})
     push_service.notify_order_status({**_order("confirmed"), "delivery_appointment": soon})   # today: as before
     push_service.notify_order_status({**_order("ready"), "delivery_method": "pickup"})

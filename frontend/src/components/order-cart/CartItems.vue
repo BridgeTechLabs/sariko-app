@@ -65,6 +65,7 @@ export default {
                 :seller-store="item.sellerStore"
                 :seller-slug-name="item.sellerSlugName"
                 :item-unavailable="item.unavailable"
+                :portions-left="item.portionsLeft"
                 />
             </div>
         </div>

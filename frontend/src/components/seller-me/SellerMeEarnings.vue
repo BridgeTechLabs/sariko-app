@@ -65,7 +65,9 @@ export default {
                 dotClass: STATE_DOT[o.payout_state] || 'dot-held',
                 stateText: o.payout_state === 'pending' && o.expected_payout_date
                     ? this.$t('seller_me.earnings_state_pending_on', { date: this.day(o.expected_payout_date) })
-                    : this.$t(`seller_me.earnings_state_${o.payout_state}`),
+                    : o.hold_complaint
+                        ? this.$t('seller_me.earnings_state_held_by', { code: o.hold_complaint })
+                        : this.$t(`seller_me.earnings_state_${o.payout_state}`),
             }))
         },
 
@@ -101,6 +103,7 @@ export default {
     },
 
     methods: {
+        orderCode,
         ...mapActions(useDashboardStore, ['fetchEarnings']),
 
         async load() {
@@ -160,6 +163,7 @@ export default {
                     <div class="main">
                         <div class="kpi-label">{{ $t('seller_me.earnings_awaiting') }}</div>
                         <div v-if="data.deductions_total" class="row-sub">{{ $t('seller_me.earnings_awaiting_deducted', { amount: formatVnd(data.deductions_total) }) }}</div>
+                        <div v-for="d in data.deductions" :key="d.order_id + d.kind" class="row-sub">{{ $t(`seller_me.earnings_deduction_${d.kind}`, { code: orderCode(d.order_id), amount: formatVnd(d.amount) }) }}</div>
                         <div v-if="data.deductions_carry" class="row-sub">{{ $t('seller_me.earnings_deductions_carry', { amount: formatVnd(data.deductions_carry) }) }}</div>
                     </div>
                     <span class="money kpi-value kpi-value--awaiting">{{ formatVnd(data.awaiting_total) }}</span>

@@ -38,7 +38,7 @@ class DAOAdminPayouts(DAOBase):
         monthly fees): the next payout takes them (admin_generate_payout_for_seller step 7)."""
         try:
             result = self._supabase_client.table("admin_payout_deductions") \
-                .select("amount, applied_amount") \
+                .select("amount, applied_amount, order_id, refund_id") \
                 .eq("seller_id", seller_id) \
                 .execute()
             return [d for d in result.data or [] if Decimal(str(d["applied_amount"])) < Decimal(str(d["amount"]))]
