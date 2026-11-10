@@ -34,6 +34,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
             _ordersLoadedAt: 0,
             _orderDetailPoller: null,
             _orderDetailWatchedId: null,
+            _detailOrderId: null,   // the order the detail page shows: answers for any other are dropped (A24a)
         }
     },
 
@@ -145,9 +146,11 @@ export const useDashboardStore = defineStore("dashboardStore", {
         },
 
         async loadOrderDetail(orderId) {
+            this._detailOrderId = orderId
             this.orderDetailLoading = true
             try {
                 const res = await apiSellerDashboard.getOrderDetail(orderId)
+                if (orderId !== this._detailOrderId) return
                 this.orderDetails = res.order || null
                 if (this.orderDetails?.delivery_method === 'delivery'
                     && ['ready', 'delivery_failed', 'done'].includes(this.orderDetails?.status)) {
@@ -156,14 +159,14 @@ export const useDashboardStore = defineStore("dashboardStore", {
             } catch (e) {
                 console.error('dashboardStore - loadOrderDetail -', e)
             } finally {
-                this.orderDetailLoading = false
+                if (orderId === this._detailOrderId) this.orderDetailLoading = false
             }
         },
 
         async _fetchDelivery(orderId) {
             try {
                 const res = await apiDeliveries.getSellerDeliveryStatus(orderId)
-                this.orderDelivery = res?.delivery || null
+                if (orderId === this._detailOrderId) this.orderDelivery = res?.delivery || null
             } catch (e) {
                 console.error('dashboardStore - _fetchDelivery -', e)
             }
@@ -172,7 +175,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
         async refreshOrderDetailSilent(orderId) {
             try {
                 const res = await apiSellerDashboard.getOrderDetail(orderId)
-                this.orderDetails = res.order || null
+                if (orderId === this._detailOrderId) this.orderDetails = res.order || null
             } catch (e) {
                 console.error('dashboardStore - refreshOrderDetailSilent -', e)
             }
@@ -181,7 +184,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
         async refreshDeliverySilent(orderId) {
             try {
                 const res = await apiDeliveries.getSellerDeliveryStatus(orderId)
-                this.orderDelivery = res?.delivery || null
+                if (orderId === this._detailOrderId) this.orderDelivery = res?.delivery || null
             } catch (e) {
                 console.error('dashboardStore - refreshDeliverySilent -', e)
             }
@@ -266,6 +269,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
         },
 
         clearOrderDetail() {
+            this._detailOrderId = null
             this.orderDetails = null
             this.orderDelivery = null
         },

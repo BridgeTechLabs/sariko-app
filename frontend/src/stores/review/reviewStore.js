@@ -18,10 +18,11 @@ export const useReviewStore = defineStore("reviewStore", {
             orderReviewed: false,
             orderOverallRating: null,
             checking: false,
+            _checkingOrderId: null,   // the last order asked about: an older answer landing later is dropped (A24a)
 
             // public review list on the food detail screen
             foodReviews: [],
-            foodReviewsFoodItemId: null,
+            foodReviewsFoodItemId: null,   // the dish asked for: an older dish's answer landing later is dropped (A24a)
             loadingFoodReviews: false,
         }
     },
@@ -67,11 +68,10 @@ export const useReviewStore = defineStore("reviewStore", {
             try {
                 this.loadingFoodReviews = true
                 this.foodReviews = []
-                this.foodReviewsFoodItemId = null
+                this.foodReviewsFoodItemId = foodItemId
                 const res = await apiReviews.getFoodItemReviews(foodItemId)
-                if (res?.data?.success) {
+                if (res?.data?.success && this.foodReviewsFoodItemId === foodItemId) {
                     this.foodReviews = res.data.reviews
-                    this.foodReviewsFoodItemId = foodItemId
                 }
             } catch (e) {
                 console.error(`reviewStore - getFoodReviews - ${e}`)
@@ -85,8 +85,9 @@ export const useReviewStore = defineStore("reviewStore", {
             try {
                 this.checking = true
                 this.reviewedOrderId = null
+                this._checkingOrderId = orderId
                 const res = await apiReviews.getOrderReview(orderId)
-                if (res?.data?.success) {
+                if (res?.data?.success && this._checkingOrderId === orderId) {
                     this.orderReviewed = res.data.reviewed
                     this.orderOverallRating = res.data.overall_rating
                     this.reviewedOrderId = orderId
