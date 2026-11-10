@@ -209,11 +209,6 @@ def test_tc18_cancelled_order_paid_twice_gets_two_refunds():
     assert _ipn(A)["RspCode"] == "02" and _ipn(B)["RspCode"] == "02" and len(FakeRefunds.rows) == 2
     assert FakeOrders.order["payment_status"] == "pending"
 
-
-def test_tc18_buyer_order_reads_leave_duplicate_refunds_out():
-    """Order detail / history show refunds[0].status: a duplicate payment's refund must not
-    appear there (filter on the embedded rows, not on the orders)."""
-    import inspect
-    from dao.dao_orders import DAOOrders
-    for method in (DAOOrders.read_orders_by_user_id, DAOOrders.read_order_by_id):
-        assert '.neq("refunds.reason", "duplicate_payment")' in inspect.getsource(method)
+# TC-18 (a duplicate payment's refund never shows on the buyer's order) moved to the DB in T172: refund_state()
+# leaves duplicate_payment out (tests/sql/g8_refund_state.sql TC-2) and the reads select only refund_state
+# (unit/test_refund_state.py).

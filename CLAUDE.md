@@ -20,8 +20,7 @@ backend only through the Admin Gateway endpoints (`X-Api-Key`).
    Supabase project: a value from another project makes every request 401.
 3. Database: there is no local Postgres. The schema is `backend/supabase/migrations/` (Supabase CLI).
    A fresh dev project: `backend/supabase/scripts/push_to_dev.sh <dev-project-ref>`
-   (`db reset --linked` + seeds `00`, `01`, `03`; it refuses the prod ref). After a reset, re-apply
-   the admin repo's `admin_*` functions. `backend/src/sql/` is legacy: don't edit it.
+   (`db reset --linked` + seeds `00`, `01`, `03`; it refuses the prod ref). `backend/src/sql/` is legacy: don't edit it.
 4. Run: `cd frontend && npm run dev` (http://localhost:8081, proxies `/rest` to :5000) and
    `cd backend/src && python main.py` (:5000, API docs at `/docs`).
    Dev panel `Ctrl+Shift+Q` (force-pay / force-status) needs `VITE_DEV_PANEL=true`; local and DEV only.

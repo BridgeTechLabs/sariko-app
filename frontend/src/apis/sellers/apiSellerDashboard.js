@@ -23,6 +23,12 @@ export const apiSellerDashboard = {
         return response.data
     },
 
+    // { latest, count }: changes whenever the list would (cached on the server, cheap to poll)
+    getOrdersHead: async () => {
+        const response = await apiClient.get('/v1/sellers/me/orders/head')
+        return response.data
+    },
+
     searchOrders: async (q) => {
         const response = await apiClient.get('/v1/sellers/me/orders/search', { params: { q } })
         return response.data
@@ -33,9 +39,10 @@ export const apiSellerDashboard = {
         return response.data
     },
 
-    updateOrderStatus: async (orderId, newStatus, cancellationReason = null) => {
+    updateOrderStatus: async (orderId, newStatus, cancellationReason = null, cancellationNote = null) => {
         const payload = { status: newStatus }
         if (cancellationReason) payload.cancellation_reason = cancellationReason
+        if (cancellationNote) payload.cancellation_note = cancellationNote
         const response = await apiClient.patch(`/v1/sellers/me/orders/${orderId}/status`, payload)
         return response.data
     },

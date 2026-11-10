@@ -33,7 +33,8 @@ export default {
                 try {
                     const res = await apiPayments.pollPaymentStatus(this.orderId)
                     if (res?.data?.wait_seconds) this.waitSeconds = res.data.wait_seconds
-                    if (res?.data?.payment_status === 'paid') {
+                    // paid, or cancelled before the money came (refunded, T175 A50): the order page says what happened
+                    if (res?.data?.payment_status === 'paid' || res?.data?.status === 'cancelled') {
                         this.stopPolling()
                         this.$router.replace(`/orders/${this.orderId}`)
                         return

@@ -21,8 +21,3 @@ supabase login
 trap 'supabase unlink >/dev/null 2>&1 || true' EXIT
 supabase link --project-ref "$ref"
 supabase db reset --linked
-
-# The reset dropped the whole database, including objects this repo does not own:
-# the admin_* payout functions live in the admin repo.
-echo
-echo "NOTE: admin_* functions are owned by the admin repo — re-apply its migrations."

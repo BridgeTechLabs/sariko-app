@@ -272,23 +272,28 @@ def get_orders(user=Depends(verify_token)):
     return {"success": True, "orders": orders}
 
 
-SELLER_LATE_REASON = "Seller was late"  # the buyer UI translates this exact text (OrderStatusHeader.vue)
+# orders.cancellation_reason codes (T178): each viewer's app translates them (frontend utils/cancelReason.js)
+SELLER_LATE_REASON = "seller_late"            # the buyer cancelled a late order
+DELIVERY_FAILED_REASON = "delivery_failed"    # the buyer cancelled a failed delivery: the company failed, not the seller (T177)
+BUYER_CANCELLED_REASON = "buyer_cancelled"    # the buyer cancelled an order still pending (A31)
 
 
 def _ts(value):
     return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
 
 
-def cancel_after(order: dict):
+def cancel_after(order: dict, get_minutes=None):
     """When the buyer may cancel a late order with a full refund (R4, R6 in
     docs/dev/order-cancel-refund.md), or None if this status has no such deadline.
-    Nothing auto-cancels: past the deadline the buyer chooses to wait or cancel."""
+    Nothing auto-cancels: past the deadline the buyer chooses to wait or cancel.
+    get_minutes: a list passes one cached settings reader, so each setting is read once per request."""
+    get_minutes = get_minutes or DAOAdminConfig().get_minutes
     changed = _ts(order.get("status_changed_at"))
     if order["status"] == "confirmed":
         appointment = _ts(order.get("delivery_appointment"))
-        return (appointment or changed) + DAOAdminConfig().get_minutes("buyer_cancel_late_confirmed_minutes", 60)
+        return (appointment or changed) + get_minutes("buyer_cancel_late_confirmed_minutes", 60)
     if order["status"] == "delivery_failed":
-        return changed + DAOAdminConfig().get_minutes("buyer_cancel_late_delivery_failed_minutes", 30)
+        return changed + get_minutes("buyer_cancel_late_delivery_failed_minutes", 30)
     return None
 
 
@@ -328,7 +333,7 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
     now = datetime.now(timezone.utc)
-    reason = None
+    reason, refund_reason = BUYER_CANCELLED_REASON, "buyer_cancel"
     if order["status"] == "pending":
         last = cancel_before(order)
         if last and now > last:
@@ -341,6 +346,8 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
         if not deadline or now < deadline:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This order can't be cancelled now")
         reason = SELLER_LATE_REASON
+        if order["status"] == "delivery_failed":   # no rider: the seller's cancel of it gets the same refund reason (A32)
+            reason, refund_reason = DELIVERY_FAILED_REASON, "driver_booking_failed"
 
     # Conditional: the seller may have moved the order on (e.g. tapped Ready) since we read it
     updated = dao_orders.update_order_status(order_id=order_id, status="cancelled", cancellation_reason=reason,
@@ -350,6 +357,6 @@ def cancel_order(order_id: str, user=Depends(verify_token)):
     push_service.notify_buyer_cancelled(updated)
 
     from dao.dao_refunds import DAORefunds
-    DAORefunds().create_refund_for_order(order, "buyer_cancel")
+    DAORefunds().create_refund_for_order(order, refund_reason)
 
     return {"success": True}

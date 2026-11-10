@@ -223,7 +223,7 @@ class Orders:
     def read_order_by_id_raw(self, order_id):
         return dict(Orders.row) if Orders.row and Orders.row["id"] == order_id else None
 
-    def update_order_status(self, order_id, status, cancellation_reason=None, expected_status=None):
+    def update_order_status(self, order_id, status, cancellation_reason=None, expected_status=None, cancellation_note=None):
         if expected_status and Orders.row["status"] != expected_status:
             return None
         Orders.row = {**Orders.row, "status": status}
@@ -239,7 +239,7 @@ class Deliveries:
 
     def create_delivery(self, **kw):
         if Deliveries.fail_create:
-            raise RuntimeError("insert failed")
+            raise RuntimeError(Deliveries.fail_create if isinstance(Deliveries.fail_create, str) else "insert failed")
         Deliveries.created.append(kw)
         return kw
 
@@ -363,6 +363,21 @@ def test_tc9_insert_failure_cancels_the_allingo_trip(seller):
     assert e.value.status_code == 500 and len(seller.http.made("POST", "/orders/ord_1/cancel")) == 1
 
 
+def test_t180_a26b_second_ready_at_once_keeps_one_trip(seller):
+    """The DB keeps one live trip per order (deliveries_one_live_trip_per_order): the second Ready's row is refused,
+    its trip is cancelled at the company and the seller gets the usual "changed, refresh" (no 500)."""
+    Deliveries.fail_create = ('Supabase error - create_delivery: duplicate key value violates unique constraint '
+                              '"deliveries_one_live_trip_per_order"')
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert e.value.status_code == 409 and len(seller.http.made("POST", "/orders/ord_1/cancel")) == 1
+
+
+def test_t180_a12a_ready_records_the_trip_fee(seller):
+    mark_ready()
+    assert Deliveries.created[0]["trip_fee"] == 34800   # the AllinGo trip's fee.total, whole đồng
+
+
 def rebook():
     return deliveries.rebook_delivery(OID, user={"id": "s"})
 
@@ -375,7 +390,7 @@ def test_tc9_rebook_lalamove_row_to_allingo(seller):
     [update] = Deliveries.updates
     assert update == {"provider": "allingo", "allingo_order_id": "ord_1", "lalamove_order_id": None, "status": "ASSIGNING_DRIVER",
                       "share_link": "https://business.allingo.vn/track/ord_1", "driver_name": None, "driver_phone": None,
-                      "driver_plate": None, "rebook_count": 2}
+                      "driver_plate": None, "rebook_count": 2, "trip_fee": 34800}   # T180 A12: the new trip's fee
     assert Orders.row["status"] == "ready"
 
 
@@ -384,7 +399,7 @@ def test_tc9_rebook_allingo_row_to_lalamove(seller, monkeypatch):
     Orders.row["status"] = "delivery_failed"
     Deliveries.row = {"id": "d1", "provider": "allingo", "allingo_order_id": "ord_1", "status": "CANCELED", "rebook_count": 0}
     lalamove = SimpleNamespace(
-        get_quotation=lambda **kw: SimpleNamespace(quotation_id="Q", stop_id_0="a", stop_id_1="b"),
+        get_quotation=lambda **kw: SimpleNamespace(quotation_id="Q", stop_id_0="a", stop_id_1="b", total_fee=41000),
         place_order=lambda **kw: SimpleNamespace(status="ASSIGNING_DRIVER", lalamove_order_id="LM2", share_link="https://ll"))
     monkeypatch.setattr(deliveries, "get_lalamove_service", lambda: lalamove)
     rebook()
@@ -428,14 +443,48 @@ def test_tc29_rebook_takes_a_running_trip_not_an_ended_one(seller):
         {"allingo_order_id": "ord_live", "status": "ON_GOING", "share_link": "https://business.allingo.vn/track/ord_live"}
 
 
+def test_a22c_lost_trip_cannot_be_rebooked(seller):   # T177 TC-A22c
+    Orders.row["status"] = "delivery_failed"
+    Deliveries.row = {"id": "d1", "provider": "allingo", "allingo_order_id": "ord_0", "status": "LOST", "rebook_count": 0}
+    with pytest.raises(HTTPException) as e:
+        rebook()
+    assert e.value.status_code == 409 and e.value.detail["code"] == "delivery_lost"
+    assert seller.http.made("POST", "/orders") == [] and Deliveries.updates == [] and Orders.writes == []
+
+
+@pytest.mark.parametrize("status, reason", [("delivery_failed", "driver_booking_failed"),   # T177 TC-A32a: no rider
+                                            ("confirmed", "seller_cancel"), ("pending", "seller_cancel")])
+def test_a32a_seller_cancel_reason(seller, status, reason):
+    Orders.row["status"] = status
+    code = "no_driver" if status == "delivery_failed" else "seller_reject_too_busy"   # a reason code (T178)
+    sellers.update_seller_order_status(OID, Schema.RequestUpdateOrderStatus(status="cancelled", cancellation_reason=code),
+                                       user={"id": "s"})
+    assert Orders.row["status"] == "cancelled" and refunds == [reason]
+
+
+def test_a32b_auto_cancel_does_not_overwrite_another_cancel(seller, monkeypatch):   # T177 TC-A32b
+    seller.http.routes[("POST", "/orders")] = reply(422, {"error": {"code": "validation_failed"}})
+    real = Orders.read_order_by_id_for_seller
+
+    def read_then_buyer_cancels(self, order_id, seller_id):
+        snapshot = real(self, order_id, seller_id)
+        Orders.row = {**Orders.row, "status": "cancelled"}   # the buyer cancelled while the booking ran
+        return snapshot
+    monkeypatch.setattr(Orders, "read_order_by_id_for_seller", read_then_buyer_cancels)
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert e.value.status_code == 409
+    assert Orders.row["status"] == "cancelled" and Orders.writes == [] and refunds == []
+
+
 @pytest.mark.parametrize("provider", ["allingo", "lalamove", None])
-def test_tc9_tc18_buyer_cancel_goes_to_the_trip_company(seller, monkeypatch, provider):
+def test_tc9_tc18_cancel_trip_goes_to_the_trip_company(seller, provider):
+    # T180 A23: the buyer's DELETE endpoint is gone (test_t180_a23_buyer_trip_cancel_is_gone); cancel_trip, used by the
+    # Ready rollback and the rebook, still cancels at the company that booked the trip
     cancelled = []
-    monkeypatch.setattr(deliveries, "get_lalamove_service", lambda: SimpleNamespace(cancel_order=lambda i: cancelled.append(i) or True))
-    monkeypatch.setattr(deliveries, "DAOOrders", lambda: SimpleNamespace(read_order_by_id=lambda oid, uid: {"id": OID}))
-    Deliveries.row = {"id": "d1", "provider": provider, "allingo_order_id": "ord_1" if provider == "allingo" else None,
-                      "lalamove_order_id": None if provider == "allingo" else "LM1", "status": "ASSIGNING_DRIVER"}
-    assert deliveries.cancel_delivery(OID, user={"id": "buyer"}) == {"success": True}
+    trip = {"provider": provider, "allingo_order_id": "ord_1" if provider == "allingo" else None,
+            "lalamove_order_id": None if provider == "allingo" else "LM1"}
+    assert deliveries.cancel_trip(trip, lambda: SimpleNamespace(cancel_order=lambda i: cancelled.append(i) or True))
     assert len(seller.http.made("POST", "/orders/ord_1/cancel")) == (provider == "allingo")
     assert cancelled == ([] if provider == "allingo" else ["LM1"])
 
@@ -505,6 +554,18 @@ def test_tc8_completed_done_once_and_canceled_fails_the_order(hook):
     assert Orders.row["status"] == "delivery_failed"
     assert [a[0] for a in hook.admin] == ["admin_delivery_failed"]
     assert Deliveries.row["driver_phone"] is None and Deliveries.row["share_link"] is None
+
+
+@pytest.mark.parametrize("leg", ["failed", "return_active", "return_finished", "lost", "damaged"])
+def test_a22_failure_after_pickup_is_lost(hook, leg):   # T177 TC-A22a / A22b
+    Deliveries.row = {**Deliveries.row, "status": "PICKED_UP", "driver_phone": "+849", "driver_plate": "59A"}
+    for _ in range(2):   # AllinGo retries the event: one order change, one push
+        assert post_event(hook.client, event(leg)).status_code == 200
+    assert Deliveries.row["status"] == "LOST" and Deliveries.row["driver_phone"] is None
+    assert Orders.row["status"] == "delivery_failed"
+    assert [a[0] for a in hook.admin] == ["admin_delivery_lost"]
+    post_event(hook.client, event("in_transit"))   # an older event arriving late does not reopen the trip
+    assert Deliveries.row["status"] == "LOST"
 
 
 def test_tc8_older_event_does_not_win(hook):

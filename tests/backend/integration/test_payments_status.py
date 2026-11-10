@@ -40,6 +40,7 @@ def test_payment_status_returns_status_for_owner(fastapi_client, monkeypatch):
     fake_orders = _FakeOrderDAO({
         "id": order_id,
         "user_id": user_id,
+        "status": "pending",
         "payment_status": "pending",
     })
     monkeypatch.setattr("apis.payments.DAOOrders", lambda: fake_orders)

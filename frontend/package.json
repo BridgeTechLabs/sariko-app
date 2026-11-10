@@ -10,7 +10,8 @@
     "scripts": {
         "dev": "vite --mode development",
         "check:i18n": "node scripts/check-i18n.mjs",
-        "build": "node scripts/check-i18n.mjs && vite build --mode production",
+        "check:frontend": "for f in ../tests/frontend/*.check.mjs; do node \"$f\" || exit 1; done",
+        "build": "node scripts/check-i18n.mjs && npm run check:frontend && vite build --mode production",
         "preview": "vite preview"
     },
     "dependencies": {

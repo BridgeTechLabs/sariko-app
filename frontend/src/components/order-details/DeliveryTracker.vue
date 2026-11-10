@@ -30,7 +30,11 @@ export default {
             return this.delivery?.status || 'PREPARING'
         },
         isCancelled() {
-            return ['CANCELLED', 'CANCELED', 'REJECTED', 'EXPIRED'].includes(this.currentStatus)
+            return ['CANCELLED', 'CANCELED', 'REJECTED', 'EXPIRED', 'LOST'].includes(this.currentStatus)
+        },
+        // A failed trip on an order that already ended (the seller delivered it, or it was cancelled): nothing to tell (T177 A46)
+        hidden() {
+            return this.isCancelled && ['done', 'cancelled'].includes(this.orderStatus)
         },
         currentStepIndex() {
             const idx = STEPS.findIndex(s => s.key === this.currentStatus)
@@ -72,13 +76,13 @@ export default {
 </script>
 
 <template>
-    <div v-if="delivery || orderStatus" class="delivery-tracker">
+    <div v-if="(delivery || orderStatus) && !hidden" class="delivery-tracker">
 
         <div class="tracker-title">{{ $t('delivery_tracker.title') }}</div>
 
         <!-- Cancelled state -->
         <div v-if="isCancelled" class="cancelled-notice">
-            {{ $t('delivery_tracker.status_CANCELLED') }}
+            {{ $t(currentStatus === 'LOST' ? 'delivery_tracker.status_LOST' : 'delivery_tracker.status_CANCELLED') }}
         </div>
 
         <!-- Status Timeline -->

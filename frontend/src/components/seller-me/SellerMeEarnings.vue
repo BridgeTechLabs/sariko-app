@@ -157,7 +157,11 @@ export default {
         <template v-else>
             <div class="card">
                 <div class="row">
-                    <span class="main kpi-label">{{ $t('seller_me.earnings_awaiting') }}</span>
+                    <div class="main">
+                        <div class="kpi-label">{{ $t('seller_me.earnings_awaiting') }}</div>
+                        <div v-if="data.deductions_total" class="row-sub">{{ $t('seller_me.earnings_awaiting_deducted', { amount: formatVnd(data.deductions_total) }) }}</div>
+                        <div v-if="data.deductions_carry" class="row-sub">{{ $t('seller_me.earnings_deductions_carry', { amount: formatVnd(data.deductions_carry) }) }}</div>
+                    </div>
                     <span class="money kpi-value kpi-value--awaiting">{{ formatVnd(data.awaiting_total) }}</span>
                 </div>
                 <div class="row">
@@ -176,7 +180,7 @@ export default {
                                 <div class="row-title">{{ o.code }} · {{ o.doneText }}</div>
                                 <div class="status"><i :class="o.dotClass" />{{ o.stateText }}</div>
                             </div>
-                            <span class="money">{{ formatVnd(o.payout_amount) }}</span>
+                            <span class="money">{{ formatVnd(o.net_amount) }}</span>
                         </div>
                         <router-link v-if="!payouts.length" to="/seller/me/earnings" class="see-all">
                             {{ $t('seller_me.earnings_see_all') }} <ChevronRight :size="16" />
@@ -229,7 +233,7 @@ export default {
                                         <div v-if="o.wh_vat_amount || o.wh_pit_amount">{{ $t('seller_me.earnings_withholding', { vat: formatVnd(o.wh_vat_amount), pit: formatVnd(o.wh_pit_amount) }) }}</div>
                                     </div>
                                 </div>
-                                <span class="money">{{ formatVnd(o.payout_amount) }}</span>
+                                <span class="money">{{ formatVnd(o.net_amount) }}</span>
                                 <ChevronRight :size="16" class="chev" :class="{ open: openId === o.id }" />
                             </div>
                         </div>

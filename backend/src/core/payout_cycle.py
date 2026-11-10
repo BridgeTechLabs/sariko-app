@@ -16,11 +16,14 @@ def period_end(day: date, weeks: int) -> date:
     return ANCHOR + timedelta(days=(day - ANCHOR).days // length * length + length - 1)
 
 
-def expected_payout_date(done_at: datetime, weeks: int, weekday: int, hour: int, window_hours: int) -> date:
-    """Payout day of the first period whose payout is made after this order's complaint window ends."""
+def expected_payout_date(done_at: datetime, weeks: int, weekday: int, hour: int, window_hours: int,
+                         now: datetime = None) -> date:
+    """Payout day of the first period whose payout is made after this order's complaint window ends and, for an
+    order back from a failed / cancelled payout, after now (T174 A18: never a day already gone)."""
+    ready = max(done_at + timedelta(hours=window_hours), now or done_at)
     end = period_end(done_at.astimezone(VN_TZ).date(), weeks)
     while True:
         payday = end + timedelta(days=weekday)
-        if done_at + timedelta(hours=window_hours) <= datetime.combine(payday, time(hour), VN_TZ):
+        if ready <= datetime.combine(payday, time(hour), VN_TZ):
             return payday
         end += timedelta(days=7 * weeks)

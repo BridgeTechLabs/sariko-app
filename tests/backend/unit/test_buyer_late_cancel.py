@@ -32,7 +32,7 @@ class FakeOrders:
     def read_order_by_id(self, order_id, user_id):
         return dict(self.row)
 
-    def update_order_status(self, order_id, status, cancellation_reason=None, expected_status=None):
+    def update_order_status(self, order_id, status, cancellation_reason=None, expected_status=None, cancellation_note=None):
         if expected_status and self.row["status"] != expected_status:
             return None
         FakeOrders.row = {**self.row, "status": status, "cancellation_reason": cancellation_reason}
@@ -89,7 +89,7 @@ def assert_refused():
 def assert_late_cancel():
     assert buyer_cancel()["success"]
     assert FakeOrders.row["status"] == "cancelled"
-    assert FakeOrders.row["cancellation_reason"] == orders.SELLER_LATE_REASON
+    assert FakeOrders.row["cancellation_reason"] == orders.SELLER_LATE_REASON == "seller_late"   # a code (T178 A40)
     assert refunds == [("o1", "buyer_cancel", 125000)]  # R7.2: full total_amount
 
 
@@ -199,7 +199,7 @@ def test_booking_attempts_come_from_admin_settings(monkeypatch):
     assert e.value.status_code == 503
     assert NoDriverLalamove.tries == 2
     assert FakeOrders.row["status"] == "cancelled"
-    assert FakeOrders.row["cancellation_reason"] == "Driver booking failed"  # OrderStatusHeader.vue translates it
+    assert FakeOrders.row["cancellation_reason"] == "no_driver"  # a code, translated per viewer (T178 A40)
     assert refunds == [("o1", "driver_booking_failed", 125000)]
 
 
@@ -227,9 +227,12 @@ def test_r6_1_delivery_failed_29_min_refused():
     assert assert_refused() == "delivery_failed"
 
 
-def test_r6_2_delivery_failed_31_min_cancels_with_refund():
+def test_r6_2_delivery_failed_31_min_cancels_with_refund():   # T177 TC-A13d: the delivery failed, not the seller
     order("delivery_failed", status_changed_at=ago(minutes=31))
-    assert_late_cancel()
+    assert buyer_cancel()["success"]
+    assert FakeOrders.row["status"] == "cancelled"
+    assert FakeOrders.row["cancellation_reason"] == orders.DELIVERY_FAILED_REASON == "delivery_failed"
+    assert refunds == [("o1", "driver_booking_failed", 125000)]   # same reason as a seller cancel of it (A32)
 
 
 def test_r6_4_rebooked_order_has_no_cancel_deadline():
@@ -266,10 +269,10 @@ def test_invalid_setting_falls_back_to_default():
     assert dao.get_minutes("k", 60) == timedelta(minutes=90)
 
 
-def test_pending_cancel_unchanged():
+def test_pending_cancel_says_the_buyer_cancelled():   # T178 TC-A31a
     order("pending")
     assert buyer_cancel()["success"]
-    assert FakeOrders.row["cancellation_reason"] is None
+    assert FakeOrders.row["cancellation_reason"] == "buyer_cancelled"
     assert refunds == [("o1", "buyer_cancel", 125000)]
 
 

@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
@@ -31,3 +32,23 @@ class DAOAdminPayouts(DAOBase):
             raise Exception(f"Supabase error - read_payouts_by_seller_id: {e}")
         except Exception as e:
             raise Exception(f"error read_payouts_by_seller_id: {e}")
+
+    def read_open_deductions(self, seller_id: str):
+        """amount / applied_amount of the seller's deductions not fully taken yet (refunds charged to the seller,
+        monthly fees): the next payout takes them (admin_generate_payout_for_seller step 7)."""
+        try:
+            result = self._supabase_client.table("admin_payout_deductions") \
+                .select("amount, applied_amount") \
+                .eq("seller_id", seller_id) \
+                .execute()
+            return [d for d in result.data or [] if Decimal(str(d["applied_amount"])) < Decimal(str(d["amount"]))]
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_open_deductions: {e}")
+
+    def has_deduction_for_order(self, order_id: str) -> bool:
+        """T176: a "Charge to seller" deduction exists for this order (the admin made it when cancelling)."""
+        try:
+            result = self._supabase_client.table("admin_payout_deductions").select("id").eq("order_id", order_id).limit(1).execute()
+            return bool(result.data)
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - has_deduction_for_order: {e}")

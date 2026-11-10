@@ -1,8 +1,7 @@
 import { defineStore } from "pinia";
 import { createPoller } from "@/composables/createPoller";
 import apiDeliveries from "@/apis/deliveries/apiDeliveries";
-
-const DELIVERY_TERMINAL = ['COMPLETED', 'CANCELED', 'CANCELLED', 'REJECTED', 'EXPIRED']
+import { DELIVERY_TERMINAL, isTripActive } from "@/utils/deliveryBadge";
 const DELIVERY_POLL_MS = 10_000
 
 export const useDeliveryStore = defineStore("deliveryStore", {
@@ -25,8 +24,7 @@ export const useDeliveryStore = defineStore("deliveryStore", {
             return new Intl.NumberFormat('vi-VN').format(state.quotation.total_fee) + ' ₫'
         },
         isDeliveryActive(state) {
-            const s = state.currentDelivery?.status
-            return s && s !== 'COMPLETED' && !['CANCELED', 'REJECTED', 'EXPIRED'].includes(s)
+            return isTripActive(state.currentDelivery?.status)
         },
     },
 
@@ -54,8 +52,10 @@ export const useDeliveryStore = defineStore("deliveryStore", {
         async _fetchDelivery(orderId) {
             try {
                 const res = await apiDeliveries.getDeliveryStatus(orderId)
-                if (res?.success && res.delivery) {
-                    this.currentDelivery = res.delivery
+                // T180 A24: an answer for an order no longer watched (slow network, the buyer moved on) is dropped;
+                // no trip yet = no trip, never the previous order's
+                if (res?.success && orderId === this._watchedOrderId) {
+                    this.currentDelivery = res.delivery || null
                 }
             } catch (e) {
                 console.error('deliveryStore - fetchDelivery -', e)
@@ -64,6 +64,7 @@ export const useDeliveryStore = defineStore("deliveryStore", {
 
         async startWatching(orderId) {
             this.stopWatching()
+            this.currentDelivery = null   // T180 A24: never show another order's trip, not even for a moment
             this._watchedOrderId = orderId
 
             await this._fetchDelivery(orderId)

@@ -38,6 +38,9 @@ STATUS = {
     **dict.fromkeys(("canceled", "failed", "return_active", "return_finished", "lost", "damaged"), "CANCELED"),
 }
 
+# A failure once the courier has the food (stored PICKED_UP): lost / damaged / sent back, not a trip to book again (T177 A22).
+LOST_AFTER_PICKUP = {"failed", "return_active", "return_finished", "lost", "damaged"}
+
 WALLET_EMPTY = "allingo_wallet_empty"
 
 
@@ -72,8 +75,10 @@ def address(line: str, lat, lon, name: str = None, phone: str = None, note: str 
 def trip_fields(order: dict) -> dict:
     """deliveries columns for an AllinGo Order (POST /orders response or a GET /orders item)."""
     delivery = order.get("delivery") or {}
+    fee = (order.get("fee") or {}).get("total")   # sandbox 09/11: fee {cod, total}, VND
     return {
         "provider": "allingo",
+        "trip_fee": int(Decimal(str(fee))) if fee is not None else None,   # T180 A12
         "allingo_order_id": order["id"],
         "lalamove_order_id": None,
         "share_link": delivery.get("track_link") or "",
@@ -168,6 +173,18 @@ class AllingoService:
         body = {**self.inquiry(pickup, dropoff), "service_id": quote.quotation_id, "estimated_price": quote.total_fee,
                 "deliverable_payment_method": "prepaid", "external_reference": order_id}
         return self._request("POST", "/orders", body, idempotency_key=f"sariko-{order_id}-{uuid.uuid4().hex}")
+
+    def wallet_balance(self) -> int:
+        """GET /wallet delivery_credit in whole đồng (VND has no minor unit; the test key answered an int + "VND"
+        on 10/11, T162). A missing / non-numeric balance or another currency is an error, never 0."""
+        data = self._request("GET", "/wallet")
+        try:
+            if data["currency"] != "VND":
+                raise ValueError(data["currency"])
+            return int(Decimal(str(data["delivery_credit"])))
+        except (KeyError, TypeError, ValueError, ArithmeticError):
+            logger.error(f"[ALLINGO] GET /wallet: unexpected answer {sorted(data) if isinstance(data, dict) else type(data)}")
+            raise AllingoError("allingo_bad_answer") from None
 
     def cancel_order(self, allingo_order_id: str) -> bool:
         """POST /orders/{id}/cancel; cancelling twice is harmless, so every call has its own key.

@@ -44,12 +44,14 @@ def reconcile_payments(now: datetime = None) -> dict:
         if outcome == "paid":
             rsp = json.loads(apply_vnpay_result(querydr_params(check)).body)
             logger.warning(f"[Reconcile] order={order['id']} txn={txn[0]} paid at VNPay, no IPN: {rsp}")
-            if rsp["RspCode"] == "00":
+            # Not for a cancelled order: that payment became a late_payment refund, told by its own push (T175 A5)
+            if rsp["RspCode"] == "00" and order["status"] == "pending":
                 push_service.notify_payment_confirmed(order)
                 counts["paid"] += 1
         elif outcome == "failed" and not order.get("vnpay_fail_notified_at"):
             dao.set_vnpay_fail_notified(order["id"], now)
-            push_service.notify_payment_failed(order)
+            if order["status"] != "cancelled":   # no "pay again" for an order that is gone
+                push_service.notify_payment_failed(order)
             counts["failed"] += 1
     return counts
 
@@ -59,9 +61,28 @@ def reconcile_payments(now: datetime = None) -> dict:
 _vnpay_error = None
 
 
+def expire_unpaid_orders(now: datetime = None) -> int:
+    """T181 A28: cancel the orders nobody paid, unpaid_order_expire_minutes (never below vnpay_query.UNPAID_FLOOR) after their last pay link (its Vietnam time,
+    read by vnpay_query.current_txn) or after their creation without one. A payment arriving later is refunded
+    (apis/payments late_payment)."""
+    now = now or datetime.now(timezone.utc)
+    limit = max(timedelta(minutes=DAOAdminConfig().get_positive_int("unpaid_order_expire_minutes", 30)), vnpay_query.UNPAID_FLOOR)
+    dao = DAOOrders()
+    expired = 0
+    for order in dao.read_expirable_unpaid_orders(created_before=now - limit):
+        txn = vnpay_query.current_txn(order)
+        start = txn[1] if txn else datetime.fromisoformat(order["created_at"]).replace(tzinfo=timezone.utc)
+        if now - start > limit and dao.expire_unpaid_order(order["id"]):
+            expired += 1
+    if expired:
+        logger.warning(f"[Reconcile] {expired} unpaid orders cancelled: payment_timeout")
+    return expired
+
+
 def reconcile_run():
     global _vnpay_error
     counts = reconcile_payments()
+    expire_unpaid_orders()   # after the VNPay check: a payment it just confirmed is never expired
     if counts["asked"] or not counts["tried"]:
         failed = counts["asked"] and counts["errors"] == counts["asked"]
         _vnpay_error = f"all {counts['asked']} VNPay checks failed" if failed else None
