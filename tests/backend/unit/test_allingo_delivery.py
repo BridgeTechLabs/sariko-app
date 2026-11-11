@@ -15,6 +15,7 @@ from fastapi import HTTPException
 import dao.dao_deliveries
 import dao.dao_refunds
 from apis import deliveries, orders, sellers
+from dao.dao_admin_config import DAOAdminConfig
 from schemas import Schema
 from services import allingo_service, push_service
 
@@ -23,14 +24,15 @@ BASE = "https://pro.allingo.vn/api/v1"
 SECRET = "whsec_test"
 
 
-def reply(status, body=None):
+def reply(status, body=None, headers=None):
     text = json.dumps(body) if body is not None else ""
-    return SimpleNamespace(status_code=status, ok=200 <= status < 300, text=text, json=lambda: json.loads(text))
+    return SimpleNamespace(status_code=status, ok=200 <= status < 300, text=text, json=lambda: json.loads(text),
+                           headers=headers or {})
 
 
-def quote(price, service_id=None, available=True, driver_info=True):
+def quote(price, service_id=None, available=True, driver_info=True, partner="grab"):
     return {"service_id": service_id or f"svc{price}", "price": price, "currency": "VND", "available": available,
-            "tracking": {"driver_info": driver_info}}
+            "tracking": {"driver_info": driver_info}, "partner": {"id": partner, "name": partner}}
 
 
 def trip(trip_id="ord_1", status="queued", leg="queued", cod=0):
@@ -42,7 +44,8 @@ class FakeHTTP:
     """routes[(method, path)] = a reply, an exception, or a list of them used in turn."""
 
     def __init__(self):
-        self.calls, self.tokens = [], 0
+        self.calls, self.tokens, self.waits = [], 0, []
+        self.now, self.cost, self.token_reply = 0.0, 0, None   # T191: a fake clock, seconds per call, a refused token
         self.routes = {("POST", "/inquiries"): reply(200, {"quotes": [quote(41000), quote(34800)]}),
                        ("GET", "/orders"): reply(200, {"data": [], "has_more": False}),
                        ("POST", "/orders"): reply(201, trip()),
@@ -50,9 +53,10 @@ class FakeHTTP:
 
     def __call__(self, method, url, json=None, params=None, headers=None, timeout=None):
         path = url.replace(BASE, "")
+        self.now += self.cost
         if path == "/oauth/token":
             self.tokens += 1
-            return reply(200, {"access_token": f"tok{self.tokens}", "expires_in": 3600})
+            return self.token_reply or reply(200, {"access_token": f"tok{self.tokens}", "expires_in": 3600})
         self.calls.append(SimpleNamespace(method=method, path=path, json=json, params=params, headers=headers))
         answer = self.routes[(method, path)]
         if isinstance(answer, list):
@@ -61,8 +65,25 @@ class FakeHTTP:
             raise answer
         return answer
 
+    def sleep(self, seconds):
+        self.waits.append(seconds)
+        self.now += seconds
+
     def made(self, method, path):
         return [c for c in self.calls if (c.method, c.path) == (method, path)]
+
+
+class SettingsRows(DAOAdminConfig):
+    """admin_settings rows for the real get_int_in_range (T192: the company switches); rows = "down" raises."""
+    rows = {}
+
+    def __init__(self):
+        pass
+
+    def get_setting(self, key):
+        if SettingsRows.rows == "down":
+            raise RuntimeError("Supabase down")
+        return SettingsRows.rows.get(key)
 
 
 @pytest.fixture
@@ -74,7 +95,10 @@ def http(monkeypatch):
     allingo_service.reset_allingo_service()
     fake = FakeHTTP()
     monkeypatch.setattr(allingo_service.requests, "request", fake)
+    monkeypatch.setattr(allingo_service, "time", SimpleNamespace(time=time.time, sleep=fake.sleep, monotonic=lambda: fake.now))
     monkeypatch.setattr(allingo_service, "enabled", lambda: True)
+    monkeypatch.setattr(allingo_service, "DAOAdminConfig", SettingsRows)
+    SettingsRows.rows = {"allingo_partner_grab": 1, "allingo_partner_gsm": 1, "allingo_partner_lalamove": 0}
     yield fake
     allingo_service.reset_allingo_service()
 
@@ -99,11 +123,11 @@ def test_tc2_inquiry_body_never_cash_and_cheapest_usable_quote(http, monkeypatch
     body = http.made("POST", "/inquiries")[0].json
     assert {k: body[k] for k in ("cod_amount", "delivery_payment_method", "payee", "type")} == \
         {"cod_amount": 0, "delivery_payment_method": "credit", "payee": "sender", "type": "on_demand"}
-    assert body["filter_partner_ids"] == ["grab", "lalamove", "gsm"]
+    assert body["filter_partner_ids"] == ["grab", "gsm"]   # T192: the switches' defaults, no Lalamove through AllinGo
     assert (result.quotation_id, result.total_fee) == ("first", 34800)   # cheapest usable; equal price -> first
 
     monkeypatch.setenv("ALLINGO_PARTNER_IDS", "simulator")
-    allingo_service.reset_allingo_service()
+    http.routes[("POST", "/inquiries")] = reply(200, {"quotes": [quote(30000, partner="simulator")]})
     allingo_service.get_allingo_service().quote(PICKUP, DROPOFF)
     assert http.made("POST", "/inquiries")[-1].json["filter_partner_ids"] == ["simulator"]
 
@@ -135,7 +159,7 @@ def test_tc24_401_renews_token_once(http):
     http.routes[("POST", "/inquiries")] = reply(401, {})
     with pytest.raises(allingo_service.AllingoError) as e:
         service.quote(PICKUP, DROPOFF)
-    assert e.value.code == "allingo_unauthorized" and http.tokens == 3   # one new token, then give up
+    assert e.value.code == "allingo_blocked" and http.tokens == 3   # one new token, then give up
 
 
 @pytest.mark.parametrize("answer", [{"id": "ord_1", "status": "canceled", "refunded_amount": 34800},
@@ -170,27 +194,47 @@ def test_tc18_switch_read_error_is_lalamove(monkeypatch):
 
 # ── TC-3, TC-23: quotes for the cart and create_order ───────────────────────
 
-def test_tc3_tc23_cart_quotation_from_allingo(api, http, monkeypatch):
-    monkeypatch.setattr(deliveries, "DAOSellerProfiles", lambda: SimpleNamespace(
-        read_seller_coords_by_id=lambda sid: {"lat": 10.77, "lon": 106.70, "address": "Q1"}))
-    monkeypatch.setattr(deliveries, "get_lalamove_service", lambda: pytest.fail("Lalamove must not be asked"))
-    r = api(deliveries.router).post("/deliveries/quotation", json={
+def cart_seller(monkeypatch, buyer_phone="0907654321"):
+    monkeypatch.setattr(deliveries, "DAOSellerProfiles", lambda: SimpleNamespace(read_seller_coords_by_id=lambda sid: {
+        "lat": 10.77, "lon": 106.70, "address": "Q1", "store_name": "Bếp A", "phone": "0901234567"}))
+    monkeypatch.setattr(deliveries, "DAOUsers", lambda: SimpleNamespace(
+        get_users=lambda uid: {"u1": {"name": "Buyer", "phone": buyer_phone, "email": "b@x.vn"}}.get(uid)))
+
+
+def post_quotation(api):
+    return api(deliveries.router).post("/deliveries/quotation", json={
         "seller_id": "s1", "delivery_lat": 10.73, "delivery_lon": 106.72, "delivery_address": "D7"})
+
+
+def test_tc3_tc23_cart_quotation_from_allingo(api, http, monkeypatch):
+    cart_seller(monkeypatch)
+    monkeypatch.setattr(deliveries, "get_lalamove_service", lambda: pytest.fail("Lalamove must not be asked"))
+    r = post_quotation(api)
     assert r.status_code == 200
     assert r.json() == {"success": True, "quotation_id": "svc34800", "stop_id_0": None, "stop_id_1": None,
                         "total_fee": 34800, "currency": "VND", "distance_km": 0}
-    assert "contact_phone" not in http.made("POST", "/inquiries")[0].json["dropoff"]   # the cart has no buyer phone
+    # T191 TC-1: an AllinGo Address needs contact_name + contact_phone (docs inquiries.md, Address required)
+    body = http.made("POST", "/inquiries")[0].json
+    assert (body["pickup"]["contact_name"], body["pickup"]["contact_phone"]) == ("Bếp A", "+84901234567")
+    assert (body["dropoff"]["contact_name"], body["dropoff"]["contact_phone"]) == ("Buyer", "+84907654321")
 
 
-@pytest.mark.parametrize("client_fee, status", [(34800, 200), (30000, 409)])
-def test_tc3_tc23_create_order_quotes_allingo(http, monkeypatch, client_fee, status):
+def fake_create_order(monkeypatch):
+    """create_order with no DB: the fakes of test_order_delivery_fee."""
     import test_order_delivery_fee as fee_test
-    fee_test.created.clear()
     for name, fake in [("DAOCartItems", fee_test.FakeCartItems), ("DAOOrders", fee_test.FakeOrders),
                        ("DAOSellerProfiles", fee_test.FakeSellers), ("DAOAdminConfig", fee_test.FakeVat),
                        ("DAOOrderItems", fee_test.FakeOrderItems), ("DAOCarts", fee_test.FakeCarts)]:
         monkeypatch.setattr(orders, name, fake)
+    return fee_test
+
+
+@pytest.mark.parametrize("client_fee, status", [(34800, 200), (30000, 409)])
+def test_tc3_tc23_create_order_quotes_allingo(http, monkeypatch, client_fee, status):
+    fee_test = fake_create_order(monkeypatch)
+    fee_test.created.clear()
     monkeypatch.setattr(orders, "get_lalamove_service", lambda: pytest.fail("Lalamove must not be asked"))
+    monkeypatch.setattr(deliveries, "DAOUsers", lambda: SimpleNamespace(get_users=lambda uid: {"name": "Buyer", "phone": "0907654321"}))
     req = Schema.RequestCreateOrder(delivery_method="delivery", delivery_address="D7", delivery_lat=10.73, delivery_lon=106.72,
                                     delivery_fee=client_fee, delivery_appointment=datetime.now(timezone.utc) + timedelta(days=2))
     if status == 409:
@@ -390,7 +434,8 @@ def test_tc9_rebook_lalamove_row_to_allingo(seller):
     [update] = Deliveries.updates
     assert update == {"provider": "allingo", "allingo_order_id": "ord_1", "lalamove_order_id": None, "status": "ASSIGNING_DRIVER",
                       "share_link": "https://business.allingo.vn/track/ord_1", "driver_name": None, "driver_phone": None,
-                      "driver_plate": None, "rebook_count": 2, "trip_fee": 34800}   # T180 A12: the new trip's fee
+                      "driver_plate": None, "rebook_count": 2, "trip_fee": 34800,   # T180 A12: the new trip's fee
+                      "allingo_partner": "grab"}   # T192 TC-10: the company of the new quote
     assert Orders.row["status"] == "ready"
 
 
@@ -405,6 +450,7 @@ def test_tc9_rebook_allingo_row_to_lalamove(seller, monkeypatch):
     rebook()
     [update] = Deliveries.updates
     assert (update["provider"], update["lalamove_order_id"], update["allingo_order_id"]) == ("lalamove", "LM2", None)
+    assert update["allingo_partner"] is None   # T192 TC-11: the AllinGo company of the old trip is not kept
 
 
 def test_tc21_tc22_empty_wallet_at_rebook_keeps_the_order(seller):
@@ -535,6 +581,7 @@ def test_tc7_signature(hook, monkeypatch):
     ("picked_up", "PICKED_UP"), ("in_transit", "PICKED_UP"), ("courier_waiting_at_destination", "PICKED_UP"),
     ("completed", "COMPLETED"), ("canceled", "CANCELED"), ("failed", "CANCELED"), ("return_finished", "CANCELED"),
     ("lost", "CANCELED"), ("damaged", "CANCELED"), ("pickup_failed", "ON_GOING"),
+    ("delivering", "PICKED_UP"), ("delivered", "COMPLETED"),   # T191 TC-10: the test-mode lifecycle (test-mode.md)
     ("deliver_failed", "ON_GOING"), ("something_new", "ON_GOING")])
 def test_tc8_status_map(hook, leg, stored):
     if stored == "ON_GOING":   # retry states and unknown values keep what is stored
@@ -697,3 +744,463 @@ def test_tc31_lookup_trouble_is_logged_and_booking_goes_on(seller, caplog, answe
     seller.http.routes[("GET", "/orders")] = answer
     mark_ready()
     assert "lookup of trips" in caplog.text and len(seller.http.made("POST", "/orders")) == 1
+
+
+# ── T191: AllinGo API fixes (docs/dev/20261111-allingo-api-fixes) ───────────
+
+def test_t191_tc2_create_order_quotes_with_the_receiver_else_the_buyer(http, monkeypatch):
+    fake_create_order(monkeypatch)
+    monkeypatch.setattr(deliveries, "DAOUsers", lambda: SimpleNamespace(get_users=lambda uid: {"name": "Buyer", "phone": "0907654321"}))
+    when = datetime.now(timezone.utc) + timedelta(days=2)
+    for receiver, contact in [({"receiver_name": "Mẹ", "receiver_phone": "0912345678"}, ("Mẹ", "+84912345678")),
+                              ({}, ("Buyer", "+84907654321"))]:
+        orders.create_order(Schema.RequestCreateOrder(delivery_method="delivery", delivery_address="D7", delivery_lat=10.73,
+                                                      delivery_lon=106.72, delivery_fee=34800, delivery_appointment=when,
+                                                      **receiver), user={"id": "buyer"})
+        body = http.made("POST", "/inquiries")[-1].json
+        assert (body["dropoff"]["contact_name"], body["dropoff"]["contact_phone"]) == contact
+        assert (body["pickup"]["contact_name"], body["pickup"]["contact_phone"]) == ("Bếp A", "+84901234567")
+
+
+def test_t191_tc3_cart_quotation_without_a_buyer_phone(api, http, monkeypatch):
+    cart_seller(monkeypatch, buyer_phone=None)
+    r = post_quotation(api)
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "quote_phone_missing"   # S1: the cart's own words
+    assert http.made("POST", "/inquiries") == []
+
+
+def test_t191_tc4_lalamove_quotation_needs_no_buyer_phone(api, monkeypatch):
+    cart_seller(monkeypatch, buyer_phone=None)
+    monkeypatch.setattr(deliveries, "DAOUsers", lambda: pytest.fail("Lalamove quotes without the buyer's profile"))
+    monkeypatch.setattr(deliveries, "get_lalamove_service", lambda: SimpleNamespace(get_quotation=lambda **kw: SimpleNamespace(
+        quotation_id="Q", stop_id_0="a", stop_id_1="b", total_fee=41000, currency="VND", distance_km=3)))
+    assert post_quotation(api).json()["total_fee"] == 41000
+
+
+def test_t191_tc5_tc7_booking_waits_between_tries(seller):
+    seller.http.routes[("POST", "/orders")] = [reply(503, {"error": {"code": "partner_unavailable"}}), reply(201, trip())]
+    mark_ready()
+    assert seller.http.waits == [1] and Deliveries.created[0]["allingo_order_id"] == "ord_1"
+    seller.http.routes[("POST", "/orders")] = reply(422, {"error": {"code": "validation_failed"}})   # TC-7
+    seller.http.waits.clear()
+    Orders.row["status"] = "confirmed"
+    with pytest.raises(HTTPException):
+        mark_ready()
+    assert seller.http.waits == []
+
+
+@pytest.mark.parametrize("header, wait", [({"Retry-After": "3"}, 3), ({"Retry-After": "120"}, 5), ({}, 1)])
+def test_t191_tc6_429_waits_retry_after_at_most_5_s(seller, header, wait):
+    seller.http.routes[("POST", "/orders")] = [reply(429, {"error": {"code": "rate_limited"}}, header), reply(201, trip())]
+    mark_ready()
+    assert seller.http.waits == [wait]
+
+
+def test_t191_tc5_no_wait_after_the_last_try(seller):
+    seller.http.routes[("POST", "/orders")] = reply(503, {"error": {"code": "partner_unavailable"}})
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert len(seller.http.made("POST", "/orders")) == 3 and seller.http.waits == [1, 2]
+    booking_failed(e)
+
+
+@pytest.mark.parametrize("status", ["pending", "something_new", "draft", "queued", "on_going"])
+def test_t191_tc8_a_trip_not_ended_is_taken(seller, status):
+    seller.http.routes[("GET", "/orders")] = reply(200, {"data": [trip("ord_9", status, "queued")]})
+    mark_ready()
+    assert seller.http.made("POST", "/orders") == [] and Deliveries.created[0]["allingo_order_id"] == "ord_9"
+
+
+@pytest.mark.parametrize("status", ["completed", "canceled", "return_finished"])
+def test_t191_tc9_an_ended_trip_is_not_taken(seller, status):
+    seller.http.routes[("GET", "/orders")] = reply(200, {"data": [trip("ord_9", status, "queued")]})
+    mark_ready()
+    assert len(seller.http.made("POST", "/orders")) == 1 and Deliveries.created[0]["allingo_order_id"] == "ord_1"
+
+
+def order_event(order_status, leg=None):
+    body = event("x")
+    body["data"]["object"] |= {"status": order_status, "delivery": leg}
+    return body
+
+
+def test_t191_tc10_delivered_finishes_the_order(hook):
+    assert post_event(hook.client, event("delivered")).status_code == 200
+    assert Deliveries.row["status"] == "COMPLETED" and Orders.row["status"] == "done" and hook.pushes == ["delivered"]
+
+
+@pytest.mark.parametrize("leg", [None, {"track_link": "https://business.allingo.vn/track/ord_1"}])
+def test_t191_tc11_no_delivery_status_reads_the_order_status(hook, leg):
+    post_event(hook.client, order_event("queued", leg))
+    assert Deliveries.row["status"] == "ASSIGNING_DRIVER" and Orders.writes == []   # anything else: kept
+    post_event(hook.client, order_event("canceled", leg))
+    assert Deliveries.row["status"] == "CANCELED" and Orders.row["status"] == "delivery_failed"
+    assert [a[0] for a in hook.admin] == ["admin_delivery_failed"]
+    Orders.row["status"], Deliveries.row["status"] = "ready", "ON_GOING"
+    post_event(hook.client, order_event("completed", leg))
+    assert Deliveries.row["status"] == "COMPLETED" and Orders.row["status"] == "done" and hook.pushes == ["delivered"]
+
+
+def test_t191_tc11_return_finished_order_after_pickup_is_lost(hook):
+    Deliveries.row["status"] = "PICKED_UP"
+    post_event(hook.client, order_event("return_finished"))
+    assert Deliveries.row["status"] == "LOST" and [a[0] for a in hook.admin] == ["admin_delivery_lost"]
+
+
+def test_t191_tc12_cancel_retried_after_partner_cancel_failed(http):
+    refused = reply(503, {"error": {"code": "partner_cancel_failed", "message": "The carrier refused the cancellation. Retry."}})
+    http.routes[("POST", "/orders/ord_1/cancel")] = [refused, reply(200, {"id": "ord_1", "status": "canceled"})]
+    assert allingo_service.get_allingo_service().cancel_order("ord_1") is True
+    keys = [c.headers["Idempotency-Key"] for c in http.made("POST", "/orders/ord_1/cancel")]
+    assert len(keys) == 2 and keys[0] != keys[1] and http.waits == [1]
+
+
+def test_t191_tc13_cancel_gives_up_after_3_calls(http):
+    http.routes[("POST", "/orders/ord_1/cancel")] = reply(503, {"error": {"code": "partner_cancel_failed"}})
+    assert allingo_service.get_allingo_service().cancel_order("ord_1") is False
+    assert len(http.made("POST", "/orders/ord_1/cancel")) == 3 and http.waits == [1, 2]
+
+
+@pytest.mark.parametrize("profile, detail", [
+    ({"address": "  "}, "Missing pickup or dropoff address. Please update your store address in settings."),
+    ({"lat": None}, "Seller location not configured")])
+def test_t191_tc14_rebook_checks_the_store_address(seller, monkeypatch, profile, detail):
+    Orders.row["status"] = "delivery_failed"
+    Deliveries.row = {"id": "d1", "provider": "allingo", "allingo_order_id": "ord_0", "status": "CANCELED", "rebook_count": 0}
+    real = Orders.read_order_with_seller_coords
+    monkeypatch.setattr(Orders, "read_order_with_seller_coords",
+                        lambda self, oid: (lambda o: {**o, "seller_profiles": {**o["seller_profiles"], **profile}})(real(self, oid)))
+    with pytest.raises(HTTPException) as e:
+        rebook()
+    assert (e.value.status_code, e.value.detail) == (400, detail)
+    assert seller.http.calls == [] and Deliveries.updates == []
+
+
+BLOCKED = ("admin_delivery_provider_blocked", f"/orders?open={OID}", {"code": OID[:8]})
+
+
+@pytest.mark.parametrize("answer", [reply(403, {"error": {"code": "app_not_approved"}}), reply(403, {"error": {"code": "app_suspended"}}),
+                                    reply(401, {"error": {"code": "token_revoked"}})])   # TC-16: 401 again after a new token
+def test_t191_tc15_tc16_blocked_app_tells_the_admins_once(seller, answer):
+    seller.http.routes[("POST", "/orders")] = answer
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert seller.admin == [BLOCKED] and seller.http.waits == []
+    assert len(seller.http.made("POST", "/orders")) == (2 if answer.status_code == 401 else 1)
+    booking_failed(e)
+
+
+def test_t191_tc15_blocked_at_rebook_keeps_the_order(seller):
+    Orders.row["status"] = "delivery_failed"
+    Deliveries.row = {"id": "d1", "provider": "allingo", "allingo_order_id": "ord_0", "status": "CANCELED", "rebook_count": 0}
+    seller.http.routes[("POST", "/orders")] = reply(403, {"error": {"code": "app_suspended"}})
+    with pytest.raises(HTTPException) as e:
+        rebook()
+    assert e.value.status_code == 503 and Orders.row["status"] == "delivery_failed" and refunds == []
+    assert seller.admin == [BLOCKED]
+
+
+def test_t191_tc15_blocked_quote_at_ready_tells_the_admins(seller):
+    seller.http.routes[("POST", "/inquiries")] = reply(403, {"error": {"code": "app_not_approved"}})
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert e.value.status_code == 502 and Orders.row["status"] == "confirmed" and seller.admin == [BLOCKED]
+
+
+# ── T191 after QA (TC-20..43, S1-S7, Q1-Q4) ─────────────────────────────────
+
+def test_t191_tc36_create_order_without_any_phone_is_400_not_502(http, monkeypatch):
+    fake_create_order(monkeypatch)
+    monkeypatch.setattr(deliveries, "DAOUsers", lambda: SimpleNamespace(get_users=lambda uid: {"name": "Buyer", "phone": None}))
+    with pytest.raises(HTTPException) as e:
+        orders.create_order(Schema.RequestCreateOrder(delivery_method="delivery", delivery_address="D7", delivery_lat=10.73,
+                                                      delivery_lon=106.72, delivery_fee=34800,
+                                                      delivery_appointment=datetime.now(timezone.utc) + timedelta(days=2)),
+                            user={"id": "buyer"})
+    assert (e.value.status_code, e.value.detail["code"]) == (400, "quote_phone_missing")
+
+
+def test_t191_tc37_cart_uses_the_address_receiver(api, http, monkeypatch):
+    cart_seller(monkeypatch, buyer_phone=None)
+    r = api(deliveries.router).post("/deliveries/quotation", json={
+        "seller_id": "s1", "delivery_lat": 10.73, "delivery_lon": 106.72, "delivery_address": "D7",
+        "receiver_name": "Mẹ", "receiver_phone": "0912345678"})
+    assert r.status_code == 200
+    dropoff = http.made("POST", "/inquiries")[0].json["dropoff"]
+    assert (dropoff["contact_name"], dropoff["contact_phone"]) == ("Mẹ", "+84912345678")
+
+
+def test_t191_tc38_ready_keeps_buyer_phone_invalid(seller, monkeypatch):
+    real = Orders.read_order_with_seller_coords
+    monkeypatch.setattr(Orders, "read_order_with_seller_coords",
+                        lambda self, oid: {**real(self, oid), "users": {"name": "Buyer", "phone": "12"}})
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert e.value.detail["code"] == "buyer_phone_invalid" and seller.http.calls == []
+
+
+def test_t191_tc39_tc43_cart_never_shows_the_store_settings_words_or_allingo_codes(api, http, monkeypatch):
+    cart_seller(monkeypatch)
+    monkeypatch.setattr(deliveries, "DAOSellerProfiles", lambda: SimpleNamespace(read_seller_coords_by_id=lambda sid: {
+        "lat": 10.77, "lon": 106.70, "address": "Q1", "store_name": "Bếp A", "phone": "123"}))
+    r = post_quotation(api)   # TC-39: the store's phone is wrong
+    assert (r.status_code, r.json()["detail"]) == (502, "Could not get a delivery fee quote. Please try again.")
+    cart_seller(monkeypatch)
+    http.routes[("POST", "/inquiries")] = reply(403, {"error": {"code": "app_not_approved"}})
+    admin = []
+    monkeypatch.setattr(push_service, "notify_admins", lambda *a, **f: admin.append(a))
+    r = post_quotation(api)   # TC-43: refused account, no alert per cart (the wallet job tells)
+    assert (r.status_code, r.json()["detail"]) == (502, "Could not get a delivery fee quote. Please try again.") and admin == []
+
+
+@pytest.mark.parametrize("token", [reply(403, {"error": "unauthorized_client"}), reply(401, {"error": "invalid_client"})])
+def test_t191_tc40_tc41_refused_token_at_ready(seller, token):
+    seller.http.token_reply = token
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert e.value.status_code == 502 and Orders.row["status"] == "confirmed" and refunds == []
+    assert seller.admin == [BLOCKED]   # Q3: once, though the lookup failed first
+
+
+def test_t191_tc42_refused_quote_at_rebook_keeps_the_order(seller):
+    Orders.row["status"] = "delivery_failed"
+    Deliveries.row = {"id": "d1", "provider": "allingo", "allingo_order_id": "ord_0", "status": "CANCELED", "rebook_count": 0}
+    seller.http.routes[("POST", "/inquiries")] = reply(403, {"error": {"code": "app_not_approved"}})
+    with pytest.raises(HTTPException) as e:
+        rebook()
+    assert e.value.status_code == 502 and Orders.row["status"] == "delivery_failed" and seller.admin == [BLOCKED]
+
+
+def test_t191_tc20_timeout_then_a_pending_trip_without_delivery(seller):
+    seller.http.routes[("POST", "/orders")] = requests.Timeout("read timeout")
+    seller.http.routes[("GET", "/orders")] = [reply(200, {"data": []}), reply(200, {"data": [
+        {"id": "ord_9", "status": "pending", "external_reference": OID, "fee": {"cod": 0, "total": 34800}, "delivery": None}]})]
+    mark_ready()
+    assert len(seller.http.made("POST", "/orders")) == 1
+    assert [(d["allingo_order_id"], d["status"]) for d in Deliveries.created] == [("ord_9", "ASSIGNING_DRIVER")]
+
+
+def test_t191_tc21_lost_answer_and_failed_lookup_posts_again(seller):
+    """Chosen: a failed lookup books again (a new key); the second trip, if any, is cancelled by its webhook (S7)."""
+    seller.http.routes[("POST", "/orders")] = [requests.Timeout("read timeout"), reply(201, trip())]
+    seller.http.routes[("GET", "/orders")] = [reply(200, {"data": []}), reply(503, {})]
+    mark_ready()
+    assert len(seller.http.made("POST", "/orders")) == 2
+
+
+def test_t191_tc22_two_running_trips_take_one(seller):
+    seller.http.routes[("GET", "/orders")] = reply(200, {"data": [trip("ord_a", "on_going", "courier_assigned"), trip("ord_b")]})
+    mark_ready()
+    assert seller.http.made("POST", "/orders") == [] and Deliveries.created[0]["allingo_order_id"] == "ord_a"
+
+
+def test_t191_tc31_more_attempts_wait_1_2_4_then_the_deadline(seller, monkeypatch):
+    monkeypatch.setattr(Settings, "get_positive_int", lambda self, key, default: 5 if key == "driver_booking_attempts" else default)
+    seller.http.routes[("POST", "/orders")] = reply(503, {"error": {"code": "partner_unavailable"}})
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    # Q4: a wait starts only if wait + 30 s still ends before 40 s: 1, 2, 4 (7 s); the 5 s wait would end at 42 s
+    assert seller.http.waits == [1, 2, 4] and len(seller.http.made("POST", "/orders")) == 4
+    booking_failed(e)
+
+
+def test_t191_tc32_slow_calls_no_new_try_after_the_deadline(seller):
+    seller.http.cost = 15   # every AllinGo call takes its whole timeout; the token is the first call's
+    seller.http.routes[("POST", "/orders")] = reply(503, {"error": {"code": "partner_unavailable"}})
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert seller.http.waits == [] and len(seller.http.made("POST", "/orders")) == 1
+    assert seller.http.now == 60   # token + lookup + quote + POST: the first try alone (not T191's), no second one
+    booking_failed(e)
+
+
+@pytest.mark.parametrize("answer, wait", [
+    (reply(429, {}, {"Retry-After": "abc"}), 1), (reply(429, {}, {"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}), 1),
+    (reply(429, {}, {"Retry-After": "0"}), 1)])
+def test_t191_tc33_odd_retry_after(seller, answer, wait):
+    seller.http.routes[("POST", "/orders")] = [answer, reply(201, trip())]
+    mark_ready()
+    assert seller.http.waits == [wait]
+
+
+def test_t191_tc34_rebook_tries_once(seller):
+    Orders.row["status"] = "delivery_failed"
+    Deliveries.row = {"id": "d1", "provider": "allingo", "allingo_order_id": "ord_0", "status": "CANCELED", "rebook_count": 0}
+    seller.http.routes[("POST", "/orders")] = reply(503, {"error": {"code": "partner_unavailable"}})
+    with pytest.raises(HTTPException) as e:
+        rebook()
+    assert e.value.status_code == 503 and seller.http.waits == [] and len(seller.http.made("POST", "/orders")) == 1
+
+
+@pytest.mark.parametrize("late, calls, waits", [(0, 3, [1, 2]), (100, 1, [])])   # Q2: past the deadline, one call still
+def test_t191_tc35_rollback_cancel_retries_in_time(seller, caplog, late, calls, waits):
+    Deliveries.fail_create = True
+    seller.http.routes[("POST", "/orders/ord_1/cancel")] = reply(503, {"error": {"code": "partner_cancel_failed"}})
+    real = Deliveries.create_delivery
+
+    def slow_insert(self, **kw):
+        seller.http.now += late
+        return real(self, **kw)
+    Deliveries.create_delivery = slow_insert
+    try:
+        with pytest.raises(HTTPException) as e:
+            mark_ready()
+    finally:
+        Deliveries.create_delivery = real
+    assert e.value.status_code == 500 and seller.http.waits == waits
+    assert len(seller.http.made("POST", "/orders/ord_1/cancel")) == calls and "MANUAL INTERVENTION" in caplog.text
+
+
+def test_t191_tc24_tc25_late_or_repeated_events_after_delivered(hook):
+    for _ in range(2):
+        post_event(hook.client, event("delivered"))
+    post_event(hook.client, event("delivering"))
+    assert Deliveries.row["status"] == "COMPLETED" and Orders.row["status"] == "done" and hook.pushes == ["delivered"]
+
+
+@pytest.mark.parametrize("order_status", ["return_finished", "canceled"])
+def test_t191_tc26_failed_end_after_pickup_is_lost(hook, seller, order_status):
+    Orders.row["status"] = "ready"
+    Deliveries.row = {"id": "d1", "order_id": OID, "provider": "allingo", "allingo_order_id": "ord_1", "status": "PICKED_UP"}
+    post_event(hook.client, order_event(order_status))
+    assert Deliveries.row["status"] == "LOST" and Orders.row["status"] == "delivery_failed"
+    with pytest.raises(HTTPException) as e:
+        rebook()
+    assert e.value.detail["code"] == "delivery_lost"
+
+
+@pytest.mark.parametrize("leg", ["queued", "pending_schedule", "pickup_failed"])
+def test_t191_tc27_cancelled_order_wins_over_a_delivery_not_ended(hook, leg):
+    post_event(hook.client, order_event("canceled", {"status": leg}))
+    assert Deliveries.row["status"] == "CANCELED" and Orders.row["status"] == "delivery_failed"
+    assert [a[0] for a in hook.admin] == ["admin_delivery_failed"]
+
+
+def test_t191_tc28_old_trip_after_a_rebook_changes_nothing(hook, http):
+    Deliveries.row["allingo_order_id"] = "ord_new"
+    for body in (order_event("canceled"), event("canceled", trip_id="ord_1")):
+        body["data"]["object"]["id"] = "ord_1"
+        assert post_event(hook.client, body).status_code == 200
+    assert Deliveries.updates == [] and Orders.writes == [] and http.calls == []
+
+
+def test_t191_tc29_completed_after_canceled_keeps_canceled(hook):
+    Orders.row["status"], Deliveries.row["status"] = "delivery_failed", "CANCELED"
+    post_event(hook.client, order_event("completed"))
+    assert Deliveries.row["status"] == "CANCELED" and Orders.row["status"] == "delivery_failed"
+
+
+# S7 + Q1: a second AllinGo trip for one order is cancelled when its webhook comes
+
+def stray(hook, http, order_status="ready", row_status="ON_GOING", trip_status="queued", cancel=None):
+    Orders.row["status"] = order_status
+    Deliveries.row = {**Deliveries.row, "status": row_status}
+    http.routes[("POST", "/orders/ord_2/cancel")] = cancel or reply(200, {"id": "ord_2", "status": "canceled"})
+    body = event("courier_assigned", trip_id="ord_2")
+    body["data"]["object"]["status"] = trip_status
+    return post_event(hook.client, body)
+
+
+@pytest.mark.parametrize("order_status, row_status", [("ready", "ON_GOING"), ("cancelled", "CANCELED"), ("done", "COMPLETED")])
+def test_t191_s7_stray_trip_cancelled(hook, http, caplog, order_status, row_status):
+    assert stray(hook, http, order_status, row_status).status_code == 200
+    assert len(http.made("POST", "/orders/ord_2/cancel")) == 1 and "stray AllinGo trip" in caplog.text
+    assert Deliveries.updates == [] and Orders.writes == []
+
+
+def test_t191_s7_ended_stray_trip_or_a_rebook_booking_is_left_alone(hook, http):
+    assert stray(hook, http, trip_status="canceled").status_code == 200
+    assert stray(hook, http, "delivery_failed", "CANCELED").status_code == 503   # Q1: the rebook is writing its row
+    assert http.made("POST", "/orders/ord_2/cancel") == []
+
+
+def test_t191_s7_failed_cancel_answers_503(hook, http):
+    assert stray(hook, http, cancel=reply(503, {"error": {"code": "partner_cancel_failed"}})).status_code == 503
+    assert len(http.made("POST", "/orders/ord_2/cancel")) == 1 and http.waits == []   # AllinGo resends the event
+
+
+def test_t191_g1_stray_trip_that_cannot_be_cancelled_is_done(hook, http):
+    assert stray(hook, http, cancel=reply(409, {"error": {"code": "cannot_cancel"}})).status_code == 200   # no 44-hour resends
+    assert len(http.made("POST", "/orders/ord_2/cancel")) == 1
+    assert allingo_service.get_allingo_service().cancel_order("ord_2") is False   # Ready / rebook rollback: still a failure
+
+
+
+# ── T192 C: the companies AllinGo may book (admin_settings allingo_partner_*) and deliveries.allingo_partner ─
+
+def asked(http):
+    return [c.json["filter_partner_ids"] for c in http.calls if c.path in ("/inquiries", "/orders") and c.method == "POST"]
+
+
+def test_t192_tc6_tc8_cart_asks_the_companies_switched_on_now(api, http, monkeypatch):
+    cart_seller(monkeypatch)
+    SettingsRows.rows |= {"allingo_partner_gsm": 0}
+    post_quotation(api)
+    SettingsRows.rows |= {"allingo_partner_gsm": 1, "allingo_partner_lalamove": 1}   # TC-8: read on every quote
+    post_quotation(api)
+    assert asked(http) == [["grab"], ["grab", "gsm", "lalamove"]]
+
+
+@pytest.mark.parametrize("env, want", [("simulator", ["simulator"]), (" grab , simulator ", ["grab", "simulator"]),
+                                       ("", ["grab", "gsm"]), ("  ,  ", ["grab", "gsm"])])   # TC-18: empty = not set
+def test_t192_tc7_tc18_env_wins_when_not_empty(http, monkeypatch, env, want):
+    monkeypatch.setenv("ALLINGO_PARTNER_IDS", env)
+    SettingsRows.rows |= {"allingo_partner_lalamove": 0}
+    assert allingo_service.partner_ids() == want
+
+
+@pytest.mark.parametrize("rows, want", [
+    ({"allingo_partner_grab": 0, "allingo_partner_gsm": 1, "allingo_partner_lalamove": 0}, ["gsm"]),   # TC-16: 0 is off
+    ({"allingo_partner_grab": 1, "allingo_partner_gsm": 0, "allingo_partner_lalamove": 1}, ["grab", "lalamove"]),
+    ({}, ["grab", "gsm"]),                                                                                # TC-17: rows missing
+    ({"allingo_partner_grab": 2, "allingo_partner_gsm": "abc", "allingo_partner_lalamove": True}, ["grab", "gsm"]),
+    ("down", ["grab", "gsm"])])                                                                           # TC-17: read error
+def test_t192_tc16_tc17_switch_values(http, caplog, rows, want):
+    SettingsRows.rows = rows
+    assert allingo_service.partner_ids() == want
+    if rows in ({}, "down"):
+        assert "using" in caplog.text   # logged, never a 500
+
+
+def test_t192_tc19_quote_of_a_company_not_asked_is_dropped(seller):
+    seller.http.routes[("POST", "/inquiries")] = reply(200, {"quotes": [quote(20000, "cheap_lalamove", partner="lalamove"),
+                                                                        quote(34800, partner="gsm")]})
+    mark_ready()
+    [post] = seller.http.made("POST", "/orders")
+    assert post.json["service_id"] == "svc34800" and Deliveries.created[0]["allingo_partner"] == "gsm"   # TC-9
+
+
+def test_t192_tc20_the_trip_asks_only_the_quoted_company(seller):
+    seller.http.routes[("POST", "/inquiries")] = reply(200, {"quotes": [quote(30000, partner="gsm"), quote(34800)]})
+    mark_ready()
+    assert asked(seller.http) == [["grab", "gsm"], ["gsm"]]   # POST /orders: the cheapest quote's company only
+
+
+def test_t192_tc21_no_company_on(api, seller, monkeypatch):
+    SettingsRows.rows = {"allingo_partner_grab": 0, "allingo_partner_gsm": 0, "allingo_partner_lalamove": 0}
+    cart_seller(monkeypatch)
+    r = post_quotation(api)
+    assert (r.status_code, r.json()["detail"]) == (502, "Could not get a delivery fee quote. Please try again.")
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert e.value.status_code == 502 and Orders.row["status"] == "confirmed" and refunds == []
+    assert seller.http.calls == [c for c in seller.http.calls if c.path == "/orders" and c.method == "GET"]   # no /inquiries
+
+
+@pytest.mark.parametrize("leg, partner", [({"status": "courier_assigned", "partner": {"id": "grab", "name": "Grab"}}, "grab"),
+                                          (None, None)])
+def test_t192_tc22_taken_trip_keeps_its_own_company(seller, leg, partner):
+    seller.http.routes[("GET", "/orders")] = reply(200, {"data": [{**trip("ord_9", "on_going"), "delivery": leg}]})
+    seller.http.routes[("POST", "/inquiries")] = reply(200, {"quotes": [quote(30000, partner="gsm")]})
+    mark_ready()
+    assert seller.http.made("POST", "/orders") == [] and Deliveries.created[0]["allingo_partner"] == partner
+
+
+def test_t192_tc11_lalamove_ready_has_no_allingo_company(seller, monkeypatch):
+    monkeypatch.setattr(allingo_service, "enabled", lambda: False)
+    lalamove = SimpleNamespace(
+        get_quotation=lambda **kw: SimpleNamespace(quotation_id="Q", stop_id_0="a", stop_id_1="b", total_fee=41000),
+        place_order=lambda **kw: SimpleNamespace(status="ASSIGNING_DRIVER", lalamove_order_id="LM2", share_link="https://ll"))
+    monkeypatch.setattr("services.lalamove_service.get_lalamove_service", lambda: lalamove)   # Ready imports it locally
+    mark_ready()
+    assert Deliveries.created[0].get("allingo_partner") is None and Deliveries.created[0]["lalamove_order_id"] == "LM2"

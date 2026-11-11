@@ -143,6 +143,10 @@ MESSAGES = {
         "en": ("Delivery wallet is empty", "No rider booked for order #{code}. Top up the delivery wallet."),
         "vi": ("Ví giao hàng hết tiền", "Chưa đặt được xe cho đơn #{code}. Hãy nạp tiền vào ví giao hàng."),
     },
+    "admin_delivery_provider_blocked": {
+        "en": ("Delivery company refused our account", "No rider can be booked. Check the AllinGo account."),
+        "vi": ("Hãng giao hàng từ chối tài khoản", "Chưa đặt được xe. Hãy kiểm tra tài khoản AllinGo."),
+    },
     "admin_delivery_wallet_low": {
         "en": ("Delivery wallet running low", "AllinGo wallet: {balance} (alert below {threshold}). Top up before trips start failing."),
         "vi": ("Ví giao hàng sắp hết tiền", "Ví AllinGo còn {balance} (báo khi dưới {threshold}). Hãy nạp tiền trước khi đặt xe bị lỗi."),
@@ -156,6 +160,7 @@ ZALO_ADMIN = {
     "admin_delivery_failed": ("ops", "🚚 Order #{code}: delivery failed, the delivery company could not deliver it."),
     "admin_delivery_lost": ("ops", "📦 Order #{code}: food lost, damaged or sent back after pickup. Contact the buyer and the seller."),
     "admin_delivery_wallet_empty": ("ops", "💸 Delivery wallet is empty: no rider booked for order #{code}. Top up the wallet."),
+    "admin_delivery_provider_blocked": ("ops", "⛔ Delivery company refused our account: no rider can be booked. Check the AllinGo account."),
     "admin_delivery_wallet_low": ("ops", "🪫 AllinGo wallet low: {balance} (alert below {threshold}). Top up before trips start failing."),
 }
 

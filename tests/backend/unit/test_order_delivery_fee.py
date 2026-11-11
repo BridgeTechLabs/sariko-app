@@ -39,7 +39,7 @@ class FakeOrders:
 class FakeSellers:
     def read_seller_order_info(self, seller_id):
         return {"user_id": "seller-user", "is_open": True, "commission_rate": Decimal("0.1"),
-                "address": "Q1", "lat": 10.77, "lon": 106.70}
+                "address": "Q1", "lat": 10.77, "lon": 106.70, "store_name": "Bếp A", "phone": "0901234567"}
 
 
 class FakeVat:

@@ -2,6 +2,8 @@ import { defineStore } from "pinia";
 import { createPoller } from "@/composables/createPoller";
 import apiDeliveries from "@/apis/deliveries/apiDeliveries";
 import { DELIVERY_TERMINAL, isTripActive } from "@/utils/deliveryBadge";
+import { apiErrorMessage } from "@/lib/axiosPolicy.js";
+import { useAuthStore } from "@/stores/auth/authStore";
 const DELIVERY_POLL_MS = 10_000
 
 export const useDeliveryStore = defineStore("deliveryStore", {
@@ -10,6 +12,7 @@ export const useDeliveryStore = defineStore("deliveryStore", {
             quotation: null,
             currentDelivery: null,
             quotationLoading: false,
+            quotationError: null,   // why there is no fee, in the buyer's words (T191)
             _poller: null,
             _watchedOrderId: null,
         }
@@ -32,8 +35,12 @@ export const useDeliveryStore = defineStore("deliveryStore", {
         async getQuotation(sellerId, deliveryLat, deliveryLon, deliveryAddress) {
             this.quotationLoading = true
             this.quotation = null
+            this.quotationError = null
             try {
-                const res = await apiDeliveries.getQuotation(sellerId, deliveryLat, deliveryLon, deliveryAddress)
+                // T191: the chosen address's receiver, the contact the order will use (else the buyer's profile)
+                const auth = useAuthStore()
+                const res = await apiDeliveries.getQuotation(sellerId, deliveryLat, deliveryLon, deliveryAddress,
+                    { receiver_name: auth.inputReceiverName, receiver_phone: auth.inputReceiverPhone })
                 if (res?.success) {
                     this.quotation = {
                         quotation_id: res.quotation_id,
@@ -44,6 +51,7 @@ export const useDeliveryStore = defineStore("deliveryStore", {
                 }
             } catch (e) {
                 console.error('deliveryStore - getQuotation -', e)
+                this.quotationError = apiErrorMessage(e?.response?.data, 'delivery_quote_failed')
             } finally {
                 this.quotationLoading = false
             }
@@ -97,6 +105,7 @@ export const useDeliveryStore = defineStore("deliveryStore", {
             this.quotation = null
             this.currentDelivery = null
             this.quotationLoading = false
+            this.quotationError = null
         },
     }
 })
