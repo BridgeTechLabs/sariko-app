@@ -15,6 +15,7 @@ from fastapi import HTTPException
 import dao.dao_deliveries
 import dao.dao_refunds
 from apis import deliveries, orders, sellers
+from dao.dao_admin_config import DAOAdminConfig
 from schemas import Schema
 from services import allingo_service, push_service
 
@@ -29,9 +30,9 @@ def reply(status, body=None, headers=None):
                            headers=headers or {})
 
 
-def quote(price, service_id=None, available=True, driver_info=True):
+def quote(price, service_id=None, available=True, driver_info=True, partner="grab"):
     return {"service_id": service_id or f"svc{price}", "price": price, "currency": "VND", "available": available,
-            "tracking": {"driver_info": driver_info}}
+            "tracking": {"driver_info": driver_info}, "partner": {"id": partner, "name": partner}}
 
 
 def trip(trip_id="ord_1", status="queued", leg="queued", cod=0):
@@ -72,6 +73,19 @@ class FakeHTTP:
         return [c for c in self.calls if (c.method, c.path) == (method, path)]
 
 
+class SettingsRows(DAOAdminConfig):
+    """admin_settings rows for the real get_int_in_range (T192: the company switches); rows = "down" raises."""
+    rows = {}
+
+    def __init__(self):
+        pass
+
+    def get_setting(self, key):
+        if SettingsRows.rows == "down":
+            raise RuntimeError("Supabase down")
+        return SettingsRows.rows.get(key)
+
+
 @pytest.fixture
 def http(monkeypatch):
     """Switch = 1 (AllinGo), test keys in env, AllinGo answered by FakeHTTP."""
@@ -83,6 +97,8 @@ def http(monkeypatch):
     monkeypatch.setattr(allingo_service.requests, "request", fake)
     monkeypatch.setattr(allingo_service, "time", SimpleNamespace(time=time.time, sleep=fake.sleep, monotonic=lambda: fake.now))
     monkeypatch.setattr(allingo_service, "enabled", lambda: True)
+    monkeypatch.setattr(allingo_service, "DAOAdminConfig", SettingsRows)
+    SettingsRows.rows = {"allingo_partner_grab": 1, "allingo_partner_gsm": 1, "allingo_partner_lalamove": 0}
     yield fake
     allingo_service.reset_allingo_service()
 
@@ -107,11 +123,11 @@ def test_tc2_inquiry_body_never_cash_and_cheapest_usable_quote(http, monkeypatch
     body = http.made("POST", "/inquiries")[0].json
     assert {k: body[k] for k in ("cod_amount", "delivery_payment_method", "payee", "type")} == \
         {"cod_amount": 0, "delivery_payment_method": "credit", "payee": "sender", "type": "on_demand"}
-    assert body["filter_partner_ids"] == ["grab", "lalamove", "gsm"]
+    assert body["filter_partner_ids"] == ["grab", "gsm"]   # T192: the switches' defaults, no Lalamove through AllinGo
     assert (result.quotation_id, result.total_fee) == ("first", 34800)   # cheapest usable; equal price -> first
 
     monkeypatch.setenv("ALLINGO_PARTNER_IDS", "simulator")
-    allingo_service.reset_allingo_service()
+    http.routes[("POST", "/inquiries")] = reply(200, {"quotes": [quote(30000, partner="simulator")]})
     allingo_service.get_allingo_service().quote(PICKUP, DROPOFF)
     assert http.made("POST", "/inquiries")[-1].json["filter_partner_ids"] == ["simulator"]
 
@@ -418,7 +434,8 @@ def test_tc9_rebook_lalamove_row_to_allingo(seller):
     [update] = Deliveries.updates
     assert update == {"provider": "allingo", "allingo_order_id": "ord_1", "lalamove_order_id": None, "status": "ASSIGNING_DRIVER",
                       "share_link": "https://business.allingo.vn/track/ord_1", "driver_name": None, "driver_phone": None,
-                      "driver_plate": None, "rebook_count": 2, "trip_fee": 34800}   # T180 A12: the new trip's fee
+                      "driver_plate": None, "rebook_count": 2, "trip_fee": 34800,   # T180 A12: the new trip's fee
+                      "allingo_partner": "grab"}   # T192 TC-10: the company of the new quote
     assert Orders.row["status"] == "ready"
 
 
@@ -433,6 +450,7 @@ def test_tc9_rebook_allingo_row_to_lalamove(seller, monkeypatch):
     rebook()
     [update] = Deliveries.updates
     assert (update["provider"], update["lalamove_order_id"], update["allingo_order_id"]) == ("lalamove", "LM2", None)
+    assert update["allingo_partner"] is None   # T192 TC-11: the AllinGo company of the old trip is not kept
 
 
 def test_tc21_tc22_empty_wallet_at_rebook_keeps_the_order(seller):
@@ -1106,3 +1124,83 @@ def test_t191_g1_stray_trip_that_cannot_be_cancelled_is_done(hook, http):
     assert len(http.made("POST", "/orders/ord_2/cancel")) == 1
     assert allingo_service.get_allingo_service().cancel_order("ord_2") is False   # Ready / rebook rollback: still a failure
 
+
+
+# ── T192 C: the companies AllinGo may book (admin_settings allingo_partner_*) and deliveries.allingo_partner ─
+
+def asked(http):
+    return [c.json["filter_partner_ids"] for c in http.calls if c.path in ("/inquiries", "/orders") and c.method == "POST"]
+
+
+def test_t192_tc6_tc8_cart_asks_the_companies_switched_on_now(api, http, monkeypatch):
+    cart_seller(monkeypatch)
+    SettingsRows.rows |= {"allingo_partner_gsm": 0}
+    post_quotation(api)
+    SettingsRows.rows |= {"allingo_partner_gsm": 1, "allingo_partner_lalamove": 1}   # TC-8: read on every quote
+    post_quotation(api)
+    assert asked(http) == [["grab"], ["grab", "gsm", "lalamove"]]
+
+
+@pytest.mark.parametrize("env, want", [("simulator", ["simulator"]), (" grab , simulator ", ["grab", "simulator"]),
+                                       ("", ["grab", "gsm"]), ("  ,  ", ["grab", "gsm"])])   # TC-18: empty = not set
+def test_t192_tc7_tc18_env_wins_when_not_empty(http, monkeypatch, env, want):
+    monkeypatch.setenv("ALLINGO_PARTNER_IDS", env)
+    SettingsRows.rows |= {"allingo_partner_lalamove": 0}
+    assert allingo_service.partner_ids() == want
+
+
+@pytest.mark.parametrize("rows, want", [
+    ({"allingo_partner_grab": 0, "allingo_partner_gsm": 1, "allingo_partner_lalamove": 0}, ["gsm"]),   # TC-16: 0 is off
+    ({"allingo_partner_grab": 1, "allingo_partner_gsm": 0, "allingo_partner_lalamove": 1}, ["grab", "lalamove"]),
+    ({}, ["grab", "gsm"]),                                                                                # TC-17: rows missing
+    ({"allingo_partner_grab": 2, "allingo_partner_gsm": "abc", "allingo_partner_lalamove": True}, ["grab", "gsm"]),
+    ("down", ["grab", "gsm"])])                                                                           # TC-17: read error
+def test_t192_tc16_tc17_switch_values(http, caplog, rows, want):
+    SettingsRows.rows = rows
+    assert allingo_service.partner_ids() == want
+    if rows in ({}, "down"):
+        assert "using" in caplog.text   # logged, never a 500
+
+
+def test_t192_tc19_quote_of_a_company_not_asked_is_dropped(seller):
+    seller.http.routes[("POST", "/inquiries")] = reply(200, {"quotes": [quote(20000, "cheap_lalamove", partner="lalamove"),
+                                                                        quote(34800, partner="gsm")]})
+    mark_ready()
+    [post] = seller.http.made("POST", "/orders")
+    assert post.json["service_id"] == "svc34800" and Deliveries.created[0]["allingo_partner"] == "gsm"   # TC-9
+
+
+def test_t192_tc20_the_trip_asks_only_the_quoted_company(seller):
+    seller.http.routes[("POST", "/inquiries")] = reply(200, {"quotes": [quote(30000, partner="gsm"), quote(34800)]})
+    mark_ready()
+    assert asked(seller.http) == [["grab", "gsm"], ["gsm"]]   # POST /orders: the cheapest quote's company only
+
+
+def test_t192_tc21_no_company_on(api, seller, monkeypatch):
+    SettingsRows.rows = {"allingo_partner_grab": 0, "allingo_partner_gsm": 0, "allingo_partner_lalamove": 0}
+    cart_seller(monkeypatch)
+    r = post_quotation(api)
+    assert (r.status_code, r.json()["detail"]) == (502, "Could not get a delivery fee quote. Please try again.")
+    with pytest.raises(HTTPException) as e:
+        mark_ready()
+    assert e.value.status_code == 502 and Orders.row["status"] == "confirmed" and refunds == []
+    assert seller.http.calls == [c for c in seller.http.calls if c.path == "/orders" and c.method == "GET"]   # no /inquiries
+
+
+@pytest.mark.parametrize("leg, partner", [({"status": "courier_assigned", "partner": {"id": "grab", "name": "Grab"}}, "grab"),
+                                          (None, None)])
+def test_t192_tc22_taken_trip_keeps_its_own_company(seller, leg, partner):
+    seller.http.routes[("GET", "/orders")] = reply(200, {"data": [{**trip("ord_9", "on_going"), "delivery": leg}]})
+    seller.http.routes[("POST", "/inquiries")] = reply(200, {"quotes": [quote(30000, partner="gsm")]})
+    mark_ready()
+    assert seller.http.made("POST", "/orders") == [] and Deliveries.created[0]["allingo_partner"] == partner
+
+
+def test_t192_tc11_lalamove_ready_has_no_allingo_company(seller, monkeypatch):
+    monkeypatch.setattr(allingo_service, "enabled", lambda: False)
+    lalamove = SimpleNamespace(
+        get_quotation=lambda **kw: SimpleNamespace(quotation_id="Q", stop_id_0="a", stop_id_1="b", total_fee=41000),
+        place_order=lambda **kw: SimpleNamespace(status="ASSIGNING_DRIVER", lalamove_order_id="LM2", share_link="https://ll"))
+    monkeypatch.setattr("services.lalamove_service.get_lalamove_service", lambda: lalamove)   # Ready imports it locally
+    mark_ready()
+    assert Deliveries.created[0].get("allingo_partner") is None and Deliveries.created[0]["lalamove_order_id"] == "LM2"

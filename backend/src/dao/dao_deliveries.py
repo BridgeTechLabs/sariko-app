@@ -14,7 +14,7 @@ class DAODeliveries(DAOBase):
     def create_delivery(self, order_id: str, provider: str, status: str,
                         user_id: str = None, seller_user_id: str = None,
                         lalamove_order_id: str = None, share_link: str = None, allingo_order_id: str = None,
-                        trip_fee: int = None):
+                        trip_fee: int = None, allingo_partner: str = None):
         try:
             data = {
                 "order_id": order_id,
@@ -31,6 +31,8 @@ class DAODeliveries(DAOBase):
                 data["allingo_order_id"] = allingo_order_id
             if share_link:
                 data["share_link"] = share_link
+            if allingo_partner:
+                data["allingo_partner"] = allingo_partner   # T192: which company AllinGo booked
             if trip_fee is not None:
                 data["trip_fee"] = trip_fee   # T180 A12: what the company charges for this trip
 

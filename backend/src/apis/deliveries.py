@@ -138,7 +138,7 @@ def book_allingo(order: dict, sender_phone: str, recipient: dict, attempts: int,
             logger.error(f"[Delivery] AllinGo trip {trip['id']} for order={order['id']} has COD; cancelling it")
             service.cancel_order(trip["id"], until=until)
             raise AllingoError("allingo_cod_not_zero")
-        return trip_fields(trip), False
+        return trip_fields(trip, quote.partner), False
     raise last_error
 
 
@@ -658,7 +658,7 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
                 **recipient,
             )
             trip = {"provider": "lalamove", "status": result.status, "lalamove_order_id": result.lalamove_order_id,
-                    "allingo_order_id": None, "share_link": result.share_link or "", "trip_fee": quotation.total_fee}
+                    "allingo_order_id": None, "allingo_partner": None, "share_link": result.share_link or "", "trip_fee": quotation.total_fee}
             taken = False
         trip_id = trip["allingo_order_id"] or trip["lalamove_order_id"]
 
