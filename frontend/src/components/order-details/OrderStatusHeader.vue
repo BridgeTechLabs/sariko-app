@@ -7,6 +7,7 @@ import { cancelReasonText } from '@/utils/cancelReason';
 import { refundChip } from '@/utils/refundChip';
 import { formatVnd } from '@/utils/priceDisplay';
 import { formatVnTime } from '@/utils/vnTime';
+import { readySubtextKey } from '@/utils/deliveryBadge';
 
 
 export default {
@@ -75,7 +76,7 @@ export default {
                 pending: 'status_subtext_pending',
                 confirmed: 'status_subtext_confirmed',
                 ready: this.order?.delivery_method === 'delivery'
-                    ? 'delivery_tracker.status_subtext_ready'
+                    ? readySubtextKey(useDeliveryStore().currentDelivery?.status)
                     : 'order_detail.status_subtext_ready_pickup',
                 done: 'status_subtext_done',
                 cancelled: 'status_subtext_cancelled',

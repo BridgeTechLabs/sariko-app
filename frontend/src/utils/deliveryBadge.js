@@ -7,6 +7,11 @@ export const DELIVERY_TERMINAL = ['COMPLETED', 'CANCELED', 'CANCELLED', 'REJECTE
 
 export const isTripActive = (status) => !!status && !DELIVERY_TERMINAL.includes(status)
 
+// The buyer's sub-line of a ready delivery order by its trip (T193): on the way to the store, on the way to the buyer,
+// else (no trip yet, assigning a driver, any other value) the "finding a driver" line
+export const readySubtextKey = (tripStatus) =>
+    `delivery_tracker.status_subtext_${['ON_GOING', 'PICKED_UP'].includes(tripStatus) ? tripStatus : 'ready'}`
+
 // i18n key for the live delivery step, or null to fall back to the order status badge
 export function liveDeliveryKey(order) {
     const step = order.status === 'ready' && order.delivery_status
