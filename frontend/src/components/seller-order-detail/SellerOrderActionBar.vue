@@ -13,7 +13,7 @@ const STATUS_NEXT = {
 const REJECT_REASONS = ['out_of_ingredients', 'too_busy', 'store_closing', 'other']
 
 // Trip over: before that the Lalamove COMPLETED webhook closes the order, not the seller.
-const DELIVERY_ENDED = ['COMPLETED', 'REJECTED', 'CANCELLED', 'CANCELED', 'EXPIRED']
+const DELIVERY_ENDED = ['COMPLETED', 'REJECTED', 'CANCELLED', 'CANCELED', 'EXPIRED', 'LOST']
 
 export default {
     components: { AlertTriangle },
@@ -60,18 +60,18 @@ export default {
         },
         rebookCount() { return this.delivery?.rebook_count || 0 },
         rebookMax() { return this.delivery?.rebook_max || 3 },  // admin_settings.seller_rebook_max
-        canRebook() {
-            return this.order.status === 'delivery_failed' && this.rebookCount < this.rebookMax
+        canRebook() {   // a lost / damaged delivery is not re-booked: the team handles it (T177 A22)
+            return this.order.status === 'delivery_failed' && this.rebookCount < this.rebookMax && this.delivery?.status !== 'LOST'
         },
         maxRebookReached() {
             return this.order.status === 'delivery_failed' && this.rebookCount >= this.rebookMax
         },
 
+        // T180 A36: no driver since status_since for more than stuck_minutes (admin_settings, from the API)
         isDeliveryStuck() {
             void this.tick
-            if (!this.delivery?.created_at) return false
-            if (this.delivery.status !== 'ASSIGNING_DRIVER') return false
-            return Date.now() - new Date(this.delivery.created_at).getTime() > 15 * 60 * 1000
+            if (this.delivery?.status !== 'ASSIGNING_DRIVER' || !this.delivery.status_since) return false
+            return Date.now() - new Date(this.delivery.status_since).getTime() > this.delivery.stuck_minutes * 60 * 1000
         },
 
         showContactAdmin() {
@@ -92,11 +92,6 @@ export default {
                 key,
                 label: this.$t(`seller_dashboard.reject_reason_${key}`),
             }))
-        },
-
-        rejectReasonText() {
-            if (this.selectedReason === 'other') return this.customReason
-            return this.rejectReasonOptions.find(o => o.key === this.selectedReason)?.label || ''
         },
 
         canConfirmReject() {
@@ -164,8 +159,7 @@ export default {
         async onCancelDueToNoDriver() {
             this.rejecting = true
             try {
-                const reason = this.$t('seller_order_detail.cancel_reason_no_driver')
-                await useDashboardStore().setOrderStatus(this.order.id, 'cancelled', reason)
+                await useDashboardStore().setOrderStatus(this.order.id, 'cancelled', 'no_driver')   // a code (T178)
                 this.$q.notify({ classes: 'quasar-notify-positive', message: this.$t('seller_order_detail.toast_order_rejected'), position: 'bottom', timeout: 1500 })
             } catch (e) {
                 console.error('SellerOrderActionBar - onCancelDueToNoDriver -', e)
@@ -194,7 +188,9 @@ export default {
             if (!this.canConfirmReject) return
             this.rejecting = true
             try {
-                await useDashboardStore().setOrderStatus(this.order.id, 'cancelled', this.rejectReasonText)
+                // a code; "other" carries the seller's own words as a note (T178)
+                await useDashboardStore().setOrderStatus(this.order.id, 'cancelled', `seller_reject_${this.selectedReason}`,
+                    this.selectedReason === 'other' ? this.customReason.trim() : null)
                 this.showRejectDialog = false
                 this.$q.notify({ classes: 'quasar-notify-positive', message: this.$t('seller_order_detail.toast_order_rejected'), position: 'bottom', timeout: 1500 })
             } catch (e) {
@@ -226,7 +222,9 @@ export default {
 
         <!-- Contact admin notice — infra errors requiring admin intervention -->
         <a v-if="showContactAdmin" :href="supportMailto" class="contact-admin-notice">
-            {{ $t('seller_order_detail.contact_admin_notice', { email: supportEmail }) }}
+            {{ isDeliveryStuck
+                ? $t('seller_order_detail.delivery_stuck_notice', { minutes: delivery.stuck_minutes, email: supportEmail })
+                : $t('seller_order_detail.contact_admin_notice', { email: supportEmail }) }}
         </a>
 
         <!-- Action buttons -->

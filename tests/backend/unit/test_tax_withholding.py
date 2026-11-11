@@ -55,7 +55,7 @@ def test_earnings_show_withholding(earnings):  # noqa: F811
         orders=[_order(1, wh_vat_amount="550", wh_pit_amount="275"), _order(2)],
         payouts=[{"id": "p1", "period_start": "2026-10-15", "period_end": "2026-10-15", "order_count": 1,
                   "net_payout": "48235", "withholding_amount": "825.00", "total_deductions": "0",
-                  "status": "pending", "paid_at": None}],
+                  "status": "completed", "paid_at": None}],   # a live payout would count in awaiting (T174 A9)
     )
     body = res.json()
     first, second = body["orders"]

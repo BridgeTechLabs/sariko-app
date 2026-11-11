@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
@@ -76,13 +76,22 @@ class DAOFoodItems(DAOBase):
         return menu
 
     def add_remaining_today(self, items: list) -> list:
-        """T134: remaining_today = portions left for today's deliveries on each dish with a daily limit
-        (seller menu "X / N left today"; buyer: same-day dishes)."""
-        limited = [f for f in items if f and f.get("daily_portions")]
-        if limited:
-            left = self.read_portions_left([f["id"] for f in limited], datetime.now(VN_TZ).date())
-            for f in limited:
-                f["remaining_today"] = left.get(f["id"], f["daily_portions"])
+        """T134: remaining_today = portions left for today's deliveries on each same-day dish with a daily limit
+        (seller menu "X / N left today"; buyer: same-day dishes). T181 A34: a pre-order dish is sold from its first
+        delivery day (today + preorder_day, Vietnam time): remaining_preorder = portions left on portions_date."""
+        today = datetime.now(VN_TZ).date()
+        by_day = {}
+        for f in items:
+            if f and f.get("daily_portions"):
+                by_day.setdefault(today + timedelta(days=f.get("preorder_day") or 0), []).append(f)
+        for day, foods in by_day.items():
+            left = self.read_portions_left([f["id"] for f in foods], day)
+            for f in foods:
+                n = left.get(f["id"], f["daily_portions"])
+                if day == today:
+                    f["remaining_today"] = n
+                else:
+                    f["remaining_preorder"], f["portions_date"] = n, day.isoformat()
         return items
 
     def read_portions_left(self, food_item_ids: list, sale_date) -> dict:

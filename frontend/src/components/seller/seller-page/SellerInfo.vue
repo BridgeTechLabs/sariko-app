@@ -1,20 +1,20 @@
 <script>
 import { mapState } from 'pinia';
-import { Notify } from 'quasar';
-import { User, Search, Share2, Heart, Star, BadgeCheck, MessageCircle, ArrowLeft } from 'lucide-vue-next';
+import { User, Star, BadgeCheck, MessageCircle, ArrowLeft, Clock } from 'lucide-vue-next';
 import { useSellerStore } from '@/stores/seller/sellerStore';
 import { useAuthStore } from '@/stores/auth/authStore';
 import { useChatStore } from '@/stores/chat/chatStore';
 import SellerInfoSheet from './SellerInfoSheet.vue';
+import { vnWeekdayKey } from '@/utils/vnTime';
+import { ratingText } from '@/utils/rating';
 
 const DEFAULT_COVER = '/images/defaullt-kitchen-bg.jpg';
 
 export default {
-    components: { User, Search, Share2, Heart, Star, BadgeCheck, MessageCircle, ArrowLeft, SellerInfoSheet },
+    components: { User, Star, BadgeCheck, MessageCircle, ArrowLeft, Clock, SellerInfoSheet },
 
     data() {
         return {
-            isFavorite: false,
             isOpeningChat: false,
         };
     },
@@ -32,6 +32,13 @@ export default {
         },
         isOpen() {
             return !!this.seller?.is_open;
+        },
+        // Today's hours in Vietnam time: null weekly_hours = open all day, no entry for today = day off.
+        todayHours() {
+            const week = this.seller?.weekly_hours;
+            if (!week) return this.$t('seller_page.info_all_day');
+            const day = week[vnWeekdayKey()];
+            return day ? `${day.open} – ${day.close}` : null;
         },
         isOwnStore() {
             const auth = useAuthStore();
@@ -58,30 +65,10 @@ export default {
     },
 
     methods: {
+        ratingText,
         goBack() {
             if (window.history.length > 1) this.$router.back();
             else this.$router.push({ name: 'home' });
-        },
-        goSearch() {
-            this.$router.push({ name: 'search' });
-        },
-        async share() {
-            const url = window.location.href;
-            const title = this.seller?.store_name || 'Sariko';
-            try {
-                if (navigator.share) {
-                    await navigator.share({ title, url });
-                } else {
-                    await navigator.clipboard.writeText(url);
-                    Notify.create({ message: this.$t('seller_page.link_copied'), color: 'positive', timeout: 1500 });
-                }
-            } catch (e) {
-                // user dismissed the share sheet — ignore
-            }
-        },
-        toggleFavorite() {
-            // TODO: persist to a favorites table once it exists — local-only for now
-            this.isFavorite = !this.isFavorite;
         },
         async chatWithSeller() {
             const auth = useAuthStore();
@@ -119,11 +106,7 @@ export default {
             </button>
 
             <div class="hero-actions">
-                <button class="hero-btn" @click="goSearch" :aria-label="$t('seller_page.aria_search')"><Search :size="18" /></button>
-                <button class="hero-btn" @click="share" :aria-label="$t('seller_page.aria_share')"><Share2 :size="18" /></button>
-                <button class="hero-btn" @click="toggleFavorite" :aria-pressed="isFavorite" :aria-label="$t('seller_page.aria_favorite')">
-                    <Heart :size="18" :fill="isFavorite ? '#f5A623' : 'none'" :color="isFavorite ? '#f5A623' : '#fff'" />
-                </button>
+                <SellerInfoSheet />
             </div>
         </div>
 
@@ -149,9 +132,16 @@ export default {
                     </div>
                 </div>
 
-                <q-badge v-if="seller?.is_founding" rounded class="founding">{{ $t('seller_page.founding_seller') }}</q-badge>
+                <div v-if="seller" class="badge-row">
+                    <span class="pill hours" :class="{ 'is-off': !todayHours }">
+                        <Clock :size="12" />{{ todayHours || $t('seller_page.info_closed_today') }}
+                    </span>
+                    <span v-if="seller.is_founding" class="pill founding">★ {{ $t('seller_page.founding_seller') }}</span>
+                </div>
 
                 <div v-if="seller && !isOpen" class="closed-notice">{{ $t('seller_page.closed_notice') }}</div>
+
+                <p v-if="seller?.description?.trim()" class="description">{{ seller.description }}</p>
 
                 <!-- Row 2: meta line (left) + chat button (right) -->
                 <div class="meta-row">
@@ -167,7 +157,7 @@ export default {
                             <span class="dot-sep"></span>
                             <span class="rating">
                                 <Star :size="13" fill="#f5A623" color="#f5A623" />
-                                {{ seller.rating_avg }}
+                                {{ ratingText(seller.rating_avg) }}
                                 <span class="rating-count">
                                     ({{ $t('common.rating_count', seller.rating_count, { count: seller.rating_count }) }})
                                 </span>
@@ -175,7 +165,6 @@ export default {
                         </template>
                     </div>
 
-                    <SellerInfoSheet />
                     <button v-if="!isOwnStore" class="chat-btn" :disabled="isOpeningChat" @click="chatWithSeller">
                         <q-spinner-dots v-if="isOpeningChat" color="dark" size="1.4em" />
                         <template v-else>
@@ -227,7 +216,6 @@ export default {
     top: calc(12px + env(safe-area-inset-top, 0px));
     right: 12px;
     display: flex;
-    gap: 8px;
     z-index: 2;
 }
 
@@ -406,15 +394,51 @@ export default {
     white-space: nowrap;
 }
 
-.founding {
+.badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
     margin-top: 6px;
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-family: $sariko-font-family-secondary;
     font-size: 11px;
     font-weight: 700;
-    padding: 3px 8px;
+    line-height: 1.4;
+    padding: 2px 8px;
+    border: solid 1px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.pill.hours {
+    color: #48d77d;
+    font-variant-numeric: tabular-nums;
+}
+
+.pill.hours.is-off {
+    color: rgb(139, 154, 184);
+}
+
+.pill.founding {
     color: #ffd000;
-    border: solid 1px #ffd000;
-    background: transparent;
+}
+
+.description {
+    margin: 8px 0 0;
+    font-family: $sariko-font-family-secondary;
+    font-size: 13px;
+    line-height: 1.45;
+    color: rgb(139, 154, 184);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
 }
 
 .distance {

@@ -1,3 +1,4 @@
+import functools
 import logging
 import re
 
@@ -24,7 +25,7 @@ from core.auth import verify_token
 from core.payout_cycle import expected_payout_date
 from core.phone import to_e164_vn
 from core.sariko_cache import cache
-from dao.dao_orders import DAOOrders, seller_orders_key
+from dao.dao_orders import DAOOrders, TRIP_ENDED, seller_orders_key
 from schemas import Schema
 from services import allingo_service
 from services.allingo_service import AllingoError
@@ -45,9 +46,16 @@ VALID_STATUS_TRANSITIONS = {
     "delivery_failed":  ["done", "cancelled"],
 }
 
+# What a seller may give as the cancel reason (T178): codes, translated per viewer; "other" carries the seller's
+# own words in cancellation_note. NO_DRIVER_REASON is also the automatic cancel after every booking attempt failed.
+NO_DRIVER_REASON = "no_driver"
+OTHER_REASON = "seller_reject_other"
+SELLER_CANCEL_REASONS = {"seller_reject_out_of_ingredients", "seller_reject_too_busy", "seller_reject_store_closing",
+                         OTHER_REASON, NO_DRIVER_REASON}
+
 # A Lalamove trip is over once it reaches one of these; before that the COMPLETED
 # webhook closes the order, so the seller can't mark it done (P0-6).
-DELIVERY_ENDED_STATUSES = {"COMPLETED", "REJECTED", "CANCELLED", "CANCELED", "EXPIRED"}
+DELIVERY_ENDED_STATUSES = TRIP_ENDED | {"COMPLETED"}
 
 # Rows one order search returns (a page size, not a business rule).
 SEARCH_LIMIT = 20
@@ -93,10 +101,11 @@ def _get_seller_id(user):
 def _with_deadlines(orders: list, seller: dict) -> list:
     """`deadline` shown under the seller's Accept / Ready buttons.
     pending (paid): when it auto-cancels; None while the store is closed, that clock is paused.
-    confirmed: when the buyer may cancel it for a full refund (R4)."""
+    confirmed / delivery_failed: when the buyer may cancel it for a full refund (R4, R6)."""
     now = datetime.now(timezone.utc)
     hours = seller.get("weekly_hours")
     window = None
+    get_minutes = functools.cache(DAOAdminConfig().get_minutes)   # each setting read once for the whole list
     for order in orders:
         order["deadline"] = None
         if (order["status"] == "pending" and order.get("payment_status") == "paid" and order.get("paid_at")
@@ -106,8 +115,8 @@ def _with_deadlines(orders: list, seller: dict) -> list:
             order["deadline"] = confirm_deadline(datetime.fromisoformat(order["paid_at"]), hours,
                                                  datetime.fromisoformat(opened_at) if opened_at else None,
                                                  now, window, seller.get("id")).isoformat()
-        elif order["status"] == "confirmed" and order.get("status_changed_at"):
-            order["deadline"] = cancel_after(order).isoformat()
+        elif order["status"] in ("confirmed", "delivery_failed") and order.get("status_changed_at"):
+            order["deadline"] = cancel_after(order, get_minutes).isoformat()
     return orders
 
 
@@ -123,6 +132,7 @@ def get_seller_info(user=Depends(verify_token)):
             "seller_id": profile["id"],
             "slug": profile.get("slug"),
             "store_name": profile.get("store_name"),
+            "description": profile.get("description"),
             "address": profile.get("address"),
             "lat": profile.get("lat"),
             "lon": profile.get("lon"),
@@ -256,6 +266,8 @@ def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
         order = dao.read_order_by_id_for_seller(order_id, seller["id"])
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        if order.get("cancellation_reason") != OTHER_REASON:   # the seller gets only its own words, not an admin's (T178)
+            order.pop("cancellation_note", None)
         order["status_history"] = dao.read_status_history(order_id)
         order["delivery_history"] = dao.read_delivery_history(order_id)   # BUGS #39: times of the delivery steps
         order |= complaints_for_order(order, user["id"], "seller")   # T35
@@ -300,8 +312,13 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     "message": "The rider is still delivering; the order completes itself when the delivery is done.",
                 })
 
-        # Pass cancellation_reason when rejecting
-        cancellation_reason = body.cancellation_reason if body.status == "cancelled" else None
+        # Rejecting: a listed code; "other" needs the seller's own words (kept apart, never shown to the buyer)
+        cancellation_reason = cancellation_note = None
+        if body.status == "cancelled":
+            cancellation_reason = body.cancellation_reason
+            cancellation_note = (body.cancellation_note or "").strip() or None
+            if cancellation_reason not in SELLER_CANCEL_REASONS or (cancellation_reason == OTHER_REASON and not cancellation_note):
+                raise HTTPException(status_code=400, detail={"code": "invalid_reason", "message": "Pick a reason (write it for Other)"})
 
         # For "ready" + delivery: book Lalamove FIRST, only update status if booking succeeds
         booking_result = None
@@ -378,7 +395,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                             sender_phone=sender_phone,
                             **recipient,
                         )
-                        booking_result = {"provider": "lalamove", "status": result.status,
+                        booking_result = {"provider": "lalamove", "status": result.status, "trip_fee": quotation.total_fee,
                                           "lalamove_order_id": result.lalamove_order_id, "share_link": result.share_link}
                         break
                     except Exception as e:
@@ -388,7 +405,10 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
             if booking_result is None:
                 logger.error(f"[Delivery] All {attempts} booking attempts failed for order={order_id}: {last_booking_error}")
                 # The buyer UI translates this exact text (OrderStatusHeader.vue); no count in it, it's a setting
-                dao_orders.update_order_status(order_id, "cancelled", "Driver booking failed")
+                # Conditional: the buyer may have cancelled (and been refunded) while the booking ran (T177 A32)
+                if not dao_orders.update_order_status(order_id, "cancelled", NO_DRIVER_REASON,
+                                                      expected_status=order["status"]):
+                    raise HTTPException(status_code=409, detail="Order status changed, please refresh")
                 from dao.dao_refunds import DAORefunds
                 DAORefunds().create_refund_for_order(order, "driver_booking_failed")
                 raise HTTPException(status_code=503, detail="Unable to book a delivery driver. Your order has been cancelled.")
@@ -412,6 +432,9 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     cancel_trip(booking_result, get_lalamove_service)
                 except Exception as cancel_err:
                     logger.error(f"[Delivery] Rollback cancel failed for {trip_id}: {cancel_err} — MANUAL INTERVENTION NEEDED")
+                if "deliveries_one_live_trip_per_order" in str(db_err):
+                    # T180 A26: a second Ready at the same moment; the first one's trip is the order's (the DB keeps one)
+                    raise HTTPException(status_code=409, detail="Order status changed, please refresh")
                 raise HTTPException(status_code=500, detail=f"Failed to record delivery: {db_err}")
             logger.warning(f"[Delivery] Auto-booked order={order_id} {booking_result['provider']}={trip_id}")
 
@@ -419,7 +442,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
         # Conditional on the status read above: the confirm-timeout job or a buyer
         # cancelling a late order may have cancelled (and refunded) it in between.
         updated = dao_orders.update_order_status(order_id, body.status, cancellation_reason,
-                                                 expected_status=order["status"])
+                                                 expected_status=order["status"], cancellation_note=cancellation_note)
         if not updated:
             # The trip was booked for an order that is no longer ours to send (R4.6).
             # It is still ASSIGNING_DRIVER, which the company lets us cancel.
@@ -429,7 +452,8 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
 
         if body.status == "cancelled":
             from dao.dao_refunds import DAORefunds
-            DAORefunds().create_refund_for_order(order, "seller_cancel")
+            # Cancelling a failed delivery = no rider, not the seller's choice (T177 A32)
+            DAORefunds().create_refund_for_order(order, "driver_booking_failed" if order["status"] == "delivery_failed" else "seller_cancel")
 
         return {"success": True, "order": updated}
     except HTTPException:
@@ -679,9 +703,11 @@ def get_seller_earnings(user=Depends(verify_token)):
         weekday = config.get_int_in_range("payout_weekday", 2, 1, 7)
         hour = config.get_int_in_range("payout_generate_hour", 8, 0, 23)
         window_hours = config.get_positive_int("complaint_window_hours", 24)
-        since = datetime.now(timezone.utc) - timedelta(days=history_days)
+        max_percent = min(config.get_positive_int("payout_deduction_max_percent", 100), 100)
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(days=history_days)
 
-        orders, awaiting = [], Decimal(0)
+        orders, waiting = [], Decimal(0)
         for row in DAOOrders().read_done_orders_for_earnings(seller_id, since):
             # What reaches the seller: the order's payout minus the tax withheld from it
             payout = _money(row.get("payout_amount"))
@@ -691,11 +717,9 @@ def get_seller_earnings(user=Depends(verify_token)):
                 state = "held"
             expected = None
             if state == "pending":
-                awaiting += payout - withheld
+                waiting += payout - withheld
                 done_at = datetime.fromisoformat(row["status_changed_at"])
-                expected = expected_payout_date(done_at, weeks, weekday, hour, window_hours).isoformat()
-            elif state == "processing":
-                awaiting += payout - withheld
+                expected = expected_payout_date(done_at, weeks, weekday, hour, window_hours, now).isoformat()
             orders.append({
                 "id": row["id"],
                 "done_at": row.get("status_changed_at"),
@@ -705,15 +729,30 @@ def get_seller_earnings(user=Depends(verify_token)):
                 "payout_amount": _vnd(payout),
                 "wh_vat_amount": _vnd(_money(row.get("wh_vat_amount"))),   # 0 until computed
                 "wh_pit_amount": _vnd(_money(row.get("wh_pit_amount"))),
+                "net_amount": _vnd(payout - withheld),   # T174 A7: what the seller gets for it
                 "payout_state": state,
+                # T181 A51: the complaint that holds it ("complaint KN000012"), so the store knows which one to settle
+                "hold_complaint": (row.get("payout_hold_note") or "").removeprefix("complaint ") or None if state == "held" else None,
                 "expected_payout_date": expected,
             })
 
+        # T174 A9: open deductions come off what is waiting the way the next payout takes them
+        # (admin_generate_payout_for_seller step 7): at most payout_deduction_max_percent of it, the rest waits.
+        dao_payouts = DAOAdminPayouts()
+        open_list = dao_payouts.read_open_deductions(seller_id)
+        open_deductions = sum((_money(d["amount"]) - _money(d["applied_amount"]) for d in open_list), Decimal(0))
+        taken = min(open_deductions, (waiting * max_percent / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+        # orders already in a payout (state processing) count at its net: their deductions are taken, not open
+        awaiting, deducted = waiting - taken, taken
+
         payouts, received = [], Decimal(0)
-        for row in DAOAdminPayouts().read_payouts_by_seller_id(seller_id, EARNINGS_PAYOUTS_LIMIT):
+        for row in dao_payouts.read_payouts_by_seller_id(seller_id, EARNINGS_PAYOUTS_LIMIT):
             net = _money(row.get("net_payout"))
             if row.get("status") == "completed":
                 received += net
+            elif row.get("status") in ("pending", "processing"):
+                awaiting += net
+                deducted += _money(row.get("total_deductions"))
             payouts.append({
                 **row,
                 "net_payout": _vnd(net),
@@ -725,6 +764,11 @@ def get_seller_earnings(user=Depends(verify_token)):
             "success": True,
             "history_days": history_days,
             "awaiting_total": _vnd(awaiting),
+            "deductions_total": _vnd(deducted),                    # comes off the orders awaiting payout
+            "deductions_carry": _vnd(open_deductions - taken),     # left for a later payout
+            # T181 A51: each open deduction: what kind (a refund charged to the store, or a fee), which order, what is left
+            "deductions": [{"order_id": d["order_id"], "kind": "refund" if d.get("refund_id") else "fee",
+                            "amount": _vnd(_money(d["amount"]) - _money(d["applied_amount"]))} for d in open_list],
             "received_total": _vnd(received),
             "payouts_limit": EARNINGS_PAYOUTS_LIMIT,   # received_total covers only these batches
             "orders": orders,

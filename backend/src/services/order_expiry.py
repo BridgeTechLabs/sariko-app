@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIRM_MINUTES = 30
 DEFAULT_REMINDER_MINUTES = 10
-TIMEOUT_REASON = "Seller did not confirm in time"  # the buyer UI translates this exact text (OrderStatusHeader.vue)
+TIMEOUT_REASON = "seller_timeout"  # orders.cancellation_reason code, translated by each viewer's app (T178)
 
 
 def _ts(value):

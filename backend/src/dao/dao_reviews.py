@@ -67,6 +67,7 @@ class DAOReviews(DAOBase):
             result = self._supabase_client.table("review_items") \
                 .select("id, rating, comment, created_at, users(name, avatar_url)") \
                 .eq("food_item_id", food_item_id) \
+                .eq("is_hidden", False) \
                 .order("created_at", desc=True) \
                 .range(offset, offset + limit - 1) \
                 .execute()
@@ -84,6 +85,7 @@ class DAOReviews(DAOBase):
             stores = self._supabase_client.table("review_stores") \
                 .select("id, order_id, rating, comment, created_at, users(name, avatar_url)") \
                 .eq("seller_id", seller_id) \
+                .eq("is_hidden", False) \
                 .order("created_at", desc=True) \
                 .range(offset, offset + limit - 1) \
                 .execute().data or []
@@ -93,6 +95,7 @@ class DAOReviews(DAOBase):
             items = self._supabase_client.table("review_items") \
                 .select("id, order_id, food_item_id, name_snapshot, rating, comment") \
                 .in_("order_id", [s["order_id"] for s in stores]) \
+                .eq("is_hidden", False) \
                 .execute().data or []
             for store in stores:
                 store["items"] = [i for i in items if i["order_id"] == store["order_id"]]

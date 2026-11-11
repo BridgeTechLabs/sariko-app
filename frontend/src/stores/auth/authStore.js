@@ -16,6 +16,7 @@ import { useComplaintStore } from "@/stores/complaint/complaintStore";
 import { useAddressStore } from "@/stores/address/addressStore";
 import { i18n } from "@/plugins/i18n";
 import { disablePush } from "@/composables/pushNotifications";
+import { fileToBase64 } from "@/utils/fileToBase64";
 
 const LANG_MAP = { 'Tiếng Việt': 'vi', 'English': 'en_ph', 'Fillipino': 'en_ph' };
 
@@ -226,6 +227,24 @@ export const useAuthStore = defineStore("authStore", {
             } catch (e) {
                 console.error(`authStore - bootstrap - ${e}`);
             }
+        },
+
+        // PATCH /users/me/profile. Throws. The reply has no user for a seller, so the local
+        // user follows what was sent.
+        async updateProfile(data) {
+            const res = await apiUsers.updateProfile(data)
+            if (this.user) {
+                if ('name' in data) this.user.fullName = data.name
+                if ('phone' in data) this.user.phone = data.phone
+                if ('avatar_url' in data) this.user.avatarUrl = data.avatar_url
+            }
+            return res
+        },
+
+        // Uploads the photo and returns its URL; saving it on the profile is a separate updateProfile.
+        async uploadAvatar(file) {
+            const res = await apiUsers.uploadAvatar(await fileToBase64(file), file.type)
+            return res.avatar_url
         },
 
         async refreshProfile() {

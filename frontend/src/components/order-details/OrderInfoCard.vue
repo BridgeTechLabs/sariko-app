@@ -27,6 +27,7 @@ export default {
                 ready: 'status_ready',
                 done: 'status_done',
                 cancelled: 'status_cancelled',
+                delivery_failed: 'status_delivery_failed',
             }
             const key = map[this.order?.status]
             return key ? this.$t(`order_detail.${key}`) : this.order?.status

@@ -1,17 +1,13 @@
 <script>
 import { CircleCheckBig, Clock, CircleX } from 'lucide-vue-next';
 import { useOrderStore } from '@/stores/order/orderStore.js';
+import { useDeliveryStore } from '@/stores/delivery/deliveryStore';
 import { cookingDay, isScheduled } from '@/utils/orderStage';
+import { cancelReasonText } from '@/utils/cancelReason';
+import { refundChip } from '@/utils/refundChip';
+import { formatVnd } from '@/utils/priceDisplay';
+import { formatVnTime } from '@/utils/vnTime';
 
-// Cancels made by the system store a fixed English text (backend constants);
-// show those translated. Reasons a seller picked or typed are shown as written.
-const SYSTEM_REASON_KEYS = {
-    'Seller did not confirm in time': 'order_detail.reason_seller_timeout',                      // services/order_expiry.py
-    'Driver booking failed': 'seller_order_detail.cancel_reason_no_driver',                    // apis/sellers.py
-    'Driver booking failed after 3 attempts': 'seller_order_detail.cancel_reason_no_driver',   // same, orders before 2026-10-15
-    'Seller was late': 'order_detail.reason_seller_late',                                     // apis/orders.py
-    'Sold out': 'order_detail.reason_sold_out',                                               // dao/dao_orders.py
-}
 
 export default {
     components: {
@@ -34,9 +30,14 @@ export default {
         isDeliveryFailed() {
             return this.order?.status === 'delivery_failed'
         },
+        // The trip was lost after pickup: the seller cannot book another one (T177)
+        isTripLost() {
+            return this.isDeliveryFailed && useDeliveryStore().currentDelivery?.status === 'LOST'
+        },
         statusTitle() {
             if (this.isPaymentPending) return this.$t('order_detail.status_title_awaiting_payment')
             if (isScheduled(this.order)) return this.$t('order_detail.status_title_scheduled')
+            if (this.isTripLost) return this.$t('order_detail.status_delivery_failed')
             const map = {
                 pending: 'status_title_pending',
                 confirmed: 'status_title_confirmed',
@@ -49,9 +50,7 @@ export default {
             return key ? this.$t(`order_detail.${key}`) : this.$t('order_detail.title')
         },
         cancellationReason() {
-            const reason = this.order?.cancellation_reason
-            if (!reason) return null
-            return SYSTEM_REASON_KEYS[reason] ? this.$t(SYSTEM_REASON_KEYS[reason]) : reason
+            return cancelReasonText(this, this.order, 'buyer')
         },
         statusSubtext() {
             if (this.isPaymentPending) return this.$t('order_detail.status_subtext_awaiting_payment')
@@ -63,6 +62,14 @@ export default {
             }
             if (this.isCancelled && this.cancellationReason) {
                 return `${this.$t('order_detail.cancelled_reason')}: ${this.cancellationReason}`
+            }
+            if (this.isTripLost) return this.$t('delivery_tracker.status_LOST')
+            if (this.isPending) {   // paid and waiting for the seller (A29)
+                if (this.order.confirm_by) {
+                    const time = formatVnTime(this.order.confirm_by, { hour: '2-digit', minute: '2-digit' })
+                    return this.$t('order_detail.status_subtext_pending_by', { time })
+                }
+                return this.$t('order_detail.status_subtext_pending_closed')
             }
             const map = {
                 pending: 'status_subtext_pending',
@@ -91,16 +98,16 @@ export default {
             }
             return map[this.order?.status] || '#ffffff'
         },
-        refundStatus() {
-            return this.order?.refunds?.[0]?.status || null
-        },
+        // refund_state (backend, T172). A failed refund shows as in progress: the team retries it.
         refundChip() {
-            const map = {
-                pending:   { label: this.$t('order_detail.refund_pending'),   cls: 'refund-pending' },
-                processed: { label: this.$t('order_detail.refund_processed'), cls: 'refund-processed' },
-                failed:    { label: this.$t('order_detail.refund_failed'),    cls: 'refund-failed' },
-            }
-            return this.refundStatus ? map[this.refundStatus] : null
+            const chip = refundChip(this.order)
+            return chip && { label: this.$t(chip.key), cls: chip.cls }
+        },
+        // A second payment of this order, being returned (backend duplicate_refund, T175 A6)
+        extraPayment() {
+            const d = this.order?.duplicate_refund
+            return d ? { text: this.$t(`order_detail.extra_payment_${d.state}`, { amount: formatVnd(d.amount) }),
+                         cls: d.state === 'refunded' ? 'refund-processed' : 'refund-pending' } : null
         }
     }
 }
@@ -116,14 +123,12 @@ export default {
         <div class="status-title">{{ statusTitle }}</div>
         <div class="status-subtext">{{ statusSubtext }}</div>
 
-        <template v-if="refundChip">
-            <div class="refund-chip" :class="refundChip.cls">
-                {{ refundChip.label }}
-            </div>
-            <div v-if="refundStatus === 'failed'" class="refund-failed-subtext">
-                {{ $t('order_detail.refund_failed_subtext') }}
-            </div>
-        </template>
+        <div v-if="refundChip" class="refund-chip" :class="refundChip.cls">
+            {{ refundChip.label }}
+        </div>
+        <div v-if="extraPayment" class="refund-chip" :class="extraPayment.cls">
+            {{ extraPayment.text }}
+        </div>
     </div>
 
     <div v-else class="loading-state">
@@ -166,15 +171,6 @@ export default {
 
 .refund-pending   { background: rgba(245, 166, 35, 0.12); color: #f5a623; }
 .refund-processed { background: rgba(34, 197, 94, 0.12);  color: #22c55e; }
-.refund-failed    { background: rgba(239, 68, 68, 0.12);   color: #ef4444; }
-
-.refund-failed-subtext {
-    margin-top: 8px;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.45);
-    text-align: center;
-    line-height: 1.5;
-}
 
 .loading-state {
     display: flex;

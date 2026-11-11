@@ -345,6 +345,7 @@ def test_reconcile_runs_without_an_ask_keep_the_last_result(monkeypatch):  # job
                   {"tried": 2, "asked": 2, "errors": 1}, {"tried": 1, "asked": 0, "errors": 0},     # one ask worked: ok
                   {"tried": 1, "asked": 1, "errors": 1}, {"tried": 0, "asked": 0, "errors": 0}])    # failed, then no order
     monkeypatch.setattr(payment_reconcile, "reconcile_payments", lambda: next(runs_))
+    monkeypatch.setattr(payment_reconcile, "expire_unpaid_orders", lambda: 0)   # T181 A28 step of the same run
     failed = []
     for _ in range(6):
         try:

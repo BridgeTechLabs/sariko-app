@@ -31,6 +31,7 @@ NAMES = {
     "order_expiry": "Auto-cancel of orders sellers did not accept",
     "payment_reconcile": "VNPay payment check",
     "api_metrics": "API response-time recording",
+    "allingo_wallet": "AllinGo wallet check",
 }
 DEFAULT_ALERT_FAILURES = 3
 TICK_SECONDS = 15   # how soon a pause / resume / new interval applies; not a business parameter

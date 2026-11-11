@@ -2,11 +2,13 @@ import json
 import logging
 import os
 import threading
+from datetime import datetime
 
 from pywebpush import webpush, WebPushException
 
 from dao.dao_push_subscriptions import DAOPushSubscriptions
 from dao.dao_users import DAOUsers
+from core.store_hours import VN_TZ
 from services import zalo
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,18 @@ MESSAGES = {
     "confirmed": {
         "en": ("Order confirmed", "The seller accepted your order and is preparing it."),
         "vi": ("Đơn hàng đã được xác nhận", "Người bán đã nhận đơn và đang chuẩn bị."),
+    },
+    "confirmed_scheduled": {   # T178 A47: a pre-order, cooked for its day
+        "en": ("Order confirmed", "The seller accepted your order and will cook it for your delivery day."),
+        "vi": ("Đơn hàng đã được xác nhận", "Người bán đã nhận đơn và sẽ làm cho ngày giao bạn đã hẹn."),
+    },
+    "ready_pickup": {
+        "en": ("Order ready", "Your order is ready for pickup at the store."),
+        "vi": ("Đơn hàng đã sẵn sàng", "Món đã xong, bạn có thể tới quán lấy."),
+    },
+    "done_pickup": {
+        "en": ("Order picked up", "Enjoy your meal! Tap to leave a review."),
+        "vi": ("Đã nhận món", "Chúc ngon miệng! Nhấn để đánh giá món."),
     },
     "ready": {
         "en": ("Order ready", "Your order is ready — delivery is being arranged."),
@@ -67,6 +81,14 @@ MESSAGES = {
         "en": ("Payment confirmed", "VNPay confirmed your payment. Your order is with the seller."),
         "vi": ("Đã xác nhận thanh toán", "VNPay đã xác nhận thanh toán. Đơn hàng đã được gửi tới người bán."),
     },
+    "seller_new_review": {   # T181 A33
+        "en": ("New review", "A customer reviewed one of your orders. Tap to see it."),
+        "vi": ("Có đánh giá mới", "Khách vừa đánh giá một đơn của bạn. Nhấn để xem."),
+    },
+    "payment_after_cancel": {
+        "en": ("Payment received after the order was cancelled", "The money will be refunded to you."),
+        "vi": ("Đã nhận tiền sau khi đơn bị huỷ", "Số tiền sẽ được hoàn lại cho bạn."),
+    },
     "payment_failed": {
         "en": ("Payment not completed", "VNPay did not take the payment for your order. You can pay again."),
         "vi": ("Thanh toán không thành công", "VNPay không ghi nhận thanh toán cho đơn hàng. Bạn có thể thanh toán lại."),
@@ -84,6 +106,27 @@ MESSAGES = {
         "en": ("New complaint {code}", "{category}. Tap to open it."),
         "vi": ("Khiếu nại mới {code}", "{category}. Nhấn để xem."),
     },
+    # T176 A4: an admin cancelled the order (Admin Gateway, apis/admin_gateway.py)
+    "admin_cancelled_paid": {
+        "en": ("Order cancelled", "Order #{code} was cancelled by Sariko. Your payment will be refunded."),
+        "vi": ("Đơn hàng đã bị hủy", "Đơn #{code} đã bị Sariko hủy. Tiền sẽ được hoàn lại cho bạn."),
+    },
+    "admin_cancelled": {
+        "en": ("Order cancelled", "Order #{code} was cancelled."),
+        "vi": ("Đơn hàng đã bị hủy", "Đơn #{code} đã bị hủy."),
+    },
+    "seller_admin_cancelled": {
+        "en": ("Order cancelled by Sariko", "Order #{code} was cancelled by Sariko. Tap to see details."),
+        "vi": ("Sariko đã hủy đơn", "Đơn #{code} đã bị Sariko hủy. Nhấn để xem chi tiết."),
+    },
+    "seller_admin_cancelled_done": {
+        "en": ("Order cancelled by Sariko", "Order #{code} was cancelled by Sariko and does not count in your earnings."),
+        "vi": ("Sariko đã hủy đơn", "Đơn #{code} đã bị Sariko hủy, không tính vào thu nhập."),
+    },
+    "seller_admin_cancelled_charged": {
+        "en": ("Order cancelled by Sariko", "Order #{code} was cancelled by Sariko. Its amount will be taken from your next payout."),
+        "vi": ("Sariko đã hủy đơn", "Đơn #{code} đã bị Sariko hủy, số tiền của đơn sẽ được trừ ở kỳ chi trả tới."),
+    },
     "admin_order_expiring": {
         "en": ("Order #{code} not accepted", "{minutes} min left before it auto-cancels. Call the seller."),
         "vi": ("Đơn #{code} chưa được nhận", "Còn {minutes} phút trước khi tự hủy. Hãy gọi người bán."),
@@ -92,9 +135,17 @@ MESSAGES = {
         "en": ("Order #{code}: delivery failed", "The delivery company could not deliver it. Tap to open the order."),
         "vi": ("Đơn #{code} giao thất bại", "Hãng giao hàng không giao được. Nhấn để mở đơn."),
     },
+    "admin_delivery_lost": {
+        "en": ("Order #{code}: food lost on the way", "Lost, damaged or sent back after pickup. Contact the buyer and the seller."),
+        "vi": ("Đơn #{code} thất lạc khi giao", "Hàng mất, hỏng hoặc bị trả lại sau khi lấy. Hãy liên hệ người mua và người bán."),
+    },
     "admin_delivery_wallet_empty": {
         "en": ("Delivery wallet is empty", "No rider booked for order #{code}. Top up the delivery wallet."),
         "vi": ("Ví giao hàng hết tiền", "Chưa đặt được xe cho đơn #{code}. Hãy nạp tiền vào ví giao hàng."),
+    },
+    "admin_delivery_wallet_low": {
+        "en": ("Delivery wallet running low", "AllinGo wallet: {balance} (alert below {threshold}). Top up before trips start failing."),
+        "vi": ("Ví giao hàng sắp hết tiền", "Ví AllinGo còn {balance} (báo khi dưới {threshold}). Hãy nạp tiền trước khi đặt xe bị lỗi."),
     },
 }
 
@@ -103,7 +154,9 @@ ZALO_ADMIN = {
     "admin_new_complaint": ("support", "📣 New complaint {code} · {category}"),
     "admin_order_expiring": ("ops", "⏰ Order #{code} not accepted by the seller, auto-cancels in {minutes} min. Call the seller."),
     "admin_delivery_failed": ("ops", "🚚 Order #{code}: delivery failed, the delivery company could not deliver it."),
+    "admin_delivery_lost": ("ops", "📦 Order #{code}: food lost, damaged or sent back after pickup. Contact the buyer and the seller."),
     "admin_delivery_wallet_empty": ("ops", "💸 Delivery wallet is empty: no rider booked for order #{code}. Top up the wallet."),
+    "admin_delivery_wallet_low": ("ops", "🪫 AllinGo wallet low: {balance} (alert below {threshold}). Top up before trips start failing."),
 }
 
 # Complaint types (apis/complaints.py CATEGORIES), same words as the app's complaint form.
@@ -133,9 +186,21 @@ def notify_order_status(order: dict):
 
     status = order.get("status")
     if status in MESSAGES:
-        _send_async(order.get("user_id"), status, f"/orders/{order['id']}")
+        _send_async(order.get("user_id"), _buyer_event(order, status), f"/orders/{order['id']}")
     if status == "delivery_failed":
         _send_async(order.get("seller_user_id"), "seller_delivery_failed", f"/seller/orders/{order['id']}")
+
+
+def _buyer_event(order: dict, status: str) -> str:
+    """T178 A47: the buyer's text follows the kind of order: a pre-order is not "being prepared" days ahead, a pickup is
+    not delivered."""
+    appointment = order.get("delivery_appointment")
+    if status == "confirmed" and appointment and \
+            datetime.fromisoformat(appointment).astimezone(VN_TZ).date() > datetime.now(VN_TZ).date():
+        return "confirmed_scheduled"
+    if status in ("ready", "done") and order.get("delivery_method") == "pickup":
+        return f"{status}_pickup"
+    return status
 
 
 def notify_buyer_cancelled(order: dict):
@@ -173,6 +238,16 @@ def notify_payment_confirmed(order: dict):
     _send_async(order.get("user_id"), "payment_confirmed", f"/orders/{order['id']}")
 
 
+def notify_seller_new_review(seller_user_id):
+    """Seller side: a buyer reviewed one of its orders (T181 A33)."""
+    _send_async(seller_user_id, "seller_new_review", "/seller/me")
+
+
+def notify_payment_after_cancel(order: dict):
+    """Buyer side: VNPay took the money after the order was cancelled; a late_payment refund is queued (T175 A5)."""
+    _send_async(order.get("user_id"), "payment_after_cancel", f"/orders/{order['id']}")
+
+
 def notify_payment_failed(order: dict):
     """Buyer side: VNPay says the pay link was not paid; once per link (T125)."""
     _send_async(order.get("user_id"), "payment_failed", f"/orders/{order['id']}")
@@ -181,6 +256,21 @@ def notify_payment_failed(order: dict):
 def notify_seller_complaint(seller_user_id, order_id: str):
     """Seller side: the buyer filed a complaint about this order (T35)."""
     _send_async(seller_user_id, "seller_complaint", f"/seller/orders/{order_id}")
+
+
+def notify_admin_cancelled(order: dict, was_done: bool, charged: bool):
+    """T176 A4: an admin cancelled the order. Buyer: refunded if paid. Seller (paid orders only, the others never reached
+    them): a done order with a "Charge to seller" deduction is taken from the next payout; a done order not paid out yet
+    does not count; otherwise (not done, or paid out with Sariko covering the refund) no money words."""
+    code = order["id"][:8].upper()
+    paid = order.get("payment_status") == "paid"
+    _send_async(order.get("user_id"), "admin_cancelled_paid" if paid else "admin_cancelled", f"/orders/{order['id']}", code=code)
+    if not paid:
+        return
+    event = ("seller_admin_cancelled_charged" if charged else
+             "seller_admin_cancelled_done" if was_done and order.get("payout_status") in (None, "pending") else
+             "seller_admin_cancelled")
+    _send_async(order.get("seller_user_id"), event, f"/seller/orders/{order['id']}", code=code)
 
 
 def notify_admins(event: str, url: str, **fields):
@@ -211,19 +301,19 @@ def _send_admins(event: str, url: str, fields: dict):
         logger.exception(f"push_service - _send_admins failed for event {event}: {repr(e)}")
 
 
-def _send_async(user_id, event: str, url: str):
+def _send_async(user_id, event: str, url: str, **fields):
     # Push services can take seconds to answer; never hold up the request
     # (or the VNPay IPN) that changed the order.
     if not user_id or not VAPID_PRIVATE_KEY:
         return
-    threading.Thread(target=_send, args=(user_id, event, url), daemon=True).start()
+    threading.Thread(target=_send, args=(user_id, event, url, fields), daemon=True).start()
 
 
-def _send(user_id: str, event: str, url: str):
+def _send(user_id: str, event: str, url: str, fields: dict):
     try:
         subscriptions = DAOPushSubscriptions().read_subscriptions_by_user_id(user_id)
         if subscriptions:
-            _deliver(user_id, subscriptions, event, url, {})
+            _deliver(user_id, subscriptions, event, url, fields)
     except Exception as e:
         logger.exception(f"push_service - _send failed for user {user_id}, event {event}: {repr(e)}")
 

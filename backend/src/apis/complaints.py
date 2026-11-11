@@ -31,7 +31,7 @@ CATEGORIES = {
     "seller": ["buyer_issue", "delivery_issue", "payment_issue", "other"],
 }
 MAX_LENGTH = 2000            # description length: an input format check, not a business parameter
-ENDED = ("done", "cancelled", "delivery_failed")
+ENDED = ("done", "cancelled")   # delivery_failed is still open: the seller rebooks or delivers it (T177 A13)
 SIGNED_URL_SECONDS = 600
 # Email to support (docs/dev/complaint-email Q5): Vietnamese labels as on the admin Complaints page
 EMAIL_CATEGORY = {"wrong_item": "Không đúng mô tả", "damaged": "Hư hỏng / không an toàn", "missing_item": "Thiếu món",

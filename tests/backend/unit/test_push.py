@@ -4,6 +4,7 @@ Run from tests/backend:  pytest unit/test_push.py
 """
 
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from pydantic import ValidationError
@@ -26,6 +27,19 @@ def _order(status, payment_status="paid"):
 def test_status_change_goes_to_buyer(sent):
     push_service.notify_order_status(_order("confirmed"))
     assert sent == [("buyer", "confirmed", "/orders/o1")]
+
+
+def test_t178_a47_scheduled_and_pickup_texts(sent):   # TC-A47a
+    later = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+    soon = datetime.now(timezone.utc).isoformat()   # now: today in Vietnam at any hour (+30 min crossed midnight at 23:30+)
+    push_service.notify_order_status({**_order("confirmed"), "delivery_appointment": later})
+    push_service.notify_order_status({**_order("confirmed"), "delivery_appointment": soon})   # today: as before
+    push_service.notify_order_status({**_order("ready"), "delivery_method": "pickup"})
+    push_service.notify_order_status({**_order("done"), "delivery_method": "pickup"})
+    push_service.notify_order_status({**_order("ready"), "delivery_method": "delivery"})
+    assert [e for _, e, _ in sent] == ["confirmed_scheduled", "confirmed", "ready_pickup", "done_pickup", "ready"]
+    for key in ("confirmed_scheduled", "ready_pickup", "done_pickup"):
+        assert {"en", "vi"} <= set(push_service.MESSAGES[key])
 
 
 def test_delivery_failed_goes_to_both(sent):

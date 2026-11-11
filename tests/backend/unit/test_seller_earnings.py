@@ -22,7 +22,7 @@ def _order(i, **over):
 @pytest.fixture
 def earnings(monkeypatch):
     """GET /me/earnings with fake DAOs; returns (response, what the DAOs were asked)."""
-    def call(orders=(), payouts=(), settings=None, seller_profile=True):
+    def call(orders=(), payouts=(), settings=None, seller_profile=True, deductions=(), now=None):
         app = FastAPI()
         app.include_router(sellers.router)
         app.dependency_overrides[verify_token] = lambda: {"id": "user-1"}
@@ -32,6 +32,9 @@ def earnings(monkeypatch):
         monkeypatch.setattr(DAOAdminConfig, "__init__", lambda self: None)
         monkeypatch.setattr(DAOAdminConfig, "get_setting", lambda self, key: values.get(key))
         asked = {}
+        if now:   # T174 A18: "now" decides the expected payout day of an order back from a failed payout
+            monkeypatch.setattr(sellers, "datetime", type("Frozen", (datetime,), {
+                "now": classmethod(lambda cls, tz=None: now.astimezone(tz))}))
 
         class Orders:
             def read_done_orders_for_earnings(self, seller_id, since):
@@ -42,6 +45,10 @@ def earnings(monkeypatch):
             def read_payouts_by_seller_id(self, seller_id, limit):
                 asked.update(payouts_seller=seller_id, limit=limit)
                 return list(payouts)
+
+            def read_open_deductions(self, seller_id):
+                asked.update(deductions_seller=seller_id)
+                return list(deductions)
 
         monkeypatch.setattr("apis.sellers.DAOOrders", Orders)
         monkeypatch.setattr("apis.sellers.DAOAdminPayouts", Payouts)
@@ -70,10 +77,10 @@ def test_states_and_totals(earnings):  # TC-26
         _order(2, payout_hold=True),
         _order(3, payout_status="processing"),
         _order(4, payout_status="paid_out"),
-    ])
+    ], payouts=[{"id": "p1", "net_payout": "49060", "total_deductions": "0", "status": "processing"}])
     body = res.json()
     assert [o["payout_state"] for o in body["orders"]] == ["pending", "held", "processing", "paid_out"]
-    assert body["awaiting_total"] == 2 * 49060        # pending + processing, not held, not paid out
+    assert body["awaiting_total"] == 2 * 49060        # pending + the processing payout (T174), not held, not paid out
     assert asked["orders_seller"] == "seller-1"
     expected_since = datetime.now(timezone.utc) - timedelta(days=30)
     assert abs((asked["since"] - expected_since).total_seconds()) < 5
@@ -100,8 +107,9 @@ def test_done_query_filters():  # TC-26: only done + paid orders of this seller 
     dao._supabase_client = type("C", (), {"table": lambda self, t: Q()})()
     since = datetime(2026, 9, 20, tzinfo=timezone.utc)
     dao.read_done_orders_for_earnings("seller-1", since)
-    for call in [("eq", ("seller_id", "seller-1")), ("eq", ("payment_status", "paid")),
-                 ("eq", ("status", "done")), ("gte", ("status_changed_at", since.isoformat()))]:
+    for call in [("eq", ("seller_id", "seller-1")), ("eq", ("payment_status", "paid")), ("eq", ("status", "done")),
+                 # T174 A9: orders still waiting are read whatever their age
+                 ("or_", (f"status_changed_at.gte.{since.isoformat()},payout_status.in.(pending,processing)",))]:
         assert call in calls
 
 
@@ -181,9 +189,10 @@ def test_tc3_window_moves_to_next_period(done, hour, want):  # TC-3
     ({"payout_period_weeks": 2}, "2026-11-10"),
     ({"payout_weekday": 9, "payout_period_weeks": 0}, "2026-11-03"),   # out of range: defaults
 ])
-def test_tc9_endpoint(earnings, settings, want):  # TC-9: 17:30 UTC 26/10 = 00:30 VN 27/10
+def test_tc9_endpoint(earnings, settings, want):  # TC-9: 17:30 UTC 26/10 = 00:30 VN 27/10, seen at 07:00 VN 27/10
     res, _ = earnings(orders=[_order(1, status_changed_at="2026-10-26T17:30:00+00:00"),
-                              _order(2, payout_status="paid_out"), _order(3, payout_hold=True)], settings=settings)
+                              _order(2, payout_status="paid_out"), _order(3, payout_hold=True)], settings=settings,
+                      now=datetime(2026, 10, 27, 0, 0, tzinfo=timezone.utc))
     first, paid, held = res.json()["orders"]
     assert first["expected_payout_date"] == want
     assert paid["expected_payout_date"] is None and held["expected_payout_date"] is None
@@ -211,3 +220,71 @@ def test_cancelled_payouts_hidden():  # payout-auto D2: a cancelled payout is no
     dao._supabase_client = type("C", (), {"table": lambda self, t: Q()})()
     dao.read_payouts_by_seller_id("seller-1", 12)
     assert ("neq", ("status", "cancelled")) in calls and ("eq", ("seller_id", "seller-1")) in calls
+
+
+# ─── T174 (docs/dev/20261110-payout-fixes) ──────────────────────────────────────────────────────────────
+def test_a7_each_order_shows_what_the_seller_gets(earnings):  # TC-A7a
+    res, _ = earnings(orders=[_order(1, wh_vat_amount="490.60", wh_pit_amount="245.30"), _order(2)])
+    body = res.json()
+    o1, o2 = body["orders"]
+    assert (o1["net_amount"], o2["net_amount"]) == (48324, 49060)   # 49060 - 735.90; no tax computed yet = payout
+    assert type(o1["net_amount"]) is int
+    assert body["awaiting_total"] == 97384 == o1["net_amount"] + o2["net_amount"]
+
+
+def test_a9a_open_deductions_come_off_awaiting(earnings):  # TC-A9a, TC-A9c
+    res, asked = earnings(orders=[_order(1), _order(2), _order(3), _order(4, payout_hold=True)],
+                          deductions=[{"amount": "50000", "applied_amount": "10000.00", "order_id": "o1", "refund_id": "r1"}, {"amount": "1000", "applied_amount": "0", "order_id": "o2", "refund_id": None}])
+    body = res.json()
+    assert asked["deductions_seller"] == "seller-1"
+    assert (body["awaiting_total"], body["deductions_total"], body["deductions_carry"]) == (147180 - 41000, 41000, 0)
+
+
+@pytest.mark.parametrize("percent, awaiting, taken, carry", [
+    (None, 0, 147180, 52820),        # the payout takes at most all of it; the rest waits for the next one
+    (50, 73590, 73590, 126410),      # payout_deduction_max_percent 50: half of the payout at most
+    (500, 0, 147180, 52820),         # above 100 = 100, like admin_generate_payout_for_seller
+])
+def test_a9b_deductions_above_awaiting(earnings, percent, awaiting, taken, carry):  # TC-A9b
+    res, _ = earnings(orders=[_order(1), _order(2), _order(3)], deductions=[{"amount": "200000", "applied_amount": "0", "order_id": "o1", "refund_id": "r1"}],
+                      settings={"payout_deduction_max_percent": percent})
+    body = res.json()
+    assert (body["awaiting_total"], body["deductions_total"], body["deductions_carry"]) == (awaiting, taken, carry)
+    assert all(type(body[k]) is int for k in ("awaiting_total", "deductions_total", "deductions_carry"))
+
+
+def test_a9_orders_in_a_payout_count_at_its_net(earnings):  # TC-A9a: their deductions are already taken (not open)
+    res, _ = earnings(orders=[_order(1), _order(2, payout_status="processing")],
+                      payouts=[{"id": "p1", "net_payout": "39060.00", "total_deductions": "10000", "status": "pending"},
+                               {"id": "p0", "net_payout": "5000", "total_deductions": "7000", "status": "completed"}])
+    body = res.json()
+    assert (body["awaiting_total"], body["deductions_total"]) == (49060 + 39060, 10000)
+    rows = sum(o["net_amount"] for o in body["orders"] if o["payout_state"] in ("pending", "processing"))
+    assert rows - body["deductions_total"] == body["awaiting_total"]   # TC-A7b: the lines add up
+
+
+@pytest.mark.parametrize("done, now, want", [
+    ("2026-10-20 12:00", "2026-11-10 10:00", "2026-11-17"),   # back from a failed payout, seen after Tuesday 08:00
+    ("2026-10-20 12:00", "2026-11-10 07:59", "2026-11-10"),   # seen before 08:00: paid today
+    ("2026-11-09 20:00", "2026-11-10 10:00", "2026-11-17"),   # TC-A18b: a new order keeps its day (window ends Tue 20:00)
+    ("2026-11-01 23:59", "2026-11-02 00:01", "2026-11-03"),   # midnight: unchanged
+])
+def test_a18a_expected_day_never_past(done, now, want):  # TC-A18a
+    assert expected_payout_date(_vn(done), 1, 2, 8, 24, _vn(now)) == date.fromisoformat(want)
+
+
+def test_a18a_endpoint_uses_now(earnings):
+    res, _ = earnings(orders=[_order(1, status_changed_at="2026-10-20T05:00:00+00:00")],
+                      now=datetime(2026, 11, 10, 3, 0, tzinfo=timezone.utc))
+    assert res.json()["orders"][0]["expected_payout_date"] == "2026-11-17"
+
+
+def test_t181_a51_deductions_listed_and_hold_names_the_complaint(earnings):
+    res, _ = earnings(orders=[_order(1, payout_hold=True, payout_hold_note="complaint KN000012"), _order(2)],
+                      deductions=[{"amount": "50000", "applied_amount": "10000.00", "order_id": "o9", "refund_id": "r1"},
+                                  {"amount": "1000", "applied_amount": "0", "order_id": "o8", "refund_id": None}])
+    body = res.json()
+    assert body["deductions"] == [{"order_id": "o9", "kind": "refund", "amount": 40000},
+                                  {"order_id": "o8", "kind": "fee", "amount": 1000}]
+    held, waiting = body["orders"]
+    assert (held["payout_state"], held["hold_complaint"]) == ("held", "KN000012") and waiting["hold_complaint"] is None

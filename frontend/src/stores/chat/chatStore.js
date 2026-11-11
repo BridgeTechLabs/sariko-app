@@ -69,7 +69,7 @@ export const useChatStore = defineStore("chatStore", {
                     .eq('conversation_id', conversationId)
                     .order('created_at', { ascending: true })
                 if (error) throw error
-                this.messages = data || []
+                if (conversationId === this.currentConversationId) this.messages = data || []   // A24a: not an older chat's
             } catch (e) {
                 console.error(`chatStore - loadMessages - ${e}`)
                 throw e

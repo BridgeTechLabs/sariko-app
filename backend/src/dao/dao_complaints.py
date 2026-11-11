@@ -54,9 +54,14 @@ class DAOComplaints(DAOBase):
             raise Exception(f"Supabase error - set complaint images: {e}")
 
     def list_by_user(self, user_id: str):
+        """The user's own complaints, and for a seller the ones others filed on their orders (T181 A21)."""
         try:
-            return self._supabase_client.table("complaints").select(PUBLIC_FIELDS) \
-                .eq("user_id", user_id).order("created_at", desc=True).execute().data or []
+            table = self._supabase_client.table("complaints")
+            own = table.select(PUBLIC_FIELDS).eq("user_id", user_id).execute().data or []
+            stores = self._supabase_client.table("seller_profiles").select("id").eq("user_id", user_id).execute().data or []
+            about_me = table.select(f"{PUBLIC_FIELDS}, orders!inner(seller_id)") \
+                .in_("orders.seller_id", [s["id"] for s in stores]).neq("user_id", user_id).execute().data if stores else []
+            return sorted(own + about_me, key=lambda r: r["created_at"], reverse=True)
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - list complaints: {e}")
 

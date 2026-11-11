@@ -19,6 +19,8 @@ jobs:
         run: |
           docker run --rm \
             -v "$PWD/tests:/tests:ro" \
+            -v "$PWD/frontend/src:/frontend/src:ro" \
+            -v "$PWD/backend/supabase/migrations:/backend/supabase/migrations:ro" \
             -e PYTHONPATH=/www \
             -w /tests/backend \
             sariko/sariko-backend:${GITHUB_SHA::7} \
