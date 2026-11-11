@@ -23,10 +23,12 @@ export default {
     async mounted() {
         const store = useDashboardStore()
         await store.loadOrderDetail(this.orderId)
+        if (this.left) return   // A24a: the seller left while it loaded; going on would stop the poll of the order opened next
         store.startWatchingOrderDetail(this.orderId)
     },
 
     beforeUnmount() {
+        this.left = true
         const store = useDashboardStore()
         store.stopWatchingOrderDetail()
         store.clearOrderDetail()
