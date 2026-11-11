@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 
 from apis.complaints import complaints_for_order
-from apis.deliveries import book_allingo, cancel_trip, keep_taken_trip, lalamove_recipient
+from apis.deliveries import book_allingo, cancel_trip, check_trip_addresses, keep_taken_trip, lalamove_recipient, seller_phone
 from apis.orders import cancel_after
 from core.store_hours import confirm_deadline, is_open_now
 from services.order_expiry import confirm_window
@@ -23,7 +23,6 @@ from fastapi import APIRouter, HTTPException, Depends, Query, status
 from apis.reviews import mask_reviewer
 from core.auth import verify_token
 from core.payout_cycle import expected_payout_date
-from core.phone import to_e164_vn
 from core.sariko_cache import cache
 from dao.dao_orders import DAOOrders, TRIP_ENDED, seller_orders_key
 from schemas import Schema
@@ -281,6 +280,7 @@ def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
 
 @router.patch("/me/orders/{order_id}/status")
 def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderStatus, user=Depends(verify_token)):
+    until = allingo_service.deadline()   # AllinGo retries stop in time for the seller's answer (T191)
     try:
         seller_id = _get_seller_id(user)
         dao_orders = DAOOrders()
@@ -344,14 +344,9 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     "message": "Set your store address and phone before marking the order ready.",
                 })
 
+            check_trip_addresses(full_order)
             pickup_address  = seller.get("address") or ""
             dropoff_address = full_order.get("delivery_address") or ""
-
-            if not pickup_address.strip() or not dropoff_address.strip():
-                raise HTTPException(
-                    status_code=400,
-                    detail="Missing pickup or dropoff address. Please update your store address in settings."
-                )
 
             allingo = allingo_service.enabled()
             if not allingo:
@@ -367,10 +362,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     dropoff_address=dropoff_address,
                 )
 
-            try:
-                sender_phone = to_e164_vn(seller.get("phone") or "")
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail={"code": "seller_phone_invalid", "message": f"Seller phone invalid: {e}. Update store phone in settings."})
+            sender_phone = seller_phone(seller)
             recipient = lalamove_recipient(full_order)
 
             logger.warning(f"[Delivery] order={order_id} sender_phone={sender_phone} recipient_phone=…{recipient['recipient_phone'][-4:]}")
@@ -381,7 +373,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
             taken = False
             if allingo:
                 try:
-                    booking_result, taken = book_allingo(full_order, sender_phone, recipient, attempts)
+                    booking_result, taken = book_allingo(full_order, sender_phone, recipient, attempts, until)
                 except AllingoError as e:   # an empty wallet goes the failed-booking way too (admins already told)
                     last_booking_error = e
             else:
@@ -429,7 +421,8 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                 # DB insert failed but the trip is already booked — roll back to avoid orphan.
                 logger.error(f"[Delivery] create_delivery failed ({booking_result['provider']}={trip_id}); cancelling the trip")
                 try:
-                    cancel_trip(booking_result, get_lalamove_service)
+                    if not cancel_trip(booking_result, get_lalamove_service, until):   # a False answer too (T191 TC-35)
+                        logger.error(f"[Delivery] Rollback cancel failed for {trip_id} — MANUAL INTERVENTION NEEDED")
                 except Exception as cancel_err:
                     logger.error(f"[Delivery] Rollback cancel failed for {trip_id}: {cancel_err} — MANUAL INTERVENTION NEEDED")
                 if "deliveries_one_live_trip_per_order" in str(db_err):
@@ -446,7 +439,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
         if not updated:
             # The trip was booked for an order that is no longer ours to send (R4.6).
             # It is still ASSIGNING_DRIVER, which the company lets us cancel.
-            if booking_result and not keep_taken_trip(taken, dao_orders, order_id) and not cancel_trip(booking_result, get_lalamove_service):
+            if booking_result and not keep_taken_trip(taken, dao_orders, order_id) and not cancel_trip(booking_result, get_lalamove_service, until):
                 logger.error(f"[Delivery] order={order_id} changed while booking; cancel of {trip_id} failed — MANUAL INTERVENTION NEEDED")
             raise HTTPException(status_code=409, detail="Order status changed, please refresh")
 

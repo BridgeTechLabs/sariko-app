@@ -32,6 +32,7 @@ class QuotationResult(BaseModel):
     total_fee: int          # VND integer (e.g. 25000)
     currency: str           # "VND"
     distance_km: float      # e.g. 3.2; 0 for AllinGo (it gives none)
+    partner: Optional[str] = None   # AllinGo: the company of the quote (partner.id), kept on the trip (T192)
 
 class PlaceOrderResult(BaseModel):
     lalamove_order_id: str

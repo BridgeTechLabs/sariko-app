@@ -38,6 +38,9 @@ export default {
         quotationLoading() {
             return this.deliveryStore.quotationLoading
         },
+        quotationError() {
+            return this.deliveryStore.quotationError
+        },
         totalAmount() {
             return this.subtotal + this.deliveryFee
         },
@@ -272,6 +275,11 @@ export default {
                     </template>
                 </q-input>
             </div>
+        </div>
+
+        <div v-if="quotationError" class="validation-card">
+            <AlertCircle class="validation-icon" :size="16" />
+            <div class="validation-messages">{{ quotationError }}</div>
         </div>
 
         <div v-if="validationIssues.length > 0" class="validation-card">
