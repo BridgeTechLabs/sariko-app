@@ -198,7 +198,7 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Seller location not configured")
         try:
             quote = quote_trip(
-                get_lalamove_service,
+                get_lalamove_service, seller_info, user_id, receiver,
                 pickup_lat=float(seller_info["lat"]),
                 pickup_lon=float(seller_info["lon"]),
                 pickup_address=seller_info["address"] or "Pickup",
@@ -206,6 +206,8 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
                 dropoff_lon=request.delivery_lon,
                 dropoff_address=request.delivery_address,
             )
+        except HTTPException:   # a missing phone for AllinGo's contacts (T191): its own 400
+            raise
         except Exception as e:
             logger.exception(f"Delivery quotation failed in POST /orders: {e}")
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,

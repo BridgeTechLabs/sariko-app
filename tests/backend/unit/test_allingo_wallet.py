@@ -15,7 +15,7 @@ BASE = "https://pro.allingo.vn/api/v1"
 
 def reply(status, body=None):
     text = json.dumps(body) if body is not None else ""
-    return SimpleNamespace(status_code=status, ok=200 <= status < 300, text=text, json=lambda: json.loads(text))
+    return SimpleNamespace(status_code=status, ok=200 <= status < 300, text=text, json=lambda: json.loads(text), headers={})
 
 
 class World:
@@ -64,6 +64,7 @@ def world(monkeypatch):
     monkeypatch.setattr(allingo_wallet.time, "monotonic", lambda: w.now)
     monkeypatch.setattr(allingo_wallet, "_settings", dict(allingo_wallet.DEFAULTS))
     monkeypatch.setattr(allingo_wallet, "_alerted_at", None)
+    monkeypatch.setattr(allingo_wallet, "_blocked_at", None)
     monkeypatch.setattr(push_service, "notify_admins", lambda event, url, **f: w.alerts.append((event, url, f)))
     yield w
     allingo_service.reset_allingo_service()
@@ -211,3 +212,42 @@ def test_tc16_wallet_and_booking_share_the_token(world):
     for t in threads:
         t.join()
     assert errors == [] and 1 <= world.tokens <= 2
+
+
+@pytest.mark.parametrize("answer", [reply(403, {"error": {"code": "app_suspended"}}), reply(401)])   # 401 again after a new token
+def test_t191_s3_refused_account_alerts_at_the_low_wallet_pace(world, answer):
+    world.wallet = [answer]
+    blocked = ("admin_delivery_provider_blocked", "/monitoring", {})
+    for _ in range(2):
+        with pytest.raises(allingo_service.AllingoError):   # still a failed read for job_health
+            allingo_wallet.check()
+    assert world.alerts == [blocked]
+    world.now += 6 * 3600
+    with pytest.raises(allingo_service.AllingoError):
+        allingo_wallet.check()
+    assert world.alerts == [blocked, blocked]
+    world.balance(900000)   # accepted again: the next refusal alerts at once
+    allingo_wallet.check()
+    world.wallet = [answer]
+    with pytest.raises(allingo_service.AllingoError):
+        allingo_wallet.check()
+    assert len(world.alerts) == 3
+
+
+def test_t191_s3_other_wallet_errors_do_not_alert(world):
+    world.wallet = [reply(503, {"error": {"code": "unavailable"}})]
+    with pytest.raises(allingo_service.AllingoError):
+        allingo_wallet.check()
+    assert world.alerts == []
+
+
+def test_t191_s3_message_without_an_order(monkeypatch):
+    sent = []
+    monkeypatch.setattr(zalo, "send", lambda kind, text: sent.append((kind, text)))
+    monkeypatch.setattr(push_service, "VAPID_PRIVATE_KEY", None)
+    push_service.notify_admins("admin_delivery_provider_blocked", "/monitoring")
+    assert sent == [("ops", "⛔ Delivery company refused our account: no rider can be booked. Check the AllinGo account.\n"
+                            "https://admin.sariko.store/monitoring")]
+    for lang in ("en", "vi"):
+        title, body = push_service._message("admin_delivery_provider_blocked", lang, {"code": "11111111"})
+        assert "{" not in title + body

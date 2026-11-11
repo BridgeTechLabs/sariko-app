@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import json
@@ -14,6 +15,7 @@ from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_deliveries import DAODeliveries
 from dao.dao_orders import DAOOrders, TRIP_ENDED
 from dao.dao_seller_profiles import DAOSellerProfiles
+from dao.dao_users import DAOUsers
 from schemas import Schema
 from services import allingo_service, push_service
 from services.allingo_service import AllingoError, address, trip_fields
@@ -47,21 +49,62 @@ def lalamove_recipient(order: dict) -> dict:
     }
 
 
-def quote_trip(lalamove, **stops):
+def seller_phone(seller: dict) -> str:
+    """The store's phone for the driver (seller_profiles.phone), +84; none / invalid -> 400 seller_phone_invalid."""
+    try:
+        return to_e164_vn(seller.get("phone") or "")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"code": "seller_phone_invalid", "message": f"Seller phone invalid: {e}. Update store phone in settings."})
+
+
+def check_trip_addresses(order: dict):
+    """Ready and rebook: no trip without the store's address and map point and the delivery address
+    (an order read by read_order_with_seller_coords)."""
+    seller = order.get("seller_profiles") or {}
+    if not (seller.get("address") or "").strip() or not (order.get("delivery_address") or "").strip():
+        raise HTTPException(status_code=400, detail="Missing pickup or dropoff address. Please update your store address in settings.")
+    if not seller.get("lat") or not seller.get("lon"):
+        raise HTTPException(status_code=400, detail="Seller location not configured")
+
+
+def quote_trip(lalamove, seller: dict, buyer_id: str, receiver: dict = None, **stops):
     """The fee from the company new trips go to (admin_settings delivery_provider_allingo), as a QuotationResult.
-    stops = get_quotation's arguments; lalamove = the caller's get_lalamove_service."""
+    stops = get_quotation's arguments; lalamove = the caller's get_lalamove_service. AllinGo also needs both
+    contacts (T191): the store (seller: store_name, phone) and the receiver (receiver_name / receiver_phone of the
+    cart's address or the order form, else the buyer's profile, as lalamove_recipient)."""
     if allingo_service.enabled():
-        return allingo_service.get_allingo_service().quote(
-            address(stops["pickup_address"], stops["pickup_lat"], stops["pickup_lon"]),
-            address(stops["dropoff_address"], stops["dropoff_lat"], stops["dropoff_lon"]))
+        try:
+            recipient = lalamove_recipient({**(receiver or {}), "users": DAOUsers().get_users(buyer_id) or {}})
+            return allingo_service.get_allingo_service().quote(
+                address(stops["pickup_address"], stops["pickup_lat"], stops["pickup_lon"],
+                        seller.get("store_name") or "Seller", to_e164_vn(seller.get("phone") or "")),
+                address(stops["dropoff_address"], stops["dropoff_lat"], stops["dropoff_lon"],
+                        recipient["recipient_name"], recipient["recipient_phone"]))
+        except HTTPException as e:
+            if e.detail["code"] != "buyer_phone_invalid":
+                raise
+            raise HTTPException(status_code=400, detail={"code": "quote_phone_missing",   # S1: the buyer's own words
+                                                         "message": "Add a phone number for the receiver to see the delivery fee"})
+        except (ValueError, AllingoError) as e:   # a bad store phone (TC-39) or AllinGo's code (TC-43): the cart's usual
+            logger.error(f"[Delivery] AllinGo quote failed: {e!r}")   # words; a refused account is told by the wallet job
+            raise HTTPException(status_code=502, detail="Could not get a delivery fee quote. Please try again.")
     return lalamove().get_quotation(**stops)
 
 
-def book_allingo(order: dict, sender_phone: str, recipient: dict, attempts: int) -> tuple[dict, bool]:
+def tell_admins(e: AllingoError, order: dict):
+    """An empty wallet or a refused account stops every trip until someone acts: push + Zalo the team."""
+    event = {allingo_service.WALLET_EMPTY: "admin_delivery_wallet_empty",
+             allingo_service.BLOCKED: "admin_delivery_provider_blocked"}.get(e.code)
+    if event:
+        push_service.notify_admins(event, f"/orders?open={order['id']}", code=order["id"][:8])
+
+
+def book_allingo(order: dict, sender_phone: str, recipient: dict, attempts: int, until: float) -> tuple[dict, bool]:
     """Book an AllinGo trip for an order read by read_order_with_seller_coords; returns (deliveries columns,
     taken = the trip was booked before this call). Every try first takes a trip still running for this order
     (an earlier try or tap may have made one), so a lost answer never books twice. A failed quote answers 502
-    and changes nothing (as with Lalamove); booking retries network / 5xx / 408 / 429 only. Raises AllingoError."""
+    and changes nothing (as with Lalamove); booking retries network / 5xx / 408 / 429 only, waiting between tries
+    while the request's deadline allows (until, wait_before_retry). Raises AllingoError."""
     service = allingo_service.get_allingo_service()
     seller = order.get("seller_profiles") or {}
     pickup = address(seller.get("address") or "", seller.get("lat"), seller.get("lon"),
@@ -79,21 +122,21 @@ def book_allingo(order: dict, sender_phone: str, recipient: dict, attempts: int)
                 quote = service.quote(pickup, dropoff)
             except AllingoError as e:
                 logger.error(f"[Delivery] AllinGo quote failed for order={order['id']}: {e.code}")
+                tell_admins(e, order)
                 raise HTTPException(status_code=502, detail="Could not get a delivery fee quote. Please try again.")
         try:
             trip = service.place_order(quote, pickup, dropoff, order["id"])
         except AllingoError as e:
             last_error = e
             logger.warning(f"[Delivery] AllinGo attempt {attempt}/{attempts} failed for order={order['id']}: {e.code}")
-            if e.code == allingo_service.WALLET_EMPTY:
-                push_service.notify_admins("admin_delivery_wallet_empty", f"/orders?open={order['id']}", code=order["id"][:8])
-            if not e.retryable:
+            tell_admins(e, order)
+            if not e.retryable or attempt == attempts or not allingo_service.wait_before_retry(e, attempt, until):
                 break
             continue
         # A second fence only: a cash trip also answers fee.cod 0 (sandbox 09/11), so this proves nothing
         if Decimal(str((trip.get("fee") or {}).get("cod") or 0)) != 0:
             logger.error(f"[Delivery] AllinGo trip {trip['id']} for order={order['id']} has COD; cancelling it")
-            service.cancel_order(trip["id"])
+            service.cancel_order(trip["id"], until=until)
             raise AllingoError("allingo_cod_not_zero")
         return trip_fields(trip), False
     raise last_error
@@ -105,11 +148,11 @@ def keep_taken_trip(taken: bool, dao_orders, order_id: str) -> bool:
     return taken and (dao_orders.read_order_by_id_raw(order_id) or {}).get("status") != "cancelled"
 
 
-def cancel_trip(trip: dict, lalamove) -> bool:
+def cancel_trip(trip: dict, lalamove, until: float = None) -> bool:
     """Cancel a booked trip at the company that booked it (deliveries.provider; NULL rows predate AllinGo
-    and are Lalamove). lalamove = the caller's get_lalamove_service."""
+    and are Lalamove). lalamove = the caller's get_lalamove_service; until = the request's deadline for AllinGo retries."""
     if trip.get("provider") == "allingo":
-        return allingo_service.get_allingo_service().cancel_order(trip["allingo_order_id"])
+        return allingo_service.get_allingo_service().cancel_order(trip["allingo_order_id"], until=until)
     return lalamove().cancel_order(trip["lalamove_order_id"])
 
 
@@ -149,7 +192,7 @@ def get_quotation(body: Schema.RequestQuotation, user=Depends(verify_token)):
             raise HTTPException(status_code=400, detail="Seller location not configured")
 
         result = quote_trip(
-            get_lalamove_service,
+            get_lalamove_service, seller, user["id"], body.model_dump(include={"receiver_name", "receiver_phone"}),
             pickup_lat=float(seller_lat),
             pickup_lon=float(seller_lon),
             pickup_address=seller.get("address") or "Pickup",
@@ -405,6 +448,25 @@ def booking_in_flight(dao_orders, dao_deliveries, order_id) -> bool:
     return bool(order and order["status"] == "confirmed" and not dao_deliveries.read_delivery_by_order_id(order_id))
 
 
+def stray_trip(dao_orders, dao_deliveries, trip: dict) -> bool:
+    """An AllinGo trip with no deliveries row, still running, for a Sariko order that has another trip or none any more:
+    the order is cancelled / done, or its row holds another trip that has not ended (a lost POST answer then a failed
+    lookup booked twice). A rebook still booking (ready / delivery_failed, row ended) answers 503 so AllinGo resends."""
+    ref = trip.get("external_reference")
+    try:
+        uuid.UUID(str(ref))
+    except ValueError:
+        return False
+    order = dao_orders.read_order_by_id_raw(ref)
+    if not order or not allingo_service.running(trip):
+        return False
+    row = dao_deliveries.read_delivery_by_order_id(ref)
+    if order["status"] in ("ready", "delivery_failed") and row and row.get("status") in TRIP_ENDED:
+        raise HTTPException(status_code=503, detail="Rebook not recorded yet")
+    return order["status"] in ("cancelled", "done") or bool(
+        row and row.get("allingo_order_id") != trip["id"] and row.get("status") not in TRIP_ENDED)
+
+
 # --------------------------------------------------------------------------
 # POST /deliveries/webhook/allingo — AllinGo trip events (public)
 # Errors answer 5xx on purpose (unlike Lalamove's 200): AllinGo resends up to 8 times over 44 hours.
@@ -429,13 +491,26 @@ async def allingo_webhook(request: Request):
         if not delivery or delivery.get("provider") != "allingo":
             if booking_in_flight(dao_orders, dao_deliveries, trip.get("external_reference")):
                 raise HTTPException(status_code=503, detail="Delivery not recorded yet")
+            if stray_trip(dao_orders, dao_deliveries, trip):   # T191 S7: a second trip for one order costs the wallet
+                logger.error(f"AllinGo webhook: stray AllinGo trip {trip['id']} for order={trip['external_reference']}; cancelling it")
+                # 409 = ended or picked up: resending will not change it, the log above is for a manual check (QA G1)
+                cancel = allingo_service.get_allingo_service().cancel_order
+                if not await asyncio.to_thread(lambda: cancel(trip["id"], attempts=1, done_on_409=True)):
+                    raise HTTPException(status_code=503, detail="Stray trip not cancelled yet")   # AllinGo resends
+                return {"success": True}
             logger.warning(f"AllinGo webhook: no delivery row for {trip.get('id')} ({event.get('type')})")
             return {"success": True}
 
         leg = trip.get("delivery") or {}
-        current = delivery.get("status")
-        new = "LOST" if current == "PICKED_UP" and leg.get("status") in allingo_service.LOST_AFTER_PICKUP \
-            else allingo_service.STATUS.get(leg.get("status"))
+        raw, current = leg.get("status"), delivery.get("status")
+        # T191: an ended order.status wins over a delivery not ended (null before a company is attached, no status,
+        # or one left queued when the order was cancelled), and a failed end after pickup is LOST either way
+        from_order = trip.get("status") in allingo_service.ENDED_ORDER and not allingo_service.leg_ended(raw)
+        if from_order:
+            raw = trip["status"]
+        new = allingo_service.STATUS.get(raw)
+        if current == "PICKED_UP" and new == "CANCELED" and (from_order or raw in allingo_service.LOST_AFTER_PICKUP):
+            new = "LOST"
         update = {"status": new} if new and trip_rank(new) > trip_rank(current) else {}
         status = update.get("status", current)
 
@@ -455,7 +530,7 @@ async def allingo_webhook(request: Request):
 
         if update:
             dao_deliveries.update_delivery(delivery["id"], update)
-        logger.warning(f"[Webhook] AllinGo {event.get('type')} → trip={trip['id']} {leg.get('status')} → {status}")
+        logger.warning(f"[Webhook] AllinGo {event.get('type')} → trip={trip['id']} {raw} → {status}")
         dao_orders.touch_order(delivery["order_id"])
         if driver_changed:
             order = dao_orders.read_order_by_id_raw(delivery["order_id"])
@@ -521,6 +596,7 @@ def get_delivery_status_for_seller(order_id: str, user=Depends(verify_token)):
 # --------------------------------------------------------------------------
 @router.post("/{order_id}/rebook")
 def rebook_delivery(order_id: str, user=Depends(verify_token)):
+    until = allingo_service.deadline()
     try:
         dao_sellers = DAOSellerProfiles()
         profile = dao_sellers.read_seller_profile_by_user_id(user["id"])
@@ -553,16 +629,13 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
             raise HTTPException(status_code=500, detail="Could not load order details")
 
         seller  = full_order.get("seller_profiles") or {}
-
-        try:
-            sender_phone = to_e164_vn(seller.get("phone") or "")
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail={"code": "seller_phone_invalid", "message": f"Seller phone invalid: {e}"})
+        check_trip_addresses(full_order)   # as Ready (T191)
+        sender_phone = seller_phone(seller)
         recipient = lalamove_recipient(full_order)
 
         if allingo_service.enabled():
             try:
-                trip, taken = book_allingo(full_order, sender_phone, recipient, attempts=1)
+                trip, taken = book_allingo(full_order, sender_phone, recipient, attempts=1, until=until)
             except AllingoError:
                 # The order stays delivery_failed (no cancel, no refund): the seller rebooks once the wallet is topped up
                 raise HTTPException(status_code=503, detail="Unable to book a delivery driver. Please try again later.")
@@ -601,7 +674,8 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
             # DB write failed but the trip is already booked — roll back to avoid orphan order.
             logger.error(f"[Delivery] DB update failed after rebook ({trip['provider']}={trip_id}); cancelling the trip")
             try:
-                cancel_trip(trip, get_lalamove_service)
+                if not cancel_trip(trip, get_lalamove_service, until):
+                    logger.error(f"[Delivery] Rollback cancel failed for {trip_id} — MANUAL INTERVENTION NEEDED")
             except Exception as cancel_err:
                 logger.error(f"[Delivery] Rollback cancel also failed for {trip_id}: {cancel_err}")
             raise HTTPException(status_code=500, detail=f"Rebook DB update failed: {db_err}")
@@ -610,7 +684,7 @@ def rebook_delivery(order_id: str, user=Depends(verify_token)):
 
         # Conditional: the buyer may have cancelled the late order meanwhile (R6) → drop the new trip
         if order["status"] == "delivery_failed" and not dao_orders.update_order_status(order_id, "ready", expected_status="delivery_failed"):
-            if not keep_taken_trip(taken, dao_orders, order_id) and not cancel_trip(trip, get_lalamove_service):
+            if not keep_taken_trip(taken, dao_orders, order_id) and not cancel_trip(trip, get_lalamove_service, until):
                 logger.error(f"[Delivery] order={order_id} changed while rebooking; cancel of {trip['provider']}={trip_id} failed — MANUAL INTERVENTION NEEDED")
             raise HTTPException(status_code=409, detail="Order status changed, please refresh")
 

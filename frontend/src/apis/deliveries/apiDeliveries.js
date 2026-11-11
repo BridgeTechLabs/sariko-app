@@ -2,12 +2,13 @@ import { apiClient } from "@/lib/axiosPolicy.js"
 
 export const apiDeliveries = {
 
-    getQuotation: async (sellerId, deliveryLat, deliveryLon, deliveryAddress) => {
+    getQuotation: async (sellerId, deliveryLat, deliveryLon, deliveryAddress, receiver = {}) => {
         const payload = {
             seller_id: sellerId,
             delivery_lat: deliveryLat,
             delivery_lon: deliveryLon,
             delivery_address: deliveryAddress,
+            ...receiver,
         }
         const response = await apiClient.post('/v1/deliveries/quotation', payload)
         return response.data

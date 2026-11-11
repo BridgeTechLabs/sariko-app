@@ -82,7 +82,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("id, store_name, address, lat, lon")
+                .select("id, store_name, address, lat, lon, phone")
                 .eq("id", seller_id)
                 .maybe_single()
                 .execute()
@@ -183,7 +183,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("user_id, is_open, weekly_hours, address, lat, lon, commission_rate_override, admin_tier_config(commission_rate)")
+                .select("user_id, is_open, weekly_hours, store_name, phone, address, lat, lon, commission_rate_override, admin_tier_config(commission_rate)")
                 .eq("id", seller_id)
                 .maybe_single()
                 .execute()
@@ -200,6 +200,8 @@ class DAOSellerProfiles(DAOBase):
                 "address": row["address"],
                 "lat": row["lat"],
                 "lon": row["lon"],
+                "store_name": row["store_name"],
+                "phone": row["phone"],
             }
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_seller_order_info: {e}")
