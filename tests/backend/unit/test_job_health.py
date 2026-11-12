@@ -185,17 +185,27 @@ class Stop(Exception):
     pass
 
 
-def run_every(monkeypatch, db, ticks, run, interval=60, reset=None, before_tick=None, run_seconds=0):
-    """every("order_expiry", interval, run) for `ticks` ticks on a fake clock (sleep moves it, each run takes
-    run_seconds); before_tick(i) can change the row between ticks. Returns [(tick, "run" | "record:<error>" | "thread:<fn>")]."""
-    clock, log = [0.0], []
+class Log(list):
+    """[(tick, "run" | "record:<error>" | "thread:<fn>")]; .sleeps = every asked sleep, .run_at = clock at each run."""
+    def __init__(self):
+        super().__init__()
+        self.sleeps, self.run_at = [], []
+
+
+def run_every(monkeypatch, db, ticks, run, interval=60, reset=None, before_tick=None, run_seconds=0, tick=15):
+    """every("order_expiry", interval, run) for `ticks` sleeps on a fake clock (sleep moves it, each run takes
+    run_seconds); before_tick(i) can change the row between ticks. TICK_SECONDS is set to `tick` (15 keeps the old
+    tests' arithmetic; the real 120 is used by the tests that pass tick=job_health.TICK_SECONDS)."""
+    clock, log = [0.0], Log()
+    monkeypatch.setattr(job_health, "TICK_SECONDS", tick)
 
     async def to_thread(fn, *args):
         log.append((len_ticks[0], f"thread:{fn.__name__}"))
         return fn(*args)
 
     async def sleep(seconds):
-        assert seconds == job_health.TICK_SECONDS
+        assert 0 <= seconds <= job_health.TICK_SECONDS
+        log.sleeps.append(seconds)
         clock[0] += seconds
         len_ticks[0] += 1
         if len_ticks[0] >= ticks:
@@ -215,6 +225,7 @@ def run_every(monkeypatch, db, ticks, run, interval=60, reset=None, before_tick=
 
     def job():
         log.append((len_ticks[0], "run"))
+        log.run_at.append(clock[0])
         clock[0] += run_seconds
         return run()
     with pytest.raises(Stop):
@@ -321,6 +332,58 @@ def test_tc20_api_metrics_paused_keeps_nothing(monkeypatch, db):  # TC-20
     assert runs(log) == [7]                                        # one full interval after the resume, not at once
     (row,) = written
     assert row["count"] == 2 and row["bucket_start"] >= resumed_at[0]
+
+
+# ─── the 120-second tick (T194 log-tick TC-1..7): sleep until the next run, never longer than TICK_SECONDS ──────
+REAL = job_health.TICK_SECONDS
+
+
+def test_t194_tc1_interval_shorter_than_tick_keeps_its_rhythm(monkeypatch, db):  # TC-1
+    log = run_every(monkeypatch, db, 6, lambda: None, interval=60, run_seconds=20, tick=REAL)
+    assert log.run_at == [0, 60, 120, 180, 240, 300]    # from the START of each run, not 20 s later
+    assert max(log.sleeps) <= 120 and set(log.sleeps) == {40}
+
+
+def test_t194_tc2_api_metrics_300_not_drifting_to_360(monkeypatch, db):  # TC-2
+    resets = []
+    log = run_every(monkeypatch, db, 7, lambda: None, interval=300, reset=lambda: resets.append(1), tick=REAL)
+    assert log.run_at == [300, 600]                      # first run after a full interval, then every 300
+    assert log.sleeps[:3] == [120, 120, 60] and resets   # reset() before the first wait
+
+
+def test_t194_tc3_long_interval_reads_control_every_tick(monkeypatch, db):  # TC-3
+    log = run_every(monkeypatch, db, 16, lambda: None, interval=1800, tick=REAL)
+    assert log.run_at == [0, 1800]
+    assert log.sleeps == [120] * 16
+    assert len([w for _, w in log if w == "thread:read_control"]) == 16   # one read per loop, none extra
+
+
+def test_t194_tc4_paused_sleeps_the_full_tick(monkeypatch, db):  # TC-4
+    db.rows["order_expiry"] = {"paused": True, "interval_seconds": 60}
+    resets = []
+    log = run_every(monkeypatch, db, 3, lambda: pytest.fail("ran while paused"), reset=lambda: resets.append(1), tick=REAL)
+    assert log.sleeps == [120, 120, 120] and len(resets) == 3 and not any(w.startswith("record") for _, w in log)
+
+
+def test_t194_tc5_resume_runs_within_one_tick(monkeypatch, db):  # TC-5
+    db.rows["order_expiry"] = {"interval_seconds": 1800}
+    log = run_every(monkeypatch, db, 5, lambda: None, tick=REAL,
+                    before_tick=lambda i: db.rows["order_expiry"].update(paused=i in (1, 2)))
+    assert log.run_at == [0, 360]                         # read at 360 s sees "resumed" and runs at once (<= 120 s)
+
+
+def test_t194_tc6_shorter_interval_applies_within_one_tick(monkeypatch, db):  # TC-6
+    db.rows["order_expiry"] = {"interval_seconds": 1800}
+    log = run_every(monkeypatch, db, 4, lambda: None, tick=REAL,
+                    before_tick=lambda i: i == 1 and db.rows["order_expiry"].update(interval_seconds=60))
+    assert log.run_at[:2] == [0, 120]                     # changed after the 1st sleep; seen at the 2nd read
+
+
+def test_t194_tc7_run_longer_than_interval_never_sleeps_negative(monkeypatch, db):  # TC-7
+    log = run_every(monkeypatch, db, 3, lambda: None, interval=60, run_seconds=90, tick=REAL)
+    assert log.sleeps == [0, 0, 0] and log.run_at == [0, 90, 180]
+    names = [w for _, w in log if w not in ("run", "thread:<lambda>")]   # <lambda> = the faked record
+    assert names[:4] == ["thread:read_control", "thread:job", "record:None", "thread:read_control"]   # one read, then one run, then the next read
 
 
 # ─── what each job runs ────────────────────────────────────────────────────────────────────────────────

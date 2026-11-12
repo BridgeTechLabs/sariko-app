@@ -38,6 +38,13 @@ def lalamove_by_default(monkeypatch):
     monkeypatch.setattr("services.allingo_service.enabled", lambda: False)
 
 
+@pytest.fixture(autouse=True)
+def clear_cache():
+    """DAOAdminConfig keeps admin_settings 60 s in the shared cache: a test must not see another test's values."""
+    from core.sariko_cache import cache
+    cache.clear()
+
+
 @pytest.fixture
 def vnp_secret():
     return os.environ["VNPAY_HASH_SECRET"]
