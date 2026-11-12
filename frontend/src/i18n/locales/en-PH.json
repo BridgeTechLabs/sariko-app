@@ -599,6 +599,8 @@
         "status_CANCELLED": "No rider found — seller is arranging",
         "status_LOST": "The food was lost or damaged on the way - Sariko is handling it",
         "status_subtext_ready": "A rider is being assigned to deliver your order.",
+        "status_subtext_ON_GOING": "Your rider is on the way to the store.",
+        "status_subtext_PICKED_UP": "Your rider has your order and is on the way to you.",
         "driver_label": "Your Rider",
         "track_rider": "Track Rider"
     },

@@ -1,11 +1,11 @@
 """Background jobs: run, health and control (docs/dev/20261106-job-health, 20261106-job-control).
 
-every(job, default_interval, run) is the loop of each background job. Every TICK_SECONDS it reads the job's row in
-metrics_job_health: paused -> skip; else, once interval_seconds have passed since the last run started, run() in a
-thread and record() the result. A pause, resume or new interval set on the admin Monitoring page so applies within
-one tick; a run in progress finishes. A failed read keeps the last values read (the code default before any), so a
-config read never stops the job. A pause / resume seen by the loop sends one Zalo message (not on the process's
-first read, so a deploy does not repeat "paused").
+every(job, default_interval, run) is the loop of each background job. It reads the job's row in metrics_job_health
+at least every TICK_SECONDS and before each run: paused -> skip; else, once interval_seconds have passed since the last
+run started, run() in a thread and record() the result. A pause, resume or new interval set on the admin Monitoring
+page applies within TICK_SECONDS (or the job's interval, if shorter); a run in progress finishes. A failed read keeps
+the last values read (the code default before any), so a config read never stops the job. A pause / resume seen by the
+loop sends one Zalo message (not on the process's first read, so a deploy does not repeat "paused").
 
 record(job, error) updates the job's last_* / failures columns (never interval_seconds or paused*, which the admin
 sets). Failed runs in a row are counted in memory, seeded from the DB on the job's first run in this process so a
@@ -34,7 +34,7 @@ NAMES = {
     "allingo_wallet": "AllinGo wallet check",
 }
 DEFAULT_ALERT_FAILURES = 3
-TICK_SECONDS = 15   # how soon a pause / resume / new interval applies; not a business parameter
+TICK_SECONDS = 120   # longest wait between control reads; not a business parameter
 
 _failures = {}                         # job -> failed runs in a row
 _alerted = set()                       # jobs whose current failing streak already got a message
@@ -86,7 +86,9 @@ async def every(job: str, default_interval: int, run, reset=None) -> None:
                 logger.exception(f"[{job}] run failed")
                 error = e
             await asyncio.to_thread(record, job, error)
-        await asyncio.sleep(TICK_SECONDS)
+        # wake for the next run, or after TICK_SECONDS to read the control row again (never a negative sleep)
+        wait = TICK_SECONDS if paused else min(TICK_SECONDS, max(0, interval - (time.monotonic() - started)))
+        await asyncio.sleep(wait)
 
 
 def _read_threshold() -> None:

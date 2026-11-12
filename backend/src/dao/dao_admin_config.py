@@ -2,9 +2,17 @@ import logging
 from datetime import timedelta
 from decimal import Decimal
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
+from core.sariko_cache import cache
 from dao.dao_base import DAOBase
 
 logger = logging.getLogger(__name__)
+
+SETTING_TTL_SECONDS = 60   # technical constant, not a business parameter: how long a read setting is kept
+_MISSING = object()        # "not cached", apart from a cached None (a missing row)
+
+
+def _cache_key(key: str) -> str:
+    return f"admin_settings_{key}_value"
 
 
 class DAOAdminConfig(DAOBase):
@@ -32,7 +40,11 @@ class DAOAdminConfig(DAOBase):
             raise Exception(f"error get_tax_rate: {e}")
 
     def get_setting(self, key: str):
-        """A platform setting from admin_settings (jsonb value), or None if the row is missing."""
+        """A platform setting from admin_settings (jsonb value), or None if the row is missing. Cached 60 s,
+        a missing row too; a failed read is not cached."""
+        cached = cache.get(_cache_key(key), _MISSING)
+        if cached is not _MISSING:
+            return cached
         try:
             result = (
                 self._supabase_client
@@ -42,33 +54,41 @@ class DAOAdminConfig(DAOBase):
                 .maybe_single()
                 .execute()
             )
-            return result.data["value"] if result and result.data else None
+            value = result.data["value"] if result and result.data else None
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - get_setting: {e}")
         except Exception as e:
             raise Exception(f"error get_setting: {e}")
+        cache.put(_cache_key(key), value, SETTING_TTL_SECONDS)
+        return value
 
     def get_positive_int(self, key: str, default: int) -> int:
-        """An integer > 0 setting. Read on every call, so an admin change applies at
-        once. A missing or invalid value (0, "abc") falls back to the default rather
-        than letting a typo cancel or unlock every order at once."""
+        """An integer > 0 setting. Cached 60 s: an admin change applies within a minute. A missing or invalid
+        value (0, "abc") falls back to the default rather than letting a typo cancel or unlock every order at once."""
         return self._positive_int(key, self.get_setting(key), default)
 
     def get_positive_ints(self, defaults: dict) -> dict:
-        """Several get_positive_int settings in one query: {key: value}, defaults for missing/invalid rows."""
-        try:
-            result = (
-                self._supabase_client
-                .table("admin_settings")
-                .select("key, value")
-                .in_("key", list(defaults))
-                .execute()
-            )
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - get_positive_ints: {e}")
-        values = {row["key"]: row["value"] for row in (result.data or [])}
-        return {key: self._positive_int(key, values.get(key), default) for key, default in defaults.items()}
+        """Several get_positive_int settings in one query (only the keys not cached): {key: value}, defaults for
+        missing/invalid rows."""
+        values = {k: v for k in defaults if (v := cache.get(_cache_key(k), _MISSING)) is not _MISSING}
+        todo = [k for k in defaults if k not in values]
+        if todo:
+            try:
+                result = (
+                    self._supabase_client
+                    .table("admin_settings")
+                    .select("key, value")
+                    .in_("key", todo)
+                    .execute()
+                )
+            except PostgrestExceptionAPIError as e:
+                raise Exception(f"Supabase error - get_positive_ints: {e}")
+            rows = {row["key"]: row["value"] for row in (result.data or [])}
+            for k in todo:
+                values[k] = rows.get(k)
+                cache.put(_cache_key(k), values[k], SETTING_TTL_SECONDS)
+        return {key: self._positive_int(key, values[key], default) for key, default in defaults.items()}
 
     @staticmethod
     def _positive_int(key: str, value, default: int) -> int:

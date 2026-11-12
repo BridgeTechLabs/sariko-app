@@ -599,6 +599,8 @@
         "status_CANCELLED": "Không tìm được tài xế — seller đang đặt lại",
         "status_LOST": "Đơn bị thất lạc / hư hỏng khi giao, Sariko đang xử lý",
         "status_subtext_ready": "Đang tìm tài xế để giao đơn hàng của bạn.",
+        "status_subtext_ON_GOING": "Tài xế đang tới quán lấy món.",
+        "status_subtext_PICKED_UP": "Tài xế đã lấy món và đang giao tới bạn.",
         "driver_label": "Tài xế của bạn",
         "track_rider": "Theo dõi tài xế"
     },
