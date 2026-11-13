@@ -5,7 +5,6 @@ import { useCartStore } from '@/stores/cart/cartStore.js';
 import { useOrderStore } from '@/stores/order/orderStore.js';
 import { useAuthStore, BUYER_MISSING_ROUTES } from '@/stores/auth/authStore.js';
 import { useDeliveryStore } from '@/stores/delivery/deliveryStore.js';
-import apiPayments from '@/apis/payments/apiPayments.js';
 
 export default {
     components: {
@@ -23,7 +22,7 @@ export default {
     },
 
     computed: {
-        ...mapGetters(useCartStore, ['subtotalText', 'subtotal', 'maxPreorderDay', 'unavailableNames', 'hasOptionProblem']),
+        ...mapGetters(useCartStore, ['subtotalText', 'subtotal', 'maxPreorderDay', 'unavailableNames', 'hasOptionProblem', 'minShortByFood']),
         ...mapState(useCartStore, ['cartItems', 'note', 'cart']),
 
         deliveryStore() {
@@ -71,6 +70,7 @@ export default {
             const issues = auth.buyerMissing.map((k) => ({ msg: this.$t(`cart_page.validation.missing_${k}`), route: BUYER_MISSING_ROUTES[k] }))
             if (this.unavailableNames.length) issues.push({ msg: this.$t('cart_page.validation.remove_unavailable', { names: this.unavailableNames.join(', ') }), route: null })
             if (this.hasOptionProblem) issues.push({ msg: this.$t('cart_page.validation.fix_options'), route: null })
+            if (Object.keys(this.minShortByFood).length) issues.push({ msg: this.$t('cart_page.validation.min_quantity'), route: null })
             if (this.isPreorder && !this.deliveryAppointment) issues.push({ msg: this.$t('cart_page.validation.missing_appointment'), route: null })
             return issues
         },
@@ -141,10 +141,9 @@ export default {
 
                     // Open VNPay payment in new tab
                     try {
-                        const payRes = await apiPayments.createVnpayPayment(order.id)
-                        if (payRes?.data?.payment_url) {
-                            // window.open(payRes.data.payment_url, '_blank')
-                            window.location.href = payRes.data.payment_url
+                        const payUrl = await orderStore.createPaymentLink(order.id)
+                        if (payUrl) {
+                            window.location.href = payUrl
                         }
                     } catch (payErr) {
                         console.error('VNPay payment URL failed:', payErr)

@@ -161,6 +161,8 @@ export const useSellerStore = defineStore('sellerStore', {
                 const found = category.food_items?.find(f => f.id === foodId)
                 if (found) {
                     this.currentFood = found
+                    // Starts at the dish's minimum per order; the buyer can go down to 1 to split it across options
+                    this.foodQuantity = Math.max(1, found.min_quantity ?? 1)
                     // Preselect the first level on offer, so the buyer never faces
                     // a disabled button with no hint why.
                     this.selectedVariantId = this.foodLevels[0]?.id ?? null

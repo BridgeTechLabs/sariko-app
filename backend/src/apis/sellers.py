@@ -32,6 +32,7 @@ from services import allingo_service
 from services.allingo_service import AllingoError
 from dao.dao_food_item_variants import DAOFoodItemVariants
 from utils.storage import upload_image_base64
+from utils.stock import add_sold_out
 
 router = APIRouter(prefix="/sellers")
 logger = logging.getLogger(__name__)
@@ -527,9 +528,10 @@ def delete_category(cat_id: str, user=Depends(verify_token)):
 def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
-        fields = body.model_dump(exclude_none=True)
+        fields = body.model_dump(exclude_none=True, exclude={"daily_portions"})   # stock replaces it (QĐ2-11)
         fields["price_text"] = _make_price_text(body.price)
         item = DAOFoodItems().create(seller_id, fields)
+        add_sold_out([item])   # a dish made with stock below its minimum shows sold out at once, as PATCH does
         return {"success": True, "item": item}
     except HTTPException:
         raise
@@ -544,9 +546,12 @@ def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_tok
 def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
-        fields = body.model_dump(exclude_none=True)
-        if "daily_portions" in body.model_fields_set:   # null clears the daily limit
-            fields["daily_portions"] = body.daily_portions
+        fields = body.model_dump(exclude_none=True, exclude={"daily_portions"})   # stock replaces it (QĐ2-11)
+        # Stock only when sent: null clears the limit, left out keeps it, so saving a price never writes back a
+        # stock the form read before paid orders took from it (BM12). A stock the seller enters starts a new round:
+        # the next sell-out pushes again whatever the cooldown (P1; a buyer's pay + cancel never clears it, BM13).
+        if "stock" in body.model_fields_set:
+            fields["stock"], fields["stock_alert_at"] = body.stock, None
         if not fields:
             raise HTTPException(status_code=400, detail="No fields to update")
         if "price" in fields:
@@ -555,7 +560,7 @@ def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depe
         item = dao.update(item_id, seller_id, fields)
         if not item:
             raise HTTPException(status_code=404, detail="Item not found")
-        dao.add_remaining_today([item])
+        add_sold_out([item])
         return {"success": True, "item": item}
     except HTTPException:
         raise

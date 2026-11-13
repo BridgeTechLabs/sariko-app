@@ -7,7 +7,7 @@ from test_seller_earnings import _order, earnings  # noqa: F401  (fixture)
 
 
 class _Client:
-    data = True   # reserve_order_portions: the portions were taken (T134)
+    data = []   # reserve_order_stock: the stock was taken, no dish went below its minimum (seller-menu đợt 2)
 
     def __init__(self, fail_compute=False):
         self.rpcs, self.fail_compute = [], fail_compute
@@ -27,6 +27,7 @@ def _dao(client, monkeypatch):
     dao._supabase_client = client
     monkeypatch.setattr(dao, "_invalidate_cache_for_order", lambda order_id: None, raising=False)
     monkeypatch.setattr(dao, "read_order_by_id_raw", lambda order_id: None, raising=False)
+    monkeypatch.setattr("dao.dao_orders.DAOAdminConfig", lambda: type("C", (), {"get_positive_int": lambda self, k, d: d})())
     return dao
 
 
