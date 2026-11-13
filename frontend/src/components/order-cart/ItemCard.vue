@@ -1,6 +1,8 @@
 <script>
 import { Plus, Minus } from 'lucide-vue-next';
 import { useCartStore } from '@/stores/cart/cartStore.js';
+import { apiErrorMessage } from '@/lib/axiosPolicy.js';
+import OptionLines from '@/components/shared/OptionLines.vue';
 
 export default {
     props: {
@@ -28,9 +30,18 @@ export default {
             required: true,
             type: Number
         },
-        itemVariantId: {
-            required: false,
-            type: String,
+        // The cart row's id: +/- and remove name the row, one dish can have several
+        rowKey: {
+            required: true,
+            type: String
+        },
+        itemOptions: {
+            type: Array,
+            default: () => []
+        },
+        // The server's reason this row can't be ordered as it is (an option off, removed, a group now required)
+        itemProblem: {
+            type: Object,
             default: null
         },
         itemVariantName: {
@@ -46,6 +57,11 @@ export default {
             require: true,
             type: String
         },
+        // Minimum per order this dish is short of in the cart (all its rows together); null = fine
+        minShort: {
+            type: Number,
+            default: null
+        },
         portionsLeft: {
             required: false,
             type: Number,
@@ -58,7 +74,7 @@ export default {
     },
 
     components: {
-        Plus, Minus
+        Plus, Minus, OptionLines
     },
 
     setup() {
@@ -72,6 +88,10 @@ export default {
             return new Intl.NumberFormat('vi-VN').format(this.itemPrice) + ' ₫'
         },
 
+        problemText() {
+            return this.itemProblem ? apiErrorMessage({ detail: this.itemProblem }) : ''
+        },
+
         totalPriceText() {
             if (!this.itemPrice) return '—'
             const total = this.itemPrice * this.itemQuantity
@@ -81,14 +101,19 @@ export default {
 
     methods: {
         async onClickPlus() {
-            await this.cartStore.updateQuantity(this.itemId, this.itemQuantity + 1, this.itemVariantId)
+            await this.cartStore.updateQuantity(this.rowKey, this.itemQuantity + 1)
         },
         async onClickMinus() {
             if (this.itemQuantity <= 1) {
-                await this.cartStore.removeItem(this.itemId, this.itemVariantId)
+                await this.cartStore.removeItem(this.rowKey)
             } else {
-                await this.cartStore.updateQuantity(this.itemId, this.itemQuantity - 1, this.itemVariantId)
+                await this.cartStore.updateQuantity(this.rowKey, this.itemQuantity - 1)
             }
+        },
+        // The row goes and the dish page opens to pick the options again
+        async chooseAgain() {
+            await this.cartStore.removeItem(this.rowKey)
+            this.$router.push(`/food/${this.sellerSlugName}/${this.itemId}`)
         }
     }
 }
@@ -97,7 +122,7 @@ export default {
 <template>
 
     <div class="background">
-        <div :class="['container', { unavailable: itemUnavailable }]">
+        <div :class="['container', { unavailable: itemUnavailable, problem: itemProblem }]">
 
             <div class="row q-gutter-md">
 
@@ -119,8 +144,15 @@ export default {
                                 <span v-if="itemUnavailable" class="item-sold-out">{{ $t('cart_page.sold_out_label') }}</span>
                                 <span v-else-if="portionsLeft !== null && itemQuantity > portionsLeft" class="item-sold-out">{{ $t('cart_page.only_left', { n: portionsLeft }) }}</span>
                             </div>
+                            <!-- the category right under the name: after the options it read as a lone line (seller-menu đợt 3) -->
                             <div class="item-category">
                                 <div>{{ itemCategory }}</div>
+                            </div>
+                            <OptionLines :options="itemOptions" class="item-options" />
+                            <div v-if="minShort" class="item-min" role="alert">{{ $t('cart_page.min_per_order', { m: minShort }) }}</div>
+                            <div v-if="itemProblem" class="item-problem" role="alert">
+                                <span>{{ problemText }}</span>
+                                <q-btn flat dense no-caps class="choose-again" :label="$t('cart_page.choose_again')" @click="chooseAgain" />
                             </div>
                         </div>
                         <div class="group-2">
@@ -159,7 +191,7 @@ export default {
 <style lang="scss" scoped>
 
 .background {
-    padding: 5px 0px 0px 20px;
+    padding: 5px 0px 0px;
 }
 
 .container {
@@ -186,6 +218,42 @@ export default {
 }
 
 .unavailable { opacity: 0.55; }
+
+.problem {
+    border: 1px solid #e5484d;
+    border-radius: 12px;
+    margin: 0 5px 5px;   /* the red frame keeps 5px from the store card's edges */
+}
+
+.item-options.option-lines { margin: 2px 0; }
+
+.item-min {
+    margin: 4px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #f5A623;
+}
+
+.item-problem {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin: 4px 0;
+    font-size: 12px;
+    color: #e5484d;
+    white-space: normal;
+}
+
+.choose-again {
+    min-height: 32px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(245, 166, 35, 0.15);
+    color: #f5A623;
+    font-size: 12px;
+    font-weight: 600;
+}
 
 .item-sold-out {
     display: inline-block;

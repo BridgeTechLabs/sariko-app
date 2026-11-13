@@ -1,9 +1,12 @@
 <script>
 import { useOrderStore } from '@/stores/order/orderStore.js';
 import { orderCode } from '@/utils/orderCode';
+import OptionLines from '@/components/shared/OptionLines.vue';
 import { isScheduled } from '@/utils/orderStage';
 
 export default {
+    components: { OptionLines },
+
     computed: {
         order() {
             return useOrderStore().currentOrder
@@ -93,10 +96,13 @@ export default {
 
         <div class="dashed-line" />
 
-        <div class="order-row" v-for="item in order.order_items" :key="item.id">
+        <template v-for="item in order.order_items" :key="item.id">
+        <div class="order-row">
             <span>{{ item.quantity }}x {{ item.name_snapshot }}<span v-if="item.variant_name_snapshot" class="order-variant"> ({{ item.variant_name_snapshot }})</span></span>
-            <span>{{ formatPrice(item.price_snapshot * item.quantity) }}</span>
+            <span class="order-price">{{ formatPrice(item.price_snapshot * item.quantity) }}</span>
         </div>
+        <OptionLines :options="item.options_snapshot" />
+        </template>
 
         <div class="dashed-line" />
 
@@ -163,5 +169,11 @@ export default {
 .order-variant {
     color: #f5A623;
     font-weight: 600;
+}
+
+.order-price {
+    flex-shrink: 0;
+    padding-left: 12px;
+    white-space: nowrap;   // a long options line under the name must not push "₫" to a new line
 }
 </style>

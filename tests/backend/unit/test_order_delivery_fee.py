@@ -22,7 +22,7 @@ created = []       # kwargs of every DAOOrders.create_order call
 class FakeCartItems:
     def read_cart_items_by_user_id(self, user_id):
         return {"id": "cart", "seller_id": "seller", "cart_items": [
-            {"quantity": 2, "food_items": {"name": "Adobo", "price": 50000, "is_available": True, "preorder_day": 1},
+            {"quantity": 2, "food_items": {"name": "Adobo", "seller_id": "seller", "price": 50000, "is_available": True, "preorder_day": 1},
              "food_item_variants": None},
         ]}
 

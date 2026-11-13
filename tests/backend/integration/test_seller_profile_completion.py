@@ -498,7 +498,7 @@ def test_tc30_cart_refuses_coming_soon(monkeypatch):
     app = FastAPI()
     app.include_router(cart.router)
     app.dependency_overrides[verify_token] = lambda: {"id": "user-c"}
-    FakeFoodItems.gate = {"is_available": True, "preorder_day": 0,
+    FakeFoodItems.gate = {"seller_id": SELLER_A, "is_available": True, "preorder_day": 0,
                           "seller_profiles": {"status": "active", "lat": None, "lon": None, "is_open": True}}
     r = TestClient(app).post("/cart/add", json={"seller_id": SELLER_A, "food_item_id": "f1", "quantity": 1})
     assert r.status_code == 400 and "not taking orders" in r.text

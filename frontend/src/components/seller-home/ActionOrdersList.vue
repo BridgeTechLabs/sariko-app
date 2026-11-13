@@ -7,6 +7,7 @@ import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '
 import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
 import { orderCode } from '@/utils/orderCode';
+import OptionLines from '@/components/shared/OptionLines.vue';
 
 const STATUS_DISPLAY_KEY = {
     pending:          'seller_home.status_new',
@@ -29,7 +30,7 @@ const REJECT_REASONS = [
 export default {
     name: 'ActionOrdersList',
 
-    components: { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin },
+    components: { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin, OptionLines },
 
     props: {
         orders: {
@@ -350,7 +351,8 @@ export default {
                 <q-separator style="background: rgba(255,255,255,0.08); margin: 10px 0;" />
 
                 <!-- Items list -->
-                <div v-for="item in order.items" :key="item.id" class="item-row">
+                <template v-for="item in order.items" :key="item.id">
+                <div class="item-row">
                     <div class="item-left">
                         <span class="item-qty">{{ item.quantity }}</span>
                         <span class="item-sep">×</span>
@@ -358,6 +360,8 @@ export default {
                     </div>
                     <span class="item-price">{{ fmt(item.price_snapshot * item.quantity) }}</span>
                 </div>
+                <OptionLines :options="item.options_snapshot" />
+                </template>
 
                 <q-separator style="background: rgba(255,255,255,0.08); margin: 10px 0;" />
 
@@ -689,6 +693,9 @@ export default {
 .item-price {
     font-size: 13px;
     color: var(--text-secondary);
+    flex-shrink: 0;
+    padding-left: 12px;
+    white-space: nowrap;
 }
 
 .total-row {

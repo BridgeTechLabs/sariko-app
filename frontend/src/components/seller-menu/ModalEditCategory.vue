@@ -1,8 +1,11 @@
 <script>
 import { useMenuStore } from '@/stores/seller/menuStore'
+import { X, ArrowUp, ArrowDown } from 'lucide-vue-next'
 
 export default {
     name: 'ModalEditCategory',
+
+    components: { X, ArrowUp, ArrowDown },
 
     props: {
         modelValue: { type: Boolean, default: false },
@@ -10,21 +13,22 @@ export default {
         category: { type: Object, default: null },
     },
 
-    emits: ['update:modelValue'],
+    emits: ['update:modelValue', 'saved'],
 
     data() {
         return {
             name: '',
             saving: false,
-            deleting: false,
-            showDeleteConfirm: false,
+            moving: false,
         }
     },
 
     computed: {
         isEdit()    { return !!this.category },
         canSave()   { return this.name.trim().length > 0 && !this.saving },
-        itemCount() { return (this.category?.food_items || []).length },
+        position()  { return useMenuStore().categories.findIndex(c => c.id === this.category?.id) },
+        isFirst()   { return this.position <= 0 },
+        isLast()    { return this.position === useMenuStore().categories.length - 1 },
     },
 
     watch: {
@@ -36,12 +40,18 @@ export default {
     methods: {
         close() { this.$emit('update:modelValue', false) },
 
-        onDeleteClick() {
-            if (this.itemCount > 0) {
-                this.$q.notify({ type: 'warning', message: this.$t('seller_menu.category_delete_has_items', { count: this.itemCount }), position: 'bottom' })
-                return
+        // Saved at once, not with the Save button
+        async move(step) {
+            if (this.moving) return
+            this.moving = true
+            try {
+                await useMenuStore().moveCategory(this.category.id, step)
+            } catch (e) {
+                console.error('ModalEditCategory - move -', e)
+                this.$q.notify({ type: 'negative', message: this.$t('seller_menu.category_move_failed'), position: 'bottom' })
+            } finally {
+                this.moving = false
             }
-            this.showDeleteConfirm = true
         },
 
         async save() {
@@ -52,7 +62,7 @@ export default {
                 if (this.isEdit) {
                     await store.updateCategory(this.category.id, { name: this.name.trim() })
                 } else {
-                    await store.createCategory(this.name.trim())
+                    this.$emit('saved', await store.createCategory(this.name.trim()))
                 }
                 this.close()
             } catch (e) {
@@ -63,106 +73,140 @@ export default {
             }
         },
 
-        async confirmDelete() {
-            this.deleting = true
-            try {
-                await useMenuStore().deleteCategory(this.category.id)
-                this.showDeleteConfirm = false
-                this.close()
-            } catch (e) {
-                console.error('ModalEditCategory - confirmDelete -', e)
-                this.$q.notify({ type: 'negative', message: this.$t('seller_menu.toast_delete_failed'), position: 'bottom' })
-            } finally {
-                this.deleting = false
-            }
-        },
     },
 }
 </script>
 
 <template>
-    <q-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)">
-        <q-card class="edit-dialog">
-            <q-card-section>
-                <div class="dialog-title">
+    <q-dialog :model-value="modelValue" position="bottom" full-width @update:model-value="$emit('update:modelValue', $event)">
+        <q-card class="edit-sheet">
+            <div class="sheet-header">
+                <span class="sheet-title">
                     {{ isEdit ? $t('seller_menu.category_edit_title') : $t('seller_menu.category_add_title') }}
-                </div>
-                <q-input
-                    v-model="name"
-                    dense outlined dark autofocus
-                    :label="$t('seller_menu.category_name_label')"
-                    :placeholder="$t('seller_menu.category_name_placeholder')"
-                    class="name-input"
-                    @keyup.enter="save"
-                />
-            </q-card-section>
+                </span>
+                <button class="btn-close" @click="close"><X :size="20" /></button>
+            </div>
 
-            <q-card-actions class="dialog-actions">
-                <q-btn
-                    v-if="isEdit"
-                    flat no-caps
-                    class="btn-delete"
-                    :loading="deleting"
-                    @click="onDeleteClick"
-                >
-                    {{ $t('seller_menu.category_delete') }}
-                </q-btn>
-                <div class="spacer" />
-                <q-btn flat no-caps :label="$t('common.button_label_cancel')" v-close-popup />
-                <q-btn flat no-caps class="btn-save" :disable="!canSave" :loading="saving" @click="save">
+            <div class="sheet-body">
+                <div>
+                    <div class="field-label">{{ $t('seller_menu.category_name_label') }}</div>
+                    <q-input
+                        v-model="name"
+                        dense outlined dark autofocus
+                        :placeholder="$t('seller_menu.category_name_placeholder')"
+                        @keyup.enter="save"
+                    />
+                    <div v-if="!isEdit" class="field-hint">{{ $t('seller_menu.category_name_hint') }}</div>
+                </div>
+
+                <div v-if="isEdit">
+                    <div class="field-label">{{ $t('seller_menu.category_position') }}</div>
+                    <div class="move-row">
+                        <button class="btn-move" :disabled="isFirst || moving" @click="move(-1)">
+                            <ArrowUp :size="16" /> {{ $t('seller_menu.category_move_up') }}
+                        </button>
+                        <button class="btn-move" :disabled="isLast || moving" @click="move(1)">
+                            <ArrowDown :size="16" /> {{ $t('seller_menu.category_move_down') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sheet-footer">
+                <q-btn unelevated no-caps class="btn-save" :disable="!canSave" :loading="saving" @click="save">
                     {{ $t('common.button_label_save') }}
                 </q-btn>
-            </q-card-actions>
+            </div>
         </q-card>
-
-        <!-- Delete confirm -->
-        <q-dialog v-model="showDeleteConfirm">
-            <q-card class="edit-dialog">
-                <q-card-section>
-                    <div class="dialog-title">{{ $t('seller_menu.category_delete_confirm_title') }}</div>
-                    <div class="dialog-sub">{{ $t('seller_menu.category_delete_confirm_body') }}</div>
-                </q-card-section>
-                <q-card-actions align="right">
-                    <q-btn flat no-caps :label="$t('common.button_label_cancel')" v-close-popup />
-                    <q-btn flat no-caps color="negative" :loading="deleting" @click="confirmDelete">
-                        {{ $t('seller_menu.category_delete_confirm_action') }}
-                    </q-btn>
-                </q-card-actions>
-            </q-card>
-        </q-dialog>
     </q-dialog>
 </template>
 
 <style lang="scss" scoped>
-.edit-dialog {
+.edit-sheet {
     background: #1f2940;
-    border-radius: 16px;
-    min-width: 300px;
+    border-radius: 20px 20px 0 0;
     color: var(--text-primary);
+    padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
-.dialog-title {
-    font-size: 17px;
-    font-weight: 700;
-    margin-bottom: 16px;
-}
-
-.dialog-sub {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin-top: 4px;
-}
-
-.name-input { margin-top: 4px; }
-
-.dialog-actions {
+.sheet-header {
     display: flex;
     align-items: center;
-    padding: 8px 16px 12px;
+    justify-content: space-between;
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
 }
 
-.spacer { flex: 1; }
+.sheet-title { font-size: 17px; font-weight: 700; }
 
-.btn-delete { color: #ef4444; font-size: 13px; }
-.btn-save   { color: var(--color-accent); font-size: 13px; font-weight: 600; }
+.btn-close {
+    background: rgba(255,255,255,0.08);
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.sheet-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.field-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+}
+
+.field-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+.move-row { display: flex; gap: 10px; }
+
+.btn-move {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.07);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    &:disabled { opacity: 0.4; cursor: default; }
+}
+
+.sheet-footer {
+    padding: 12px 16px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+.btn-save {
+    width: 100%;
+    background: var(--color-accent);
+    color: #121b2f;
+    font-weight: 700;
+    font-size: 15px;
+    border-radius: 12px;
+    padding: 12px;
+}
+
+
 </style>

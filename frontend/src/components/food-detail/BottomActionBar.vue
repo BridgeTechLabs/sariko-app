@@ -5,7 +5,6 @@ import { useSellerStore } from '@/stores/seller/sellerStore';
 import { useCartStore } from '@/stores/cart/cartStore';
 import { useAuthStore } from '@/stores/auth/authStore';
 import { formatVnd } from '@/utils/priceDisplay';
-import { portionsLeftToday } from '@/utils/portions';
 
 export default {
     components: { Minus, Plus, ShoppingBasket },
@@ -31,10 +30,11 @@ export default {
             return !!this.food && this.quantity > 1
         },
         soldOut() {
-            return this.food?.is_available === false || this.soldOutToday
+            return this.food?.is_available === false || this.food?.options_sold_out || !!this.food?.sold_out
         },
-        soldOutToday() {
-            return portionsLeftToday(this.food) === 0
+        // The cart may hold fewer in total (other options of this dish), so this only hints; the order is what checks it
+        minQuantity() {
+            return this.food?.min_quantity ?? 1
         },
         storeClosed() {
             return blockedByClosedStore(this.seller, this.food?.preorder_day)
@@ -46,7 +46,7 @@ export default {
             // Every level sold out: nothing addable, even though `levels` is empty.
             if (this.allLevels.length && !this.levels.length) return false
             const levelPicked = !this.levels.length || !!this.sellerStore.selectedVariantId
-            return !!this.food && !!this.seller && levelPicked && !this.loading
+            return !!this.food && !!this.seller && levelPicked && !this.sellerStore.missingGroup && !this.loading
         },
         allLevels() {
             return this.food?.food_item_variants || []
@@ -59,7 +59,8 @@ export default {
         },
         unitPrice() {
             if (!this.food) return 0
-            return this.selectedVariant ? Number(this.selectedVariant.price) : Number(this.food.price)
+            const base = this.selectedVariant ? Number(this.selectedVariant.price) : Number(this.food.price)
+            return base + this.sellerStore.optionsExtra   // shown only: the server prices the cart line
         },
         singlePriceText() {
             if (!this.food) return '—'
@@ -90,7 +91,7 @@ export default {
             this.loading = true
             const cartStore = useCartStore()
             try {
-                const added = await cartStore.addItem(this.seller.id, this.food.id, this.seller.store_name, this.quantity, this.sellerStore.selectedVariantId)
+                const added = await cartStore.addItem(this.seller.id, this.food.id, this.seller.store_name, this.quantity, this.sellerStore.selectedVariantId, this.sellerStore.selectedOptionIds)
                 if (!added || cartStore.isShowModalCartConflict) {
                     this.loading = false
                     return
@@ -150,6 +151,12 @@ export default {
         </div>
 
 
+        <div v-if="food && quantity < minQuantity && !soldOut" class="min-hint" aria-live="polite">
+            {{ $t('food_detail_page.min_per_order', { m: minQuantity }) }}
+        </div>
+        <div v-if="sellerStore.missingGroup && !soldOut" class="missing" aria-live="polite">
+            {{ $t('food_detail_page.options_missing', { group: sellerStore.missingGroup.name }) }}
+        </div>
         <button
             class="cta"
             :disabled="!canAdd"
@@ -161,7 +168,7 @@ export default {
         >
             <span v-if="loading" class="cta__spinner" aria-hidden="true"></span>
             <ShoppingBasket v-else :size="20" />
-            <span class="cta__label">{{ soldOutToday ? $t('seller_page.section_food_cards.label_sold_out_today') : soldOut ? $t('food_detail_page.button_sold_out') : storeClosed ? $t('food_detail_page.button_store_closed') : $t('food_detail_page.button_add_to_cart') }}</span>
+            <span class="cta__label">{{ soldOut ? $t('food_detail_page.button_sold_out') : storeClosed ? $t('food_detail_page.button_store_closed') : $t('food_detail_page.button_add_to_cart') }}</span>
         </button>
     </div>
 </template>
@@ -173,6 +180,13 @@ export default {
     gap: 14px;
     width: 100%;
     font-family: $sariko-font-family-secondary;
+}
+
+.min-hint {
+    margin-top: -6px;
+    padding: 0 4px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 /* Total price row */
@@ -211,6 +225,13 @@ export default {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
     line-height: 1;
+}
+
+.missing {
+    margin-bottom: -6px;
+    text-align: center;
+    font-size: 13px;
+    color: #f5A623;
 }
 
 /* Controls row */

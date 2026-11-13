@@ -1,6 +1,7 @@
 import functools
 import logging
 import re
+import uuid
 
 from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
@@ -16,6 +17,7 @@ from dao.dao_admin_payouts import DAOAdminPayouts
 from dao.dao_seller_profiles import DAOSellerProfiles
 from dao.dao_food_items import DAOFoodItems, FoodItemNameTaken
 from dao.dao_menu_categories import DAOMenuCategories
+from dao.dao_menu_option_groups import DAOMenuOptionGroups, OptionNameTaken
 from dao.dao_reviews import DAOReviews
 
 from fastapi import APIRouter, HTTPException, Depends, Query, status
@@ -30,6 +32,7 @@ from services import allingo_service
 from services.allingo_service import AllingoError
 from dao.dao_food_item_variants import DAOFoodItemVariants
 from utils.storage import upload_image_base64
+from utils.stock import add_sold_out
 
 router = APIRouter(prefix="/sellers")
 logger = logging.getLogger(__name__)
@@ -468,7 +471,8 @@ def _make_price_text(price: int) -> str:
 def get_seller_menu(user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
-        return {"success": True, "menu": DAOFoodItems().read_menu_by_seller_id(seller_id)}
+        return {"success": True, "menu": DAOFoodItems().read_menu_by_seller_id(seller_id),
+                "option_groups": DAOMenuOptionGroups().read_store_groups(seller_id), "option_limits": _menu_limits()}
     except HTTPException:
         raise
     except Exception as e:
@@ -524,9 +528,10 @@ def delete_category(cat_id: str, user=Depends(verify_token)):
 def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
-        fields = body.model_dump(exclude_none=True)
+        fields = body.model_dump(exclude_none=True, exclude={"daily_portions"})   # stock replaces it (QĐ2-11)
         fields["price_text"] = _make_price_text(body.price)
         item = DAOFoodItems().create(seller_id, fields)
+        add_sold_out([item])   # a dish made with stock below its minimum shows sold out at once, as PATCH does
         return {"success": True, "item": item}
     except HTTPException:
         raise
@@ -541,9 +546,12 @@ def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_tok
 def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
-        fields = body.model_dump(exclude_none=True)
-        if "daily_portions" in body.model_fields_set:   # null clears the daily limit
-            fields["daily_portions"] = body.daily_portions
+        fields = body.model_dump(exclude_none=True, exclude={"daily_portions"})   # stock replaces it (QĐ2-11)
+        # Stock only when sent: null clears the limit, left out keeps it, so saving a price never writes back a
+        # stock the form read before paid orders took from it (BM12). A stock the seller enters starts a new round:
+        # the next sell-out pushes again whatever the cooldown (P1; a buyer's pay + cancel never clears it, BM13).
+        if "stock" in body.model_fields_set:
+            fields["stock"], fields["stock_alert_at"] = body.stock, None
         if not fields:
             raise HTTPException(status_code=400, detail="No fields to update")
         if "price" in fields:
@@ -552,7 +560,7 @@ def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depe
         item = dao.update(item_id, seller_id, fields)
         if not item:
             raise HTTPException(status_code=404, detail="Item not found")
-        dao.add_remaining_today([item])
+        add_sold_out([item])
         return {"success": True, "item": item}
     except HTTPException:
         raise
@@ -621,6 +629,150 @@ def delete_variant(variant_id: str, user=Depends(verify_token)):
     except Exception as e:
         logger.exception(f"Exception in DELETE /sellers/me/menu/variants/{variant_id}: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Option groups (seller-menu đợt 3, ADR 0003) ────────────────────────────────
+# A store's groups are shared by its dishes. Every id in these routes is checked against the caller's store
+# first and answers one 404 "Not found" otherwise (BM3); the composite FKs are the second line. Errors past
+# the checks reach main.py's handler: a plain 500, no database text (QĐ3-5b).
+
+MENU_LIMITS = {"menu_max_groups_per_dish": 10, "menu_max_options_per_group": 30,
+               "menu_max_groups_per_store": 50, "menu_option_max_extra_price": 1_000_000}
+
+
+def _menu_limits() -> dict:
+    return DAOAdminConfig().get_positive_ints(MENU_LIMITS)
+
+
+NAME_TAKEN = {"code": "option_name_taken", "message": "Two options have the same name"}
+
+
+def _not_found():
+    return HTTPException(status_code=404, detail="Not found")
+
+
+def _limit_error(code: str, message: str, most: int):
+    return HTTPException(status_code=400, detail={"code": code, "message": message, "max": most})
+
+
+def _check_options(body, limits: dict, current: list) -> list:
+    """The group's new option list as dicts, after the checks: given ids are options of this group, the
+    count and the names, and the extra price cap for a price that is new or changed (an option saved under a
+    higher cap keeps its price, TC3-67)."""
+    by_id = {o["id"]: o for o in current}
+    options = [o.model_dump() | {"id": str(o.id) if o.id else None} for o in body.options]
+    if any(o["id"] and o["id"] not in by_id for o in options):
+        raise _not_found()
+    most = limits["menu_max_options_per_group"]
+    if len(options) > most:
+        raise _limit_error("options_max", f"At most {most} options in one group", most)
+    names = [o["name"] for o in options]
+    if len(set(names)) < len(names):
+        raise HTTPException(status_code=409, detail=NAME_TAKEN)
+    cap = limits["menu_option_max_extra_price"]
+    if any(o["extra_price"] > cap and Decimal(str(by_id.get(o["id"], {}).get("extra_price", -1))) != o["extra_price"]
+           for o in options):
+        raise _limit_error("extra_price_max", f"An option can add at most {_make_price_text(cap)}", cap)
+    return options
+
+
+def _save_group(seller_id: str, group_id, body, current: list, limits: dict) -> dict:
+    options = _check_options(body, limits, current)
+    dao = DAOMenuOptionGroups()
+    try:
+        group_id = dao.save_group(seller_id, group_id, body.model_dump(exclude={"options"}), options)
+    except OptionNameTaken:
+        raise HTTPException(status_code=409, detail=NAME_TAKEN)
+    return dao.read_group(group_id, seller_id)
+
+
+@router.post("/me/menu/items/{item_id}/option-groups")
+def create_option_group(item_id: uuid.UUID, body: Schema.RequestOptionGroup, user=Depends(verify_token)):
+    """A new group, made from the dish form and put on that dish (Q4: groups are created from a dish)."""
+    seller_id, item_id = _get_seller_id(user), str(item_id)
+    dao = DAOMenuOptionGroups()
+    if not DAOFoodItems().read_owned_by_seller(item_id, seller_id):
+        raise _not_found()
+    limits = _menu_limits()
+    if dao.count_store_groups(seller_id) >= limits["menu_max_groups_per_store"]:
+        most = limits["menu_max_groups_per_store"]
+        raise _limit_error("groups_per_store_max", f"A store can have at most {most} option groups", most)
+    links = dao.read_dish_links(item_id, seller_id)
+    if len(links) >= limits["menu_max_groups_per_dish"]:
+        most = limits["menu_max_groups_per_dish"]
+        raise _limit_error("groups_per_dish_max", f"A dish can have at most {most} option groups", most)
+    group = _save_group(seller_id, None, body, [], limits)
+    dao.attach(item_id, group["id"], seller_id, len(links))
+    group["dish_ids"] = [item_id]
+    return {"success": True, "group": group}
+
+
+@router.put("/me/menu/option-groups/{group_id}")
+def update_option_group(group_id: uuid.UUID, body: Schema.RequestOptionGroup, user=Depends(verify_token)):
+    """Name, required, how many, and the options (add / edit / turn off / remove): for every dish using it."""
+    seller_id = _get_seller_id(user)
+    current = DAOMenuOptionGroups().read_group(str(group_id), seller_id)
+    if not current:
+        raise _not_found()
+    return {"success": True, "group": _save_group(seller_id, str(group_id), body, current["menu_options"], _menu_limits())}
+
+
+@router.delete("/me/menu/option-groups/{group_id}")
+def delete_option_group(group_id: uuid.UUID, user=Depends(verify_token)):
+    """Only a group no dish uses (ADR 0003 point 11)."""
+    seller_id, dao = _get_seller_id(user), DAOMenuOptionGroups()
+    group = dao.read_group(str(group_id), seller_id)
+    if not group:
+        raise _not_found()
+    if group["dish_ids"]:
+        raise HTTPException(status_code=409, detail={"code": "group_in_use", "message": "Remove this group from its dishes first"})
+    dao.delete_group(str(group_id), seller_id)
+    return {"success": True}
+
+
+def _owned_dish_and_group(item_id: str, group_id: str, seller_id: str):
+    if not DAOFoodItems().read_owned_by_seller(item_id, seller_id) or not DAOMenuOptionGroups().read_group(group_id, seller_id):
+        raise _not_found()
+
+
+@router.post("/me/menu/items/{item_id}/option-groups/{group_id}")
+def attach_option_group(item_id: uuid.UUID, group_id: uuid.UUID, user=Depends(verify_token)):
+    seller_id, item_id, group_id = _get_seller_id(user), str(item_id), str(group_id)
+    _owned_dish_and_group(item_id, group_id, seller_id)
+    dao = DAOMenuOptionGroups()
+    links = dao.read_dish_links(item_id, seller_id)
+    if group_id not in links:
+        most = _menu_limits()["menu_max_groups_per_dish"]
+        if len(links) >= most:
+            raise _limit_error("groups_per_dish_max", f"A dish can have at most {most} option groups", most)
+        dao.attach(item_id, group_id, seller_id, len(links))
+    return {"success": True}
+
+
+@router.delete("/me/menu/items/{item_id}/option-groups/{group_id}")
+def detach_option_group(item_id: uuid.UUID, group_id: uuid.UUID, user=Depends(verify_token)):
+    """Takes the group off this dish; the group stays (ADR 0003 point 11)."""
+    seller_id, item_id, group_id = _get_seller_id(user), str(item_id), str(group_id)
+    _owned_dish_and_group(item_id, group_id, seller_id)
+    dao = DAOMenuOptionGroups()
+    dao.detach(item_id, group_id, seller_id)
+    # The rest numbered 0..n-1 again: the next attach takes position n (len of the links)
+    dao.set_dish_order(item_id, seller_id, dao.read_dish_links(item_id, seller_id))
+    return {"success": True}
+
+
+@router.put("/me/menu/items/{item_id}/option-groups")
+def order_option_groups(item_id: uuid.UUID, body: Schema.RequestDishGroupOrder, user=Depends(verify_token)):
+    """The dish's groups in a new order: the list must be exactly the groups the dish uses."""
+    seller_id, item_id = _get_seller_id(user), str(item_id)
+    if not DAOFoodItems().read_owned_by_seller(item_id, seller_id):
+        raise _not_found()
+    dao = DAOMenuOptionGroups()
+    group_ids = [str(g) for g in body.group_ids]
+    if sorted(group_ids) != sorted(dao.read_dish_links(item_id, seller_id)):
+        raise HTTPException(status_code=400, detail="The list must hold every group of this dish once")
+    dao.set_dish_order(item_id, seller_id, group_ids)
+    return {"success": True}
 
 
 @router.post("/me/menu/items/{item_id}/image")

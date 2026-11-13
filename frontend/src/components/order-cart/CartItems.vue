@@ -1,6 +1,6 @@
 <script>
 import { Store, ChevronUp, ChevronDown } from 'lucide-vue-next'
-import { mapActions, mapState } from 'pinia';
+import { mapActions, mapGetters, mapState } from 'pinia';
 import { useCartStore } from '@/stores/cart/cartStore.js';
 import ItemCard from '@/components/order-cart/ItemCard.vue';
 
@@ -26,7 +26,8 @@ export default {
     computed: {
         ...mapState(useCartStore, [
             "cartItems"
-        ])
+        ]),
+        ...mapGetters(useCartStore, ['minShortByFood'])
     },
 
     mounted() {
@@ -55,17 +56,20 @@ export default {
                 <ItemCard  v-for="item in cartItems"
                 :key="item.rowKey"
                 :item-id="item.id"
+                :row-key="item.rowKey"
+                :item-options="item.options"
+                :item-problem="item.problem"
                 :item-name="item.name"
                 :item-price="item.price"
                 :item-category="item.category"
                 :item-img-src="item.imgSrc || '/images/default-food-image.webp'"
                 :item-quantity="item.quantity"
-                :item-variant-id="item.variantId"
                 :item-variant-name="item.variantName"
                 :seller-store="item.sellerStore"
                 :seller-slug-name="item.sellerSlugName"
                 :item-unavailable="item.unavailable"
                 :portions-left="item.portionsLeft"
+                :min-short="minShortByFood[item.id] ?? null"
                 />
             </div>
         </div>

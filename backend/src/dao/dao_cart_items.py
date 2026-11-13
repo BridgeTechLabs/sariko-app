@@ -1,24 +1,29 @@
-from typing import Optional
 import logging
 
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
 from dao.dao_base import DAOBase
+from utils.pricing import OPTION_GROUPS_EMBED
 
 logger = logging.getLogger(__name__)
 
+
+class CartLimit(Exception):
+    """add_cart_item refused the add: str(self) is "quantity_max" or "cart_max_lines"."""
+
+
 class DAOCartItems(DAOBase):
-    
+
     def __init__(self):
         super().__init__()
         self._table_name = "cart_items"
-        
-        
+
+
     def read_cart_items_by_user_id(self, user_id: str):
-        
+
         try:
             result = self._supabase_client.table("carts") \
-                .select("id, seller_id, seller_profiles(slug, store_name), cart_items(quantity, variant_id, food_items(id, name, price_text, price, unit_label, preorder_day, daily_portions, image_url, is_available, menu_categories(name)), food_item_variants(id, name, price, price_text, is_available))") \
+                .select("id, seller_id, seller_profiles(slug, store_name), cart_items(id, quantity, variant_id, option_ids, food_items(id, seller_id, name, price_text, price, unit_label, preorder_day, stock, min_quantity, image_url, is_available, menu_categories(name), " + OPTION_GROUPS_EMBED + "), food_item_variants(id, name, price, price_text, is_available))") \
                 .eq("user_id", user_id) \
                 .limit(1) \
                 .execute()
@@ -30,106 +35,45 @@ class DAOCartItems(DAOBase):
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_cart_items with user_id {user_id}: {e}")
-                
+
         except Exception as e:
-            raise Exception(f"error read_cart_items with user_id {user_id}: {e}")        
-        
-        
-        
-    @staticmethod
-    def _match_variant(query, variant_id: Optional[str]):
-        """Narrow a cart_items query to one (dish, level) pair.
-
-        variant_id None means "the dish has no levels" — which is NOT the same as
-        "any level". The two partial unique indexes on cart_items keep those as
-        separate rows, so an omitted filter would match the wrong row (or several).
-        """
-        if variant_id is None:
-            return query.is_("variant_id", "null")
-        return query.eq("variant_id", variant_id)
+            raise Exception(f"error read_cart_items with user_id {user_id}: {e}")
 
 
-    def find_item(self, cart_id: str, food_item_id: str, variant_id: Optional[str] = None):
-
+    def add_item(self, cart_id: str, food_item_id: str, variant_id, option_ids: list, quantity: int,
+                 max_quantity: int, max_lines: int):
+        """One statement (rpc add_cart_item): a new row, or the quantity added to the row with the same dish,
+        level and options. CartLimit when the dish total or the number of rows would pass its cap."""
         try:
-            query = self._supabase_client.table(self._table_name) \
-                .select("id, quantity") \
-                .eq("cart_id", cart_id) \
-                .eq("food_item_id", food_item_id)
-            
-            result = self._match_variant(query, variant_id) \
-                .limit(1) \
-                .execute()
-
-            if result and result.data:
-                return result.data[0]
-
-            return None
-
+            self._supabase_client.rpc("add_cart_item", {
+                "p_cart_id": cart_id, "p_food_item_id": food_item_id, "p_variant_id": variant_id,
+                "p_option_ids": option_ids, "p_qty": quantity, "p_max_qty": max_quantity, "p_max_lines": max_lines,
+            }).execute()
         except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - find_item with cart_id {cart_id} and food_item_id {food_item_id}: {e}")
-        except Exception as e:
-            raise Exception(f"error find_item with cart_id {cart_id} and food_item_id {food_item_id}: {e}")
-
-    def update_quantity(self, cart_id: str, food_item_id: str, quantity: int, variant_id: Optional[str] = None):
-
-        try:
-            query = self._supabase_client.table(self._table_name) \
-                .update({"quantity": quantity}) \
-                .eq("cart_id", cart_id) \
-                .eq("food_item_id", food_item_id)
-            result = self._match_variant(query, variant_id).execute()
-
-            if result and result.data:
-                return result.data
-
-            return None
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - update_quantity with cart_id {cart_id} and food_item_id {food_item_id}: {e}")
-
-        except Exception as e:
-            raise Exception(f"error update_quantity with cart_id {cart_id} and food_item_id {food_item_id}: {e}")
+            if e.message in ("quantity_max", "cart_max_lines"):
+                raise CartLimit(e.message)
+            raise Exception(f"Supabase error - add_item with cart_id {cart_id} and food_item_id {food_item_id}: {e}")
 
 
-    def remove_item(self, cart_id: str, food_item_id: str, variant_id: Optional[str] = None):
-
-        try:
-            query = self._supabase_client.table(self._table_name) \
-                .delete() \
-                .eq("cart_id", cart_id) \
-                .eq("food_item_id", food_item_id)
-            result = self._match_variant(query, variant_id).execute()
-
-            return True
-
-        except PostgrestExceptionAPIError as e:
-            raise Exception(f"Supabase error - remove_item with cart_id {cart_id} and food_item_id {food_item_id}: {e}")
-
-        except Exception as e:
-            raise Exception(f"error remove_item with cart_id {cart_id} and food_item_id {food_item_id}: {e}")
+    def read_lines(self, cart_id: str) -> list:
+        return self._supabase_client.table(self._table_name) \
+            .select("id, food_item_id, variant_id, option_ids, quantity") \
+            .eq("cart_id", cart_id) \
+            .execute().data or []
 
 
-    def update_food_item_by_cart_id(self, cart_id: str, food_item_id: str, quantity: int = 1, variant_id: Optional[str] = None):
+    # Both writes name the caller's cart in the statement itself: a row of another cart is never touched (BM8).
+    def update_quantity(self, cart_id: str, item_id: str, quantity: int) -> list:
+        return self._supabase_client.table(self._table_name) \
+            .update({"quantity": quantity}) \
+            .eq("id", item_id) \
+            .eq("cart_id", cart_id) \
+            .execute().data or []
 
-        try:
 
-            query = self._supabase_client.table(self._table_name)
-            query = query.insert({"cart_id": cart_id, "food_item_id": food_item_id, "variant_id": variant_id, "quantity": quantity})
-    
-            result = query.execute()
-            
-            if result and result.data:
-                return result.data
-            
-            return None
-
-        except PostgrestExceptionAPIError as e:
-            # 23505 = cart_items_dish_variant_key / cart_items_dish_novariant_key:
-            # a concurrent add already inserted this (cart, dish, level).
-            if e.code == "23505":
-                return None
-            raise Exception(f"Supabase error - update_food_item_by_cart_id with cart_id {cart_id} and food_item_id {food_item_id}: {e}")
-                
-        except Exception as e:
-            raise Exception(f"error update_food_item_by_cart_id with cart_id {cart_id} and food_item_id {food_item_id}: {e}")        
+    def remove_item(self, cart_id: str, item_id: str) -> list:
+        return self._supabase_client.table(self._table_name) \
+            .delete() \
+            .eq("id", item_id) \
+            .eq("cart_id", cart_id) \
+            .execute().data or []

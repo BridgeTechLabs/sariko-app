@@ -93,6 +93,14 @@ MESSAGES = {
         "en": ("Payment not completed", "VNPay did not take the payment for your order. You can pay again."),
         "vi": ("Thanh toán không thành công", "VNPay không ghi nhận thanh toán cho đơn hàng. Bạn có thể thanh toán lại."),
     },
+    "seller_stock_out": {   # seller-menu đợt 2 QĐ2-10: a paid order took the last portions
+        "en": ("Out of stock", "{dish} is sold out. Enter new stock to keep selling."),
+        "vi": ("Hết hàng", "{dish} đã hết hàng. Nhập số mới để bán tiếp."),
+    },
+    "seller_stock_low": {   # ... or left fewer than one order must take
+        "en": ("Below the minimum", "{dish}: {n} left, below the minimum of {m} per order. Buyers see it as sold out."),
+        "vi": ("Dưới mức tối thiểu", "{dish} còn {n} phần, ít hơn mức tối thiểu {m} phần mỗi đơn. Người mua đang thấy hết hàng."),
+    },
     "seller_complaint": {
         "en": ("New complaint on an order", "A customer filed a complaint about an order. Tap to see it."),
         "vi": ("Có khiếu nại về đơn hàng", "Khách vừa gửi khiếu nại về một đơn hàng. Nhấn để xem."),
@@ -256,6 +264,13 @@ def notify_payment_after_cancel(order: dict):
 def notify_payment_failed(order: dict):
     """Buyer side: VNPay says the pay link was not paid; once per link (T125)."""
     _send_async(order.get("user_id"), "payment_failed", f"/orders/{order['id']}")
+
+
+def notify_seller_stock(seller_user_id, dish: dict):
+    """Seller side: a paid order took a dish below its minimum per order (a reserve_order_stock row: name, stock,
+    min_quantity). Opens the menu to enter new stock. The name is cut to 60 characters (QĐ3-8c)."""
+    event = "seller_stock_out" if dish["stock"] == 0 else "seller_stock_low"
+    _send_async(seller_user_id, event, "/seller/menu", dish=(dish.get("name") or "")[:60], n=dish["stock"], m=dish["min_quantity"])
 
 
 def notify_seller_complaint(seller_user_id, order_id: str):

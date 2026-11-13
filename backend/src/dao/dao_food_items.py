@@ -1,10 +1,9 @@
 import logging
-from datetime import datetime, timedelta
-
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
-from core.store_hours import VN_TZ
 from dao.dao_base import DAOBase
+from utils.pricing import OPTION_GROUPS_EMBED, options_sold_out
+from utils.stock import add_sold_out
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +41,14 @@ class DAOFoodItems(DAOBase):
     def read_featured_dishes(self, limit: int = 12):
         result = (
             self._supabase_client.table(self._table_name)
-            .select("id, name, price, price_text, image_url, rating_avg, rating_count, food_item_variants(price, is_available), seller_profiles!inner(id, slug, store_name)")
+            .select("id, name, price, price_text, image_url, rating_avg, rating_count, stock, min_quantity, food_item_variants(price, is_available), seller_profiles!inner(id, slug, store_name), food_item_option_groups(group_id)")
             .eq("is_featured", True)
             .eq("is_available", True)
             .eq("seller_profiles.is_listed", True)
             .limit(limit)
             .execute()
         )
-        return result.data or []
+        return add_sold_out(result.data or [])
 
     def read_food_items_by_seller_id(self, seller_id: str):
         result = (
@@ -65,41 +64,18 @@ class DAOFoodItems(DAOBase):
     def read_menu_by_seller_id(self, seller_id: str):
         result = (
             self._supabase_client.table("menu_categories")
-            .select("id, name, sort_order, is_active, food_items(id, name, description, price, price_text, unit_label, min_quantity, quantity_step, preorder_day, is_available, is_featured, daily_portions, image_url, category_id, rating_avg, rating_count, food_item_variants(id, name, price, price_text, sort_order, is_available))")
+            .select("id, name, sort_order, is_active, food_items(id, name, description, price, price_text, unit_label, min_quantity, quantity_step, preorder_day, is_available, is_featured, stock, image_url, category_id, rating_avg, rating_count, food_item_variants(id, name, price, price_text, sort_order, is_available), " + OPTION_GROUPS_EMBED + ")")
             .eq("seller_id", seller_id)
             .order("sort_order")
             .order("sort_order", foreign_table="food_items.food_item_variants")
             .execute()
         )
         menu = result.data or []
-        self.add_remaining_today([f for c in menu for f in c.get("food_items") or []])
+        foods = [f for c in menu for f in c.get("food_items") or []]
+        for f in foods:   # options_sold_out also puts the groups on the dish as option_groups
+            f["options_sold_out"] = options_sold_out(f)   # a required group with every option off (ADR 0003 point 8)
+        add_sold_out(foods)
         return menu
-
-    def add_remaining_today(self, items: list) -> list:
-        """T134: remaining_today = portions left for today's deliveries on each same-day dish with a daily limit
-        (seller menu "X / N left today"; buyer: same-day dishes). T181 A34: a pre-order dish is sold from its first
-        delivery day (today + preorder_day, Vietnam time): remaining_preorder = portions left on portions_date."""
-        today = datetime.now(VN_TZ).date()
-        by_day = {}
-        for f in items:
-            if f and f.get("daily_portions"):
-                by_day.setdefault(today + timedelta(days=f.get("preorder_day") or 0), []).append(f)
-        for day, foods in by_day.items():
-            left = self.read_portions_left([f["id"] for f in foods], day)
-            for f in foods:
-                n = left.get(f["id"], f["daily_portions"])
-                if day == today:
-                    f["remaining_today"] = n
-                else:
-                    f["remaining_preorder"], f["portions_date"] = n, day.isoformat()
-        return items
-
-    def read_portions_left(self, food_item_ids: list, sale_date) -> dict:
-        """{food_item_id: portions left on sale_date} for the dishes with a daily limit (docs/dev/daily-portions)."""
-        rows = self._supabase_client.rpc(
-            "portions_left", {"p_food_item_ids": food_item_ids, "p_sale_date": sale_date.isoformat()}
-        ).execute().data or []
-        return {r["food_item_id"]: r["remaining"] for r in rows}
 
     def create(self, seller_id: str, fields: dict):
         fields["seller_id"] = seller_id
@@ -116,10 +92,10 @@ class DAOFoodItems(DAOBase):
         return result.data[0] if result.data else None
 
     def read_order_gate(self, item_id: str):
-        """is_available + preorder_day + the seller's switch and hours: enough to decide if the dish can be ordered now."""
+        """is_available + preorder_day + the seller's switch and hours + the option groups: enough to decide if the dish can be ordered now."""
         result = (
             self._supabase_client.table(self._table_name)
-            .select("name, is_available, preorder_day, daily_portions, seller_profiles(status, lat, lon, is_open, weekly_hours)")
+            .select("seller_id, name, is_available, preorder_day, stock, min_quantity, seller_profiles(status, lat, lon, is_open, weekly_hours), " + OPTION_GROUPS_EMBED)
             .eq("id", item_id)
             .limit(1)
             .execute()

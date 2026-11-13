@@ -11,6 +11,11 @@ export default {
             type: Boolean,
             default: false
         },
+        // Stock under the dish's minimum: shown as sold out, not tappable, like on the store page
+        soldOut: {
+            type: Boolean,
+            default: false
+        },
         itemId: {
             required: true,
             type: [String, Number]
@@ -49,12 +54,14 @@ export default {
 
     methods: {
         goToDetail() {
+            if (this.soldOut) return
             this.$router.push(`/food/${this.sellerSlug}/${this.itemId}`)
         },
 
         async handleAddToCart(e) {
             e.stopPropagation()
-            // No single price to add — the level is picked on the detail page.
+            if (this.soldOut) return
+            // No single price to add — the level / options are picked on the detail page.
             if (this.hasVariants) return this.goToDetail()
             const authStore = useAuthStore()
             if (!authStore.user) {
@@ -87,7 +94,9 @@ export default {
             <q-img
             :src="imgSrc"
             :ratio="16/9"
+            :class="{ 'sold-out-img': soldOut }"
             />
+            <div v-if="soldOut" class="sold-out-label">{{ $t('seller_page.section_food_cards.label_sold_out') }}</div>
         </div>
 
         <div class="food-info">
@@ -95,7 +104,7 @@ export default {
             <div class="seller-name">{{ sellerName }}</div>
             <div class="price-row">
                 <div class="food-price">{{ price }}</div>
-                <q-btn flat dense no-caps :loading="loading" @click="handleAddToCart">
+                <q-btn v-if="!soldOut" flat dense no-caps :loading="loading" @click="handleAddToCart">
                     <CirclePlus :size="22" style="color: #f5A623" />
                     <template #loading>
                         <q-spinner-dots color="orange" size="16px" />
@@ -107,6 +116,23 @@ export default {
 </template>
 
 <style lang="scss" scoped>
+
+.food-image { position: relative; }
+
+.sold-out-img { opacity: 0.4; }
+
+.sold-out-label {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 3px 10px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+}
 
 .card {
     background-color:#121827;

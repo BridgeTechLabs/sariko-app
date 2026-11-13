@@ -30,40 +30,58 @@ def carts(monkeypatch):
             Carts.log.append(("delete_cart", cart_id))
 
     class Items:
-        def update_quantity(self, **kw):
-            Carts.log.append(("update_quantity", kw))
+        lines = []
 
-        def remove_item(self, **kw):
-            Carts.log.append(("remove_item", kw))
+        def read_lines(self, cart_id):
+            return Items.lines
+
+        def update_quantity(self, cart_id, item_id, quantity):
+            Carts.log.append(("update_quantity", cart_id, item_id, quantity))
+            return [{"id": item_id}]
+
+        def remove_item(self, cart_id, item_id):
+            Carts.log.append(("remove_item", cart_id, item_id))
+            return [{"id": item_id}]
 
     Carts.log = []
+    Items.lines = [{"id": LINE, "food_item_id": F1, "variant_id": "v1", "option_ids": [], "quantity": 2},
+                   {"id": LINE_OPT, "food_item_id": F1, "variant_id": "v1", "option_ids": [OPT], "quantity": 1}]
     monkeypatch.setattr(cart, "DAOCarts", Carts)
     monkeypatch.setattr(cart, "DAOCartItems", Items)
     monkeypatch.setattr(orders, "DAOAdminConfig", lambda: SimpleNamespace(get_positive_int=lambda key, default: default))
     return Carts
 
 
+F1, LINE, LINE_OPT, OPT = ("00000000-0000-4000-8000-00000000000" + c for c in "1234")
+
+
 def test_cart_update_quantity(api, carts):
-    r = api(cart.router).patch("/cart/update", json={"food_item_id": "f1", "quantity": 3, "variant_id": "v1"})
+    r = api(cart.router).patch("/cart/update", json={"id": LINE_OPT, "quantity": 3})
     assert r.json() == {"success": True}
-    assert carts.log == [("update_quantity", {"cart_id": "cart1", "food_item_id": "f1", "quantity": 3, "variant_id": "v1"})]
+    assert carts.log == [("update_quantity", "cart1", LINE_OPT, 3)]
+
+
+def test_cart_update_the_old_way_is_the_row_without_options(api, carts):   # TC3-58, TC3-63: JS before option groups
+    r = api(cart.router).patch("/cart/update", json={"food_item_id": F1, "quantity": 3, "variant_id": "v1"})
+    assert r.json() == {"success": True}
+    assert carts.log == [("update_quantity", "cart1", LINE, 3)]
 
 
 def test_cart_update_quantity_must_be_positive(api, carts):
-    r = api(cart.router).patch("/cart/update", json={"food_item_id": "f1", "quantity": 0})
+    r = api(cart.router).patch("/cart/update", json={"id": LINE, "quantity": 0})
     assert r.status_code == 422 and set(r.json()) == VALIDATION and carts.log == []
 
 
 def test_cart_remove_and_clear(api, carts):
     c = api(cart.router)
-    assert c.delete("/cart/remove/f1", params={"variant_id": "v1"}).json() == {"success": True}
+    assert c.delete(f"/cart/remove/{LINE_OPT}").json() == {"success": True}
+    assert c.delete(f"/cart/remove/{F1}", params={"variant_id": "v1"}).json() == {"success": True}   # the old way
     assert c.delete("/cart/clear").json() == {"success": True}
-    assert carts.log == [("remove_item", {"cart_id": "cart1", "food_item_id": "f1", "variant_id": "v1"}),
-                         ("delete_cart", "cart1")]
+    assert carts.log == [("remove_item", "cart1", LINE_OPT), ("remove_item", "cart1", LINE), ("delete_cart", "cart1")]
 
 
-@pytest.mark.parametrize("method,path,body", [("patch", "/cart/update", {"food_item_id": "f1", "quantity": 1}),
-                                              ("delete", "/cart/remove/f1", None), ("delete", "/cart/clear", None)])
+@pytest.mark.parametrize("method,path,body", [("patch", "/cart/update", {"id": LINE, "quantity": 1}),
+                                              ("delete", f"/cart/remove/{LINE}", None), ("delete", "/cart/clear", None)])
 def test_cart_without_a_cart_is_404(api, carts, method, path, body):
     carts.cart = None
     r = api(cart.router).request(method.upper(), path, json=body)
@@ -89,7 +107,9 @@ def test_cart_add_price_option_rules(api, monkeypatch, carts, variants, variant_
 
 def test_cart_add_from_another_seller(api, monkeypatch, carts):
     monkeypatch.setattr(cart, "DAOFoodItemVariants", lambda: SimpleNamespace(read_by_food_item_id=lambda f: []))
-    monkeypatch.setattr(cart, "DAOFoodItems", lambda: SimpleNamespace(read_order_gate=lambda f: None))
+    gate = {"seller_id": "s2", "is_available": True, "preorder_day": 1,
+            "seller_profiles": {"status": "active", "lat": 10.77, "lon": 106.70, "is_open": True}}
+    monkeypatch.setattr(cart, "DAOFoodItems", lambda: SimpleNamespace(read_order_gate=lambda f: gate))
     r = api(cart.router).post("/cart/add", json={"seller_id": "s2", "food_item_id": "f1"})
     assert r.status_code == 400
     assert r.json() == {"detail": {"message": "Cart contains items from another seller", "current_seller_name": "Bếp A"}}

@@ -2,6 +2,7 @@
 import { Phone } from 'lucide-vue-next';
 import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { orderCode } from '@/utils/orderCode';
+import OptionLines from '@/components/shared/OptionLines.vue';
 import { cancelReasonText } from '@/utils/cancelReason';
 
 const STATUS_DISPLAY_KEY = {
@@ -37,7 +38,7 @@ const DELIVERY_CANCEL_ERROR_KEY = {
 export default {
     name: 'SellerOrderDetailContent',
 
-    components: { Phone },
+    components: { Phone, OptionLines },
 
     props: {
         order: {
@@ -280,10 +281,13 @@ export default {
         <!-- Items -->
         <div class="card">
             <div class="section-label" style="margin-bottom:12px;">{{ $t('seller_order_detail.section_items') }}</div>
-            <div v-for="item in order.order_items" :key="item.id" class="item-row">
+            <template v-for="item in order.order_items" :key="item.id">
+            <div class="item-row">
                 <span class="item-name">{{ item.quantity }}x {{ item.name_snapshot }}<span v-if="item.variant_name_snapshot" class="order-variant"> ({{ item.variant_name_snapshot }})</span></span>
                 <span class="item-price">{{ fmt(item.price_snapshot * item.quantity) }}</span>
             </div>
+            <OptionLines :options="item.options_snapshot" />
+            </template>
             <q-separator style="background:rgba(255,255,255,0.08);margin:12px 0;" />
             <div class="item-row">
                 <span class="info-key">{{ $t('seller_order_detail.label_subtotal') }}</span>
@@ -436,7 +440,7 @@ export default {
 }
 
 .item-name  { font-size: 14px; color: var(--text-primary); }
-.item-price { font-size: 14px; color: var(--text-secondary); }
+.item-price { font-size: 14px; color: var(--text-secondary); flex-shrink: 0; padding-left: 12px; white-space: nowrap; }
 
 .total-row {
     font-size: 15px;

@@ -1,19 +1,16 @@
 <script>
-import { mapState, mapWritableState } from 'pinia';
+import { mapState } from 'pinia';
 import { useSellerStore } from '@/stores/seller/sellerStore';
-import { useCartStore } from '@/stores/cart/cartStore';
 import FoodCard from '@/components/seller/seller-page/FoodCard.vue'
 import MenuEmptyState from '@/components/seller/seller-page/MenuEmptyState.vue'
-import ModalCartConflict from '@/components/order-cart/ModalCartConflict.vue';
-import { foodPriceDisplay, hasVariants } from '@/utils/priceDisplay';
-import { portionsLeftToday, preorderPortions } from '@/utils/portions';
+import { foodPriceDisplay, picksOnDetail } from '@/utils/priceDisplay';
+import { stockLeft } from '@/utils/portions';
 
 export default {
-    methods: { foodPriceDisplay, hasVariants, portionsLeftToday, preorderPortions },
+    methods: { foodPriceDisplay, picksOnDetail, stockLeft },
     components: {
         FoodCard,
         MenuEmptyState,
-        ModalCartConflict
     },
 
     computed: {
@@ -21,10 +18,6 @@ export default {
             "menu",
             "selectedCategoryMenu"
         ]),
-
-        ...mapWritableState(useCartStore, [
-            "isShowModalCartConflict"
-        ])
     }
 }
 </script>
@@ -41,13 +34,13 @@ export default {
                 :item-id="food.id"
                 :name="food.name"
                 :price="foodPriceDisplay(food)"
-                :has-variants="hasVariants(food)"
+                :has-variants="picksOnDetail(food)"
                 :imgSrc="food.image_url ? food.image_url : '/images/default-food-image.webp'"
                 :unit-label="food.unit_label || 'pcs'"
                 :preorder-day="food.preorder_day || 0"
-                :is-available="food.is_available !== false"
-                :portions-left="portionsLeftToday(food)"
-                :preorder-portions="preorderPortions(food)"
+                :is-available="food.is_available !== false && !food.options_sold_out"
+                :stock-left="stockLeft(food)"
+                :sold-out="!!food.sold_out"
                 :rating-avg="food.rating_avg"
                 :rating-count="food.rating_count || 0"
                 />
@@ -56,10 +49,6 @@ export default {
         </div>
 
     </div>
-
-    <q-dialog v-model="isShowModalCartConflict">
-        <ModalCartConflict />
-    </q-dialog>
 
 </template>
 
