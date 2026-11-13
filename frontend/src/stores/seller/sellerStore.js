@@ -50,6 +50,10 @@ export const useSellerStore = defineStore('sellerStore', {
         foodGroups(state) {
             return state.currentFood?.option_groups || []
         },
+        // The dish's price levels on offer (a level that is off stays hidden)
+        foodLevels(state) {
+            return (state.currentFood?.food_item_variants || []).filter(v => v.is_available !== false)
+        },
         optionsExtra() {
             return this.foodGroups.flatMap(g => g.menu_options)
                 .filter(o => this.selectedOptionIds.includes(o.id))
@@ -159,8 +163,7 @@ export const useSellerStore = defineStore('sellerStore', {
                     this.currentFood = found
                     // Preselect the first level on offer, so the buyer never faces
                     // a disabled button with no hint why.
-                    const levels = (found.food_item_variants || []).filter(v => v.is_available !== false)
-                    this.selectedVariantId = levels.length ? levels[0].id : null
+                    this.selectedVariantId = this.foodLevels[0]?.id ?? null
                     break
                 }
             }

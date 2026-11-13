@@ -55,6 +55,37 @@ export const apiSellerMenu = {
         return res.data
     },
 
+    // Option groups (seller-menu đợt 3): made from a dish, shared by the dishes they are put on
+    createOptionGroup: async (itemId, body) => {
+        const res = await apiClient.post(`/v1/sellers/me/menu/items/${itemId}/option-groups`, body)
+        return res.data
+    },
+
+    updateOptionGroup: async (groupId, body) => {
+        const res = await apiClient.put(`/v1/sellers/me/menu/option-groups/${groupId}`, body)
+        return res.data
+    },
+
+    deleteOptionGroup: async (groupId) => {
+        const res = await apiClient.delete(`/v1/sellers/me/menu/option-groups/${groupId}`)
+        return res.data
+    },
+
+    attachOptionGroup: async (itemId, groupId) => {
+        const res = await apiClient.post(`/v1/sellers/me/menu/items/${itemId}/option-groups/${groupId}`)
+        return res.data
+    },
+
+    detachOptionGroup: async (itemId, groupId) => {
+        const res = await apiClient.delete(`/v1/sellers/me/menu/items/${itemId}/option-groups/${groupId}`)
+        return res.data
+    },
+
+    orderOptionGroups: async (itemId, groupIds) => {
+        const res = await apiClient.put(`/v1/sellers/me/menu/items/${itemId}/option-groups`, { group_ids: groupIds })
+        return res.data
+    },
+
     uploadItemImage: async (itemId, imageBase64, contentType) => {
         const res = await apiClient.post(`/v1/sellers/me/menu/items/${itemId}/image`, { image_base64: imageBase64, content_type: contentType })
         return res.data

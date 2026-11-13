@@ -2,7 +2,7 @@
 import { Plus, Minus } from 'lucide-vue-next';
 import { useCartStore } from '@/stores/cart/cartStore.js';
 import { apiErrorMessage } from '@/lib/axiosPolicy.js';
-import { formatVnd, optionsLines } from '@/utils/priceDisplay';
+import OptionLines from '@/components/shared/OptionLines.vue';
 
 export default {
     props: {
@@ -69,7 +69,7 @@ export default {
     },
 
     components: {
-        Plus, Minus
+        Plus, Minus, OptionLines
     },
 
     setup() {
@@ -81,10 +81,6 @@ export default {
         singlePriceText() {
             if (!this.itemPrice) return '—'
             return new Intl.NumberFormat('vi-VN').format(this.itemPrice) + ' ₫'
-        },
-
-        optionLines() {
-            return optionsLines(this.itemOptions)
         },
 
         problemText() {
@@ -99,7 +95,6 @@ export default {
     },
 
     methods: {
-        formatVnd,
         async onClickPlus() {
             await this.cartStore.updateQuantity(this.rowKey, this.itemQuantity + 1)
         },
@@ -144,12 +139,11 @@ export default {
                                 <span v-if="itemUnavailable" class="item-sold-out">{{ $t('cart_page.sold_out_label') }}</span>
                                 <span v-else-if="portionsLeft !== null && itemQuantity > portionsLeft" class="item-sold-out">{{ $t('cart_page.only_left', { n: portionsLeft }) }}</span>
                             </div>
-                            <div v-for="line in optionLines" :key="line.label" class="option-row" :class="{ 'option-row--sub': line.sub }">
-                                <span>{{ line.label }}</span><span v-if="line.extra !== null">+{{ formatVnd(line.extra) }}</span>
-                            </div>
+                            <!-- the category right under the name: after the options it read as a lone line (seller-menu đợt 3) -->
                             <div class="item-category">
                                 <div>{{ itemCategory }}</div>
                             </div>
+                            <OptionLines :options="itemOptions" class="item-options" />
                             <div v-if="itemProblem" class="item-problem" role="alert">
                                 <span>{{ problemText }}</span>
                                 <q-btn flat dense no-caps class="choose-again" :label="$t('cart_page.choose_again')" @click="chooseAgain" />
@@ -225,19 +219,7 @@ export default {
     margin: 0 5px 5px;   /* the red frame keeps 5px from the store card's edges */
 }
 
-.option-row {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 2px 0;
-    font-size: 11px;
-    color: var(--text-secondary);
-
-    span:last-child { flex-shrink: 0; white-space: nowrap; }
-}
-
-.option-row--sub { padding-left: 12px; }
+.item-options.option-lines { margin: 2px 0; }
 
 .item-problem {
     display: flex;

@@ -2,6 +2,7 @@
 import BottomNavigation from '@/components/nav/BottomNavigation.vue'
 import SellerBottomNav from '@/components/nav/SellerBottomNav.vue'
 import SellerOrderAlert from '@/components/seller-home/SellerOrderAlert.vue'
+import ModalCartConflict from '@/components/order-cart/ModalCartConflict.vue'
 import { defineAsyncComponent } from 'vue'
 import { setUpAxiosPolicy } from "@/lib/axiosPolicy.js";
 import { useAuthStore } from '@/stores/auth/authStore'
@@ -19,6 +20,7 @@ export default {
         BottomNavigation,
         SellerBottomNav,
         SellerOrderAlert,
+        ModalCartConflict,
     },
 
     setup() {
@@ -76,6 +78,7 @@ export default {
         <SellerOrderAlert v-if="isSeller && userId" :key="userId" />
         <SellerBottomNav v-if="showNavigation && isSeller" />
         <BottomNavigation v-else-if="showNavigation" />
+        <ModalCartConflict />
         <component :is="DevPanel" v-if="DevPanel" />
     </div>    
 </template>

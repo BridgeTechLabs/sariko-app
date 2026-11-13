@@ -3,17 +3,19 @@ import { useMenuStore } from '@/stores/seller/menuStore'
 import SellerMenuCategorySection from './SellerMenuCategorySection.vue'
 import ModalEditCategory from './ModalEditCategory.vue'
 import ModalEditItem from './ModalEditItem.vue'
+import SellerOptionGroupList from './SellerOptionGroupList.vue'
 import { Plus } from 'lucide-vue-next'
 
 export default {
     name: 'SellerMenuList',
 
-    components: { SellerMenuCategorySection, ModalEditCategory, ModalEditItem, Plus },
+    components: { SellerMenuCategorySection, ModalEditCategory, ModalEditItem, SellerOptionGroupList, Plus },
 
     data() {
         return {
             showAddCategory: false,
             showAddItem: false,
+            tab: 'dishes',   // or 'groups' (seller-menu đợt 3)
         }
     },
 
@@ -36,6 +38,11 @@ export default {
 
 <template>
     <div>
+        <q-tabs v-model="tab" dense no-caps align="justify" class="menu-tabs">
+            <q-tab name="dishes" :label="$t('seller_menu.tab_dishes')" />
+            <q-tab name="groups" :label="$t('seller_menu.tab_option_groups')" />
+        </q-tabs>
+
         <!-- Loading -->
         <div v-if="isLoading" class="skeleton-list">
             <div v-for="n in 3" :key="n" class="sk-section">
@@ -49,6 +56,8 @@ export default {
                 </div>
             </div>
         </div>
+
+        <SellerOptionGroupList v-else-if="tab === 'groups' && !loadError" />
 
         <!-- Load failed: not the same as an empty menu -->
         <div v-else-if="loadError" class="empty-state">
@@ -81,7 +90,7 @@ export default {
         </div>
 
         <!-- Fixed bar just above the bottom nav; the list keeps a bottom pad of its height -->
-        <div v-if="!isLoading && !loadError && categories.length" class="add-bar">
+        <div v-if="tab === 'dishes' && !isLoading && !loadError && categories.length" class="add-bar">
             <button class="btn-add-dish" @click="showAddItem = true">
                 <Plus :size="16" /> {{ $t('seller_menu.item_add_dish') }}
             </button>
@@ -97,6 +106,18 @@ export default {
 </template>
 
 <style lang="scss" scoped>
+.menu-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg-main);
+    color: var(--text-secondary);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    :deep(.q-tab) { min-height: 44px; font-size: 15px; }
+    :deep(.q-tab--active) { color: var(--color-accent); font-weight: 600; }
+    :deep(.q-tab__indicator) { background: var(--color-accent); height: 2px; }
+}
+
 /* Skeleton */
 .skeleton-list {
     display: flex;
