@@ -191,7 +191,7 @@ export default {
 <style lang="scss" scoped>
 
 .background {
-    padding: 5px 0px 0px 20px;
+    padding: 5px 0px 0px;
 }
 
 .container {
@@ -222,6 +222,7 @@ export default {
 .problem {
     border: 1px solid #e5484d;
     border-radius: 12px;
+    margin: 0 5px 5px;   /* the red frame keeps 5px from the store card's edges */
 }
 
 .option-row {
