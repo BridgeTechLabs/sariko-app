@@ -5,11 +5,11 @@ import { useCartStore } from '@/stores/cart/cartStore';
 import FoodCard from '@/components/seller/seller-page/FoodCard.vue'
 import MenuEmptyState from '@/components/seller/seller-page/MenuEmptyState.vue'
 import ModalCartConflict from '@/components/order-cart/ModalCartConflict.vue';
-import { foodPriceDisplay, hasVariants } from '@/utils/priceDisplay';
+import { foodPriceDisplay, picksOnDetail } from '@/utils/priceDisplay';
 import { portionsLeftToday, preorderPortions } from '@/utils/portions';
 
 export default {
-    methods: { foodPriceDisplay, hasVariants, portionsLeftToday, preorderPortions },
+    methods: { foodPriceDisplay, picksOnDetail, portionsLeftToday, preorderPortions },
     components: {
         FoodCard,
         MenuEmptyState,
@@ -41,11 +41,11 @@ export default {
                 :item-id="food.id"
                 :name="food.name"
                 :price="foodPriceDisplay(food)"
-                :has-variants="hasVariants(food)"
+                :has-variants="picksOnDetail(food)"
                 :imgSrc="food.image_url ? food.image_url : '/images/default-food-image.webp'"
                 :unit-label="food.unit_label || 'pcs'"
                 :preorder-day="food.preorder_day || 0"
-                :is-available="food.is_available !== false"
+                :is-available="food.is_available !== false && !food.options_sold_out"
                 :portions-left="portionsLeftToday(food)"
                 :preorder-portions="preorderPortions(food)"
                 :rating-avg="food.rating_avg"

@@ -41,10 +41,25 @@ export const useSellerStore = defineStore('sellerStore', {
             currentSeller: null,
             foodQuantity: 1,
             selectedVariantId: null,
+            selectedOptionIds: [],
         }
     },
 
     getters: {
+        // The dish page's option groups (seller-menu đợt 3); the server prices and checks them again
+        foodGroups(state) {
+            return state.currentFood?.option_groups || []
+        },
+        optionsExtra() {
+            return this.foodGroups.flatMap(g => g.menu_options)
+                .filter(o => this.selectedOptionIds.includes(o.id))
+                .reduce((sum, o) => sum + Number(o.extra_price), 0)
+        },
+        // First required group with nothing picked: the add button waits for it
+        missingGroup() {
+            return this.foodGroups.find(g => g.is_required && !g.menu_options.some(o => this.selectedOptionIds.includes(o.id))) || null
+        },
+
         menu(state) {
             if (!state.selectedCategoryMenu || !state.menus.length) return []
             const category = state.menus.find(m => m.id === state.selectedCategoryMenu)
@@ -125,6 +140,7 @@ export const useSellerStore = defineStore('sellerStore', {
             this.currentSeller = null
             this.foodQuantity = 1
             this.selectedVariantId = null
+            this.selectedOptionIds = []
 
             // Load seller if not already loaded for this slug
             if (this.seller?.slug !== sellerSlug) {
@@ -147,6 +163,19 @@ export const useSellerStore = defineStore('sellerStore', {
                     this.selectedVariantId = levels.length ? levels[0].id : null
                     break
                 }
+            }
+        },
+
+        // Choose 1 replaces the group's pick (a required one can't be emptied); Up to N stops at N
+        toggleOption(group, optionId) {
+            const inGroup = new Set(group.menu_options.map(o => o.id))
+            const picked = this.selectedOptionIds.filter(id => inGroup.has(id))
+            if (picked.includes(optionId)) {
+                if (!(group.is_required && group.max_select === 1)) this.selectedOptionIds = this.selectedOptionIds.filter(id => id !== optionId)
+            } else if (group.max_select === 1) {
+                this.selectedOptionIds = [...this.selectedOptionIds.filter(id => !inGroup.has(id)), optionId]
+            } else if (picked.length < group.max_select) {
+                this.selectedOptionIds = [...this.selectedOptionIds, optionId]
             }
         }
     }

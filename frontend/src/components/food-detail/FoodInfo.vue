@@ -1,12 +1,13 @@
 <script>
 import { Store, Star } from 'lucide-vue-next';
+import FoodOptions from '@/components/food-detail/FoodOptions.vue';
 import { useSellerStore } from '@/stores/seller/sellerStore';
 import { foodPriceDisplay, formatVnd } from '@/utils/priceDisplay';
 import { portionsLeftToday, preorderPortions } from '@/utils/portions';
 import { ratingText } from '@/utils/rating';
 
 export default {
-    components: { Store, Star },
+    components: { Store, Star, FoodOptions },
 
     computed: {
         sellerStore() {
@@ -105,6 +106,7 @@ export default {
                     </button>
                 </div>
             </div>
+            <FoodOptions />
             <p v-if="food.description" class="food-description">{{ food.description }}</p>
         </template>
 

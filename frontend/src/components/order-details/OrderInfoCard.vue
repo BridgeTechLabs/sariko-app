@@ -1,6 +1,7 @@
 <script>
 import { useOrderStore } from '@/stores/order/orderStore.js';
 import { orderCode } from '@/utils/orderCode';
+import { optionsLines } from '@/utils/priceDisplay';
 import { isScheduled } from '@/utils/orderStage';
 
 export default {
@@ -46,6 +47,7 @@ export default {
     },
 
     methods: {
+        optionsLines,
         formatPrice(value) {
             return new Intl.NumberFormat('vi-VN').format(value) + ' ₫'
         },
@@ -93,10 +95,15 @@ export default {
 
         <div class="dashed-line" />
 
-        <div class="order-row" v-for="item in order.order_items" :key="item.id">
+        <template v-for="item in order.order_items" :key="item.id">
+        <div class="order-row">
             <span>{{ item.quantity }}x {{ item.name_snapshot }}<span v-if="item.variant_name_snapshot" class="order-variant"> ({{ item.variant_name_snapshot }})</span></span>
-            <span>{{ formatPrice(item.price_snapshot * item.quantity) }}</span>
+            <span class="order-price">{{ formatPrice(item.price_snapshot * item.quantity) }}</span>
         </div>
+        <div v-for="line in optionsLines(item.options_snapshot)" :key="line.label" class="option-row" :class="{ 'option-row--sub': line.sub }">
+            <span>{{ line.label }}</span><span v-if="line.extra !== null">+{{ formatPrice(line.extra) }}</span>
+        </div>
+        </template>
 
         <div class="dashed-line" />
 
@@ -164,4 +171,23 @@ export default {
     color: #f5A623;
     font-weight: 600;
 }
+
+.order-price {
+    flex-shrink: 0;
+    padding-left: 12px;
+    white-space: nowrap;   // a long options line under the name must not push "₫" to a new line
+}
+
+.option-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin: -2px 0 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+
+    span:last-child { flex-shrink: 0; white-space: nowrap; }
+}
+
+.option-row--sub { padding-left: 12px; }
 </style>

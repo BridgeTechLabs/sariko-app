@@ -31,7 +31,7 @@ export default {
             return !!this.food && this.quantity > 1
         },
         soldOut() {
-            return this.food?.is_available === false || this.soldOutToday
+            return this.food?.is_available === false || this.food?.options_sold_out || this.soldOutToday
         },
         soldOutToday() {
             return portionsLeftToday(this.food) === 0
@@ -46,7 +46,7 @@ export default {
             // Every level sold out: nothing addable, even though `levels` is empty.
             if (this.allLevels.length && !this.levels.length) return false
             const levelPicked = !this.levels.length || !!this.sellerStore.selectedVariantId
-            return !!this.food && !!this.seller && levelPicked && !this.loading
+            return !!this.food && !!this.seller && levelPicked && !this.sellerStore.missingGroup && !this.loading
         },
         allLevels() {
             return this.food?.food_item_variants || []
@@ -59,7 +59,8 @@ export default {
         },
         unitPrice() {
             if (!this.food) return 0
-            return this.selectedVariant ? Number(this.selectedVariant.price) : Number(this.food.price)
+            const base = this.selectedVariant ? Number(this.selectedVariant.price) : Number(this.food.price)
+            return base + this.sellerStore.optionsExtra   // shown only: the server prices the cart line
         },
         singlePriceText() {
             if (!this.food) return '—'
@@ -90,7 +91,7 @@ export default {
             this.loading = true
             const cartStore = useCartStore()
             try {
-                const added = await cartStore.addItem(this.seller.id, this.food.id, this.seller.store_name, this.quantity, this.sellerStore.selectedVariantId)
+                const added = await cartStore.addItem(this.seller.id, this.food.id, this.seller.store_name, this.quantity, this.sellerStore.selectedVariantId, this.sellerStore.selectedOptionIds)
                 if (!added || cartStore.isShowModalCartConflict) {
                     this.loading = false
                     return
@@ -150,6 +151,9 @@ export default {
         </div>
 
 
+        <div v-if="sellerStore.missingGroup && !soldOut" class="missing" aria-live="polite">
+            {{ $t('food_detail_page.options_missing', { group: sellerStore.missingGroup.name }) }}
+        </div>
         <button
             class="cta"
             :disabled="!canAdd"
@@ -211,6 +215,13 @@ export default {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
     line-height: 1;
+}
+
+.missing {
+    margin-bottom: -6px;
+    text-align: center;
+    font-size: 13px;
+    color: #f5A623;
 }
 
 /* Controls row */
