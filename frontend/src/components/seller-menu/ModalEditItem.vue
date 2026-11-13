@@ -3,6 +3,7 @@ import { useMenuStore } from '@/stores/seller/menuStore'
 import { ImagePlus, X, Plus, Trash2 } from 'lucide-vue-next'
 import SectionTitle from '@/components/shared/SectionTitle.vue'
 import ModalEditCategory from './ModalEditCategory.vue'
+import DishOptionGroups from './DishOptionGroups.vue'
 
 // Last option of the category list: opens the new-category form instead of picking a category
 const NEW_CATEGORY = '__new__'
@@ -19,7 +20,7 @@ const isFractional = p => typeof p === 'number' && !Number.isInteger(p)
 export default {
     name: 'ModalEditItem',
 
-    components: { ImagePlus, X, Plus, Trash2, SectionTitle, ModalEditCategory },
+    components: { ImagePlus, X, Plus, Trash2, SectionTitle, ModalEditCategory, DishOptionGroups },
 
     props: {
         modelValue: { type: Boolean, default: false },
@@ -361,6 +362,10 @@ export default {
                         </div>
                     </div>
 
+                </div>
+
+                <div class="group">
+                    <DishOptionGroups :dish-id="item?.id || null" />
                 </div>
 
                 <div class="group">

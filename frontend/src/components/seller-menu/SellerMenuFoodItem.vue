@@ -50,6 +50,8 @@ export default {
                 <span class="food-price">{{ foodPriceDisplay(item) }}</span>
                 <template v-if="item.unit_label && !hasVariants(item)"> / {{ item.unit_label }}</template>
                 <span v-if="!item.is_available" class="food-tag-off">{{ $t('seller_menu.item_off') }}</span>
+                <!-- a required option group with every option off (QĐ3-6) -->
+                <span v-else-if="item.options_sold_out" class="food-tag-off">{{ $t('seller_menu.item_options_sold_out') }}</span>
             </div>
             <div v-if="item.daily_portions" class="food-portions" :class="{ 'food-portions--out': (item.portions_date ? item.remaining_preorder : item.remaining_today) === 0 }">
                 <!-- a pre-order dish counts its first delivery day, not today (T181 A34) -->

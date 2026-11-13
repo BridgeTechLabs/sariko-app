@@ -9,9 +9,9 @@ import { formatVnd } from '@/utils/priceDisplay';
 // a level that is off stays hidden, as before.
 export default {
     computed: {
-        ...mapState(useSellerStore, ['currentFood', 'foodGroups', 'selectedOptionIds', 'selectedVariantId']),
+        ...mapState(useSellerStore, ['foodLevels', 'foodGroups', 'selectedOptionIds', 'selectedVariantId']),
         groups() {
-            const levels = (this.currentFood?.food_item_variants || []).filter(v => v.is_available !== false)
+            const levels = this.foodLevels
             if (!levels.length) return this.foodGroups
             const levelGroup = { id: 'levels', isLevel: true, name: this.$t('food_detail_page.label_price_levels'),
                 is_required: true, max_select: 1, menu_options: levels.map(v => ({ ...v, is_available: true })) }

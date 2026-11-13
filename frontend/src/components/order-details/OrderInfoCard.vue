@@ -1,10 +1,12 @@
 <script>
 import { useOrderStore } from '@/stores/order/orderStore.js';
 import { orderCode } from '@/utils/orderCode';
-import { optionsLines } from '@/utils/priceDisplay';
+import OptionLines from '@/components/shared/OptionLines.vue';
 import { isScheduled } from '@/utils/orderStage';
 
 export default {
+    components: { OptionLines },
+
     computed: {
         order() {
             return useOrderStore().currentOrder
@@ -47,7 +49,6 @@ export default {
     },
 
     methods: {
-        optionsLines,
         formatPrice(value) {
             return new Intl.NumberFormat('vi-VN').format(value) + ' ₫'
         },
@@ -100,9 +101,7 @@ export default {
             <span>{{ item.quantity }}x {{ item.name_snapshot }}<span v-if="item.variant_name_snapshot" class="order-variant"> ({{ item.variant_name_snapshot }})</span></span>
             <span class="order-price">{{ formatPrice(item.price_snapshot * item.quantity) }}</span>
         </div>
-        <div v-for="line in optionsLines(item.options_snapshot)" :key="line.label" class="option-row" :class="{ 'option-row--sub': line.sub }">
-            <span>{{ line.label }}</span><span v-if="line.extra !== null">+{{ formatPrice(line.extra) }}</span>
-        </div>
+        <OptionLines :options="item.options_snapshot" />
         </template>
 
         <div class="dashed-line" />
@@ -177,17 +176,4 @@ export default {
     padding-left: 12px;
     white-space: nowrap;   // a long options line under the name must not push "₫" to a new line
 }
-
-.option-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    margin: -2px 0 4px;
-    font-size: 11px;
-    color: var(--text-secondary);
-
-    span:last-child { flex-shrink: 0; white-space: nowrap; }
-}
-
-.option-row--sub { padding-left: 12px; }
 </style>

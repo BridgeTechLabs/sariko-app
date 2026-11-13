@@ -2,7 +2,7 @@
 import { Phone } from 'lucide-vue-next';
 import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { orderCode } from '@/utils/orderCode';
-import { optionsLines } from '@/utils/priceDisplay';
+import OptionLines from '@/components/shared/OptionLines.vue';
 import { cancelReasonText } from '@/utils/cancelReason';
 
 const STATUS_DISPLAY_KEY = {
@@ -38,7 +38,7 @@ const DELIVERY_CANCEL_ERROR_KEY = {
 export default {
     name: 'SellerOrderDetailContent',
 
-    components: { Phone },
+    components: { Phone, OptionLines },
 
     props: {
         order: {
@@ -188,7 +188,6 @@ export default {
     },
 
     methods: {
-        optionsLines,
         // When the order reached this status (history_order_status), Vietnam time;
         // the date too unless it was today (with the year: vi-VN writes day + month
         // alone as "16-10"). Orders before 2026-10-16 have no history.
@@ -287,9 +286,7 @@ export default {
                 <span class="item-name">{{ item.quantity }}x {{ item.name_snapshot }}<span v-if="item.variant_name_snapshot" class="order-variant"> ({{ item.variant_name_snapshot }})</span></span>
                 <span class="item-price">{{ fmt(item.price_snapshot * item.quantity) }}</span>
             </div>
-            <div v-for="line in optionsLines(item.options_snapshot)" :key="line.label" class="option-row" :class="{ 'option-row--sub': line.sub }">
-                <span>{{ line.label }}</span><span v-if="line.extra !== null">+{{ fmt(line.extra) }}</span>
-            </div>
+            <OptionLines :options="item.options_snapshot" />
             </template>
             <q-separator style="background:rgba(255,255,255,0.08);margin:12px 0;" />
             <div class="item-row">
@@ -525,17 +522,4 @@ export default {
     color: #f5A623;
     font-weight: 600;
 }
-
-.option-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    margin: -2px 0 4px;
-    font-size: 11px;
-    color: var(--text-secondary);
-
-    span:last-child { flex-shrink: 0; white-space: nowrap; }
-}
-
-.option-row--sub { padding-left: 12px; }
 </style>

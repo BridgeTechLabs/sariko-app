@@ -28,7 +28,7 @@ export default {
             return this.food.unit_label ? `${base} / ${this.food.unit_label}` : base
         },
         levels() {
-            return (this.food?.food_item_variants || []).filter(v => v.is_available !== false)
+            return this.sellerStore.foodLevels
         },
         hasRating() {
             return this.food?.rating_count > 0 && this.food?.rating_avg != null
