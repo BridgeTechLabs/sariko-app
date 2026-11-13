@@ -339,7 +339,7 @@ export default {
 }
 
 .option-name { flex: 1; min-width: 0; }
-.option-price { width: 104px; }
+.option-price { width: 150px; }
 
 .btn-icon {
     background: none;
