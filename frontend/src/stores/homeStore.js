@@ -23,6 +23,7 @@ export const useHomeStore = defineStore('homeStore', {
                         name: d.name,
                         price: foodPriceDisplay(d),
                         hasVariants: picksOnDetail(d),
+                        soldOut: !!d.sold_out,
                         imgSrc: d.image_url,
                         sellerId: d.seller_profiles?.id,
                         sellerSlug: d.seller_profiles?.slug,

@@ -4,10 +4,10 @@ import { useSellerStore } from '@/stores/seller/sellerStore';
 import FoodCard from '@/components/seller/seller-page/FoodCard.vue'
 import MenuEmptyState from '@/components/seller/seller-page/MenuEmptyState.vue'
 import { foodPriceDisplay, picksOnDetail } from '@/utils/priceDisplay';
-import { portionsLeftToday, preorderPortions } from '@/utils/portions';
+import { stockLeft } from '@/utils/portions';
 
 export default {
-    methods: { foodPriceDisplay, picksOnDetail, portionsLeftToday, preorderPortions },
+    methods: { foodPriceDisplay, picksOnDetail, stockLeft },
     components: {
         FoodCard,
         MenuEmptyState,
@@ -39,8 +39,8 @@ export default {
                 :unit-label="food.unit_label || 'pcs'"
                 :preorder-day="food.preorder_day || 0"
                 :is-available="food.is_available !== false && !food.options_sold_out"
-                :portions-left="portionsLeftToday(food)"
-                :preorder-portions="preorderPortions(food)"
+                :stock-left="stockLeft(food)"
+                :sold-out="!!food.sold_out"
                 :rating-avg="food.rating_avg"
                 :rating-count="food.rating_count || 0"
                 />

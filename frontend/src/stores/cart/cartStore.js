@@ -3,7 +3,7 @@ import apiCarts from "@/apis/cart/apiCart";
 import { Notify } from "quasar";
 import { i18n } from "@/plugins/i18n";
 import { apiErrorMessage } from "@/lib/axiosPolicy.js";
-import { portionsLeftToday } from "@/utils/portions";
+import { stockLeft, minShortByFood } from "@/utils/portions";
 
 export const useCartStore = defineStore("cartStore", {
     state() {
@@ -48,6 +48,10 @@ export const useCartStore = defineStore("cartStore", {
         hasOptionProblem(state) {
             return state.cartItems.some(i => i.problem)
         },
+        // Dishes below their minimum per order (utils/portions.js): the order is refused (400) until fixed
+        minShortByFood(state) {
+            return minShortByFood(state.cartItems)
+        },
         maxPreorderDay(state) {
             return Math.max(0, ...state.cartItems.map(i => i.preorder_day ?? 0))
         }
@@ -83,8 +87,9 @@ export const useCartStore = defineStore("cartStore", {
                             "sellerSlugName": this.cart?.seller_profiles?.slug,
                             "preorder_day": _cartItems[i]?.food_items?.preorder_day ?? 0,
                             // The seller can switch a dish or level off after it went into the cart
-                            // Same-day dish with a daily limit: portions left today (null = no number)
-                            "portionsLeft": portionsLeftToday(_cartItems[i]?.food_items),
+                            // Stock left (null = no limit) and the dish's minimum per order
+                            "portionsLeft": stockLeft(_cartItems[i]?.food_items),
+                            "minQuantity": _cartItems[i]?.food_items?.min_quantity ?? 1,
                             "unavailable": _cartItems[i]?.food_items?.is_available === false || _variant?.is_available === false,
                         })
                     }

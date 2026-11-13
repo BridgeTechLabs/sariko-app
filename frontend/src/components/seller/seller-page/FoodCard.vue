@@ -50,15 +50,15 @@ export default {
             type: Number,
             default: 0
         },
-        // Portions left today (utils/portions.js); null = not shown. 0 = sold out today, not tappable
-        portionsLeft: {
+        // Stock left (utils/portions.js stockLeft); null = no limit, nothing shown
+        stockLeft: {
             type: Number,
             default: null
         },
-        // Pre-order dish: { n, date } of its first delivery day (utils/portions.js preorderPortions), null = not shown
-        preorderPortions: {
-            type: Object,
-            default: null
+        // The dish's stock is under its minimum per order: shown as sold out, not tappable
+        soldOut: {
+            type: Boolean,
+            default: false
         }
     },
 
@@ -84,7 +84,7 @@ export default {
             return this.ratingCount > 0 && this.ratingAvg != null
         },
         canOrder() {
-            return this.isAvailable && this.portionsLeft !== 0
+            return this.isAvailable && !this.soldOut
         }
     },
 
@@ -136,7 +136,7 @@ export default {
             class="food-thumb"
             @error="$event.target.src = '/images/default-food-image.webp'"
             />
-            <div v-if="!canOrder" class="sold-out-label">{{ isAvailable ? $t('seller_page.section_food_cards.label_sold_out_today') : $t('seller_page.section_food_cards.label_sold_out') }}</div>
+            <div v-if="!canOrder" class="sold-out-label">{{ $t('seller_page.section_food_cards.label_sold_out') }}</div>
         </div>
 
         <div class="food-info">
@@ -156,11 +156,8 @@ export default {
                 <q-badge v-else class="preorder-badge" color="positive">
                     {{ $t('seller_page.section_food_cards.label_item_instant') }}
                 </q-badge>
-                <q-badge v-if="portionsLeft > 0" class="preorder-badge" color="grey-8">
-                    {{ $t('seller_page.section_food_cards.label_portions_left', { n: portionsLeft }) }}
-                </q-badge>
-                <q-badge v-else-if="preorderPortions" class="preorder-badge" color="grey-8">
-                    {{ $t('seller_page.section_food_cards.label_portions_left_on', preorderPortions) }}
+                <q-badge v-if="stockLeft > 0 && !soldOut" class="preorder-badge" color="grey-8">
+                    {{ $t('seller_page.section_food_cards.label_portions_left', { n: stockLeft }) }}
                 </q-badge>
             </div>
 

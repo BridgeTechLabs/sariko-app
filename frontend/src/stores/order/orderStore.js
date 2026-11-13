@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import apiOrders from "@/apis/orders/apiOrders";
+import apiPayments from "@/apis/payments/apiPayments";
 import { createPoller } from "@/composables/createPoller";
 
 const ORDER_LIST_POLL_MS = 15_000
@@ -36,6 +37,13 @@ export const useOrderStore = defineStore("orderStore", {
     },
 
     actions: {
+        // The VNPay page to pay an order on, or null. Throws (with .status / .code) when refused, e.g. 409 stock_short:
+        // axiosPolicy has already toasted the translated message.
+        async createPaymentLink(orderId) {
+            const res = await apiPayments.createVnpayPayment(orderId)
+            return res?.data?.payment_url || null
+        },
+
         async placeOrder(deliveryMethod, deliveryAddress, note, deliveryOpts = {}, deliveryAppointment = null) {
             try {
                 this.loading = true

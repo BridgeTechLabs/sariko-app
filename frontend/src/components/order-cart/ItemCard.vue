@@ -57,6 +57,11 @@ export default {
             require: true,
             type: String
         },
+        // Minimum per order this dish is short of in the cart (all its rows together); null = fine
+        minShort: {
+            type: Number,
+            default: null
+        },
         portionsLeft: {
             required: false,
             type: Number,
@@ -144,6 +149,7 @@ export default {
                                 <div>{{ itemCategory }}</div>
                             </div>
                             <OptionLines :options="itemOptions" class="item-options" />
+                            <div v-if="minShort" class="item-min" role="alert">{{ $t('cart_page.min_per_order', { m: minShort }) }}</div>
                             <div v-if="itemProblem" class="item-problem" role="alert">
                                 <span>{{ problemText }}</span>
                                 <q-btn flat dense no-caps class="choose-again" :label="$t('cart_page.choose_again')" @click="chooseAgain" />
@@ -220,6 +226,13 @@ export default {
 }
 
 .item-options.option-lines { margin: 2px 0; }
+
+.item-min {
+    margin: 4px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #f5A623;
+}
 
 .item-problem {
     display: flex;

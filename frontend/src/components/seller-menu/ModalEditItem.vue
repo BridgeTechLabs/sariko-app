@@ -8,6 +8,10 @@ import DishOptionGroups from './DishOptionGroups.vue'
 // Last option of the category list: opens the new-category form instead of picking a category
 const NEW_CATEGORY = '__new__'
 
+// Stock is a whole number 0..100000 (an input limit of the API, not a business parameter); empty = no limit
+const STOCK_MAX = 100000
+const isStock = v => Number.isInteger(v) && v >= 0 && v <= STOCK_MAX
+
 // nginx client_max_body_size is 10m and base64 adds ~33%, so ~7.5 MB raw is the ceiling
 const MAX_IMAGE_MB = 7
 // What the backend's Pillow re-encode can read (iPhone HEIC is not)
@@ -39,6 +43,10 @@ export default {
             deleting: false,
             showDeleteConfirm: false,
             showNewCategory: false,
+            // BM12: the form opens with the stock of that moment; saving sends it only if the seller edited the field,
+            // or a paid order's deduction in the meantime would be overwritten by the old number
+            stockTouched: false,
+            STOCK_MAX,
             uploadProgress: false,
         }
     },
@@ -47,7 +55,11 @@ export default {
         isEdit() { return !!this.item },
         canSave() {
             const variantsOk = this.form.variants.every(v => v.name.trim() && isWholeVnd(v.price))
-            return this.form.name.trim() && isWholeVnd(this.form.price) && this.form.category_id && variantsOk && !this.saving
+            return this.form.name.trim() && isWholeVnd(this.form.price) && this.form.category_id && variantsOk && !this.stockInvalid && !this.saving
+        },
+        stockInvalid() {
+            const v = this.form.stock
+            return this.stockTouched && v !== '' && v != null && !isStock(v)
         },
         variantFractional() { return this.form.variants.some(v => isFractional(v.price)) },
         // q-select shows no placeholder of its own for a plain (non-searchable) select
@@ -91,7 +103,7 @@ export default {
                 unit_label: '',
                 min_quantity: 1,
                 preorder_day: 0,
-                daily_portions: null,   // empty = no daily limit
+                stock: null,   // empty = no limit
                 is_preorder: false,   // UI only: off = instant (preorder_day 0), on = preorder_day ≥ 1
                 is_available: true,
                 is_featured: false,
@@ -101,6 +113,7 @@ export default {
         },
 
         _resetForm() {
+            this.stockTouched = false
             this.imageFile = null
             this.imagePreview = null
             if (this.isEdit) {
@@ -112,7 +125,7 @@ export default {
                     unit_label: this.item.unit_label || '',
                     min_quantity: this.item.min_quantity ?? 1,
                     preorder_day: this.item.preorder_day ?? 0,
-                    daily_portions: this.item.daily_portions ?? null,
+                    stock: this.item.stock ?? null,
                     is_preorder: (this.item.preorder_day ?? 0) > 0,
                     is_available: this.item.is_available ?? true,
                     is_featured: this.item.is_featured ?? false,
@@ -197,8 +210,8 @@ export default {
                     preorder_day: this.form.is_preorder ? Math.max(1, Number(this.form.preorder_day) || 1) : 0,
                     is_available: this.form.is_available,
                     is_featured: this.form.is_featured,
-                    daily_portions: this.form.daily_portions > 0 ? Math.floor(this.form.daily_portions) : null,
                 }
+                if (this.stockTouched) payload.stock = this.form.stock === '' || this.form.stock == null ? null : this.form.stock
 
                 // Clear image explicitly if removed
                 if (!this.form.image_url && !this.imageFile && this.isEdit && this.item.image_url) {
@@ -377,11 +390,13 @@ export default {
                             <q-input v-model.number="form.min_quantity" dense outlined dark type="number" :min="1" />
                         </div>
                         <div class="field-group flex-1">
-                            <div class="field-label">{{ $t('seller_menu.item_daily_portions') }}</div>
-                            <q-input v-model.number="form.daily_portions" dense outlined dark type="number" step="1" min="1" inputmode="numeric" @keydown="blockNonDigit"
-                                :placeholder="$t('seller_menu.item_daily_portions_placeholder')" />
+                            <div class="field-label">{{ $t('seller_menu.item_stock') }}</div>
+                            <q-input v-model.number="form.stock" dense outlined dark type="number" step="1" min="0" :max="STOCK_MAX" inputmode="numeric" @keydown="blockNonDigit"
+                                :error="stockInvalid" :error-message="$t('seller_menu.item_stock_error', { max: STOCK_MAX })" hide-bottom-space
+                                :placeholder="$t('seller_menu.item_stock_placeholder')" @update:model-value="stockTouched = true" />
                         </div>
                     </div>
+                    <div class="variant-hint">{{ $t('seller_menu.item_stock_hint') }}</div>
 
                     <!-- Toggles -->
                     <div class="toggle-row">
