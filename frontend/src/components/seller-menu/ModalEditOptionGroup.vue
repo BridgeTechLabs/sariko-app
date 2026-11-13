@@ -183,7 +183,7 @@ export default {
                         {{ $t('seller_menu.og_price_max', { price: formatVnd(limits.menu_option_max_extra_price) }) }}
                     </div>
                     <div class="hint">
-                        {{ atOptionsMax ? $t('api_errors.options_max', { max: limits.menu_max_options_per_group }) : $t('seller_menu.og_options_hint') }}
+                        {{ atOptionsMax ? $t('api_errors.options_max', { max: limits.menu_max_options_per_group, count: limits.menu_max_options_per_group }) : $t('seller_menu.og_options_hint') }}
                     </div>
                 </div>
 
