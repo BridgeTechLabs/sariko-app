@@ -90,7 +90,7 @@ export const useCartStore = defineStore("cartStore", {
                             // Stock left (null = no limit) and the dish's minimum per order
                             "portionsLeft": stockLeft(_cartItems[i]?.food_items),
                             "minQuantity": _cartItems[i]?.food_items?.min_quantity ?? 1,
-                            "unavailable": _cartItems[i]?.food_items?.is_available === false || _variant?.is_available === false,
+                            "unavailable": _cartItems[i]?.food_items?.is_available === false || _variant?.is_available === false || _cartItems[i]?.food_items?.sold_out === true,
                         })
                     }
                 }

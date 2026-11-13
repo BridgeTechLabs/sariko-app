@@ -12,6 +12,10 @@ class CartLimit(Exception):
     """add_cart_item refused the add: str(self) is "quantity_max" or "cart_max_lines"."""
 
 
+class CartGone(Exception):
+    """The cart was deleted between reading it and adding to it (cart_items_cart_id_fkey, 23503): nothing was written."""
+
+
 class DAOCartItems(DAOBase):
 
     def __init__(self):
@@ -52,6 +56,8 @@ class DAOCartItems(DAOBase):
         except PostgrestExceptionAPIError as e:
             if e.message in ("quantity_max", "cart_max_lines"):
                 raise CartLimit(e.message)
+            if e.code == "23503":
+                raise CartGone()
             raise Exception(f"Supabase error - add_item with cart_id {cart_id} and food_item_id {food_item_id}: {e}")
 
 

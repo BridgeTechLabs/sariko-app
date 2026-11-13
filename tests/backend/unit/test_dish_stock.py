@@ -80,8 +80,8 @@ class _Query:
 class _Client:
     """reserve = what reserve_order_stock answers: None (a dish short), [] or the dishes that crossed."""
 
-    def __init__(self, reserve):
-        self.reserve, self.calls = reserve, []
+    def __init__(self, reserve, cancelled_meanwhile=False):
+        self.reserve, self.calls, self.cancelled_meanwhile = reserve, [], cancelled_meanwhile
         self.order = {"id": ORDER_ID, "user_id": "buyer", "seller_user_id": "seller", "status": "pending",
                       "payment_status": "pending", "total_amount": "100000", "transaction_ref": None,
                       "ipn_data": None, "payment_create_date": "20260430120000"}
@@ -90,8 +90,12 @@ class _Client:
         self.calls.append(("rpc", name, params))
         if name == "reserve_order_stock":
             return _Result(self.reserve)
-        if name == "update_order_payment_status":
+        if name == "update_order_payment_status":   # T208: true = the order still waits (pending)
+            if self.cancelled_meanwhile:              # cancelled after the IPN read it: nothing written
+                self.order["status"] = "cancelled"
+                return _Result(False)
             self.order.update(payment_status=params["p_status"], transaction_ref=params["p_transaction_ref"])
+            return _Result(True)
         return _Result(None)
 
     def table(self, name):
@@ -101,8 +105,8 @@ class _Client:
 @pytest.fixture
 def ipn(fastapi_client, vnp_secret, monkeypatch):
     """A paid IPN through apply_vnpay_result and the real DAOOrders on a fake client."""
-    def call(reserve, stock_push_fails=False, new_order_push_fails=False):
-        client = _Client(reserve)
+    def call(reserve, stock_push_fails=False, new_order_push_fails=False, cancelled_meanwhile=False):
+        client = _Client(reserve, cancelled_meanwhile)
         dao = DAOOrders.__new__(DAOOrders)
         dao._table_name, dao._supabase_client = "orders", client
         monkeypatch.setattr(dao, "_invalidate_cache_for_order", lambda order_id: None, raising=False)
@@ -125,7 +129,9 @@ def ipn(fastapi_client, vnp_secret, monkeypatch):
             pushes.append(("stock", seller_user_id, dish["name"]))
         monkeypatch.setattr("dao.dao_orders.push_service.notify_seller_stock", stock_push)
         monkeypatch.setattr(DAORefunds, "__init__", lambda self: None)
-        monkeypatch.setattr(DAORefunds, "create_refund", lambda self, **kw: refunds.append(kw))
+        monkeypatch.setattr(DAORefunds, "create_refund", lambda self, **kw: refunds.append(kw) or {"id": "rf1", **kw})
+        monkeypatch.setattr(DAORefunds, "read_txn_refs", lambda self, order_id: {r["original_txn_ref"] for r in refunds})
+        monkeypatch.setattr("apis.payments.push_service.notify_payment_after_cancel", lambda order: pushes.append("after_cancel"))
         params = make_ipn_params(vnp_secret, ORDER_ID, 100000)
         res = fastapi_client.get("/payments/vnpay/ipn", params=params)
         return res.json(), client, pushes, refunds, params
@@ -171,6 +177,30 @@ def test_tc2_20_push_failure_keeps_the_ipn(ipn):
 def test_g1_new_order_push_failure_keeps_the_stock_push(ipn):
     body, client, pushes, _, _ = ipn(reserve=[FRIED], new_order_push_fails=True)
     assert body["RspCode"] == "00" and pushes == [("stock", "seller", "Fried chicken")]
+
+
+# ─── T208 (QĐ4-8): a cancel between the IPN's read and the "paid" write ───────
+@pytest.mark.parametrize("reserve", [[], None])   # TC4-25 stock taken; TC4-30 a dish short
+def test_tc4_25_tc4_30_cancelled_while_marking_paid(ipn, reserve):
+    body, client, pushes, refunds, params = ipn(reserve=reserve, cancelled_meanwhile=True)
+    assert body["RspCode"] == "00"
+    assert (client.order["status"], client.order["payment_status"]) == ("cancelled", "pending")
+    assert [(r["reason"], r["original_txn_ref"]) for r in refunds] == [("late_payment", params["vnp_TxnRef"])]   # not sold_out
+    assert pushes == ["after_cancel"]                   # no new-order / stock push, no "cancelled" from _cancel_sold_out
+    names = [c[1] for c in client.calls if c[0] == "rpc"]
+    assert "compute_order_withholding" not in names
+
+
+def test_tc4_29_paid_twice_is_not_refunded(monkeypatch):
+    client = _Client([])
+    dao = DAOOrders.__new__(DAOOrders)
+    dao._table_name, dao._supabase_client = "orders", client
+    monkeypatch.setattr(dao, "_invalidate_cache_for_order", lambda order_id: None, raising=False)
+    monkeypatch.setattr(dao, "read_order_by_id_raw", lambda order_id: None, raising=False)
+    monkeypatch.setattr("dao.dao_orders.DAOAdminConfig", lambda: type("C", (), {"get_positive_int": lambda self, k, d: d})())
+    assert dao.update_payment_status(ORDER_ID, "paid", "TXN") is True
+    assert dao.update_payment_status(ORDER_ID, "paid", "TXN") is True   # still pending until the seller takes it
+    assert client.order["payment_status"] == "paid" and client.order["status"] == "pending"
 
 
 def test_stock_push_texts(monkeypatch):

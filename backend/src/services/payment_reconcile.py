@@ -44,8 +44,10 @@ def reconcile_payments(now: datetime = None) -> dict:
         if outcome == "paid":
             rsp = json.loads(apply_vnpay_result(querydr_params(check)).body)
             logger.warning(f"[Reconcile] order={order['id']} txn={txn[0]} paid at VNPay, no IPN: {rsp}")
-            # Not for a cancelled order: that payment became a late_payment refund, told by its own push (T175 A5)
-            if rsp["RspCode"] == "00" and order["status"] == "pending":
+            # Not for a cancelled order: that payment became a late_payment refund, told by its own push (T175 A5),
+            # also when it was cancelled after this run read it (T208: the order stays unpaid)
+            if rsp["RspCode"] == "00" and order["status"] == "pending" and \
+                    (dao.read_order_by_id_raw(order["id"]) or {}).get("payment_status") == "paid":
                 push_service.notify_payment_confirmed(order)
                 counts["paid"] += 1
         elif outcome == "failed" and not order.get("vnpay_fail_notified_at"):
