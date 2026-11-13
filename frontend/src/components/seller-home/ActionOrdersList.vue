@@ -7,6 +7,7 @@ import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '
 import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
 import { orderCode } from '@/utils/orderCode';
+import { optionsLines } from '@/utils/priceDisplay';
 
 const STATUS_DISPLAY_KEY = {
     pending:          'seller_home.status_new',
@@ -150,6 +151,7 @@ export default {
     },
 
     methods: {
+        optionsLines,
         formatWait,
 
         t(key, fallback) {
@@ -350,7 +352,8 @@ export default {
                 <q-separator style="background: rgba(255,255,255,0.08); margin: 10px 0;" />
 
                 <!-- Items list -->
-                <div v-for="item in order.items" :key="item.id" class="item-row">
+                <template v-for="item in order.items" :key="item.id">
+                <div class="item-row">
                     <div class="item-left">
                         <span class="item-qty">{{ item.quantity }}</span>
                         <span class="item-sep">×</span>
@@ -358,6 +361,10 @@ export default {
                     </div>
                     <span class="item-price">{{ fmt(item.price_snapshot * item.quantity) }}</span>
                 </div>
+                <div v-for="line in optionsLines(item.options_snapshot)" :key="line.label" class="option-row" :class="{ 'option-row--sub': line.sub }">
+                    <span>{{ line.label }}</span><span v-if="line.extra !== null">+{{ fmt(line.extra) }}</span>
+                </div>
+                </template>
 
                 <q-separator style="background: rgba(255,255,255,0.08); margin: 10px 0;" />
 
@@ -689,6 +696,9 @@ export default {
 .item-price {
     font-size: 13px;
     color: var(--text-secondary);
+    flex-shrink: 0;
+    padding-left: 12px;
+    white-space: nowrap;
 }
 
 .total-row {
@@ -940,4 +950,17 @@ export default {
     color: #f5A623;
     font-weight: 600;
 }
+
+.option-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin: -2px 0 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+
+    span:last-child { flex-shrink: 0; white-space: nowrap; }
+}
+
+.option-row--sub { padding-left: 12px; }
 </style>

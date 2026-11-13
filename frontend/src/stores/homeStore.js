@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { categories } from "@/stores/data.js";
 import { apiSellers } from "@/apis/sellers/apiSellers.js";
-import { foodPriceDisplay, hasVariants } from '@/utils/priceDisplay'
+import { foodPriceDisplay, picksOnDetail } from '@/utils/priceDisplay'
 
 export const useHomeStore = defineStore('homeStore', {
     state: () => {
@@ -22,7 +22,7 @@ export const useHomeStore = defineStore('homeStore', {
                         id: d.id,
                         name: d.name,
                         price: foodPriceDisplay(d),
-                        hasVariants: hasVariants(d),
+                        hasVariants: picksOnDetail(d),
                         imgSrc: d.image_url,
                         sellerId: d.seller_profiles?.id,
                         sellerSlug: d.seller_profiles?.slug,

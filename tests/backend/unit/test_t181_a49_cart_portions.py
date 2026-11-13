@@ -4,8 +4,8 @@ import apis.cart as cart_api
 
 
 def test_a49_cart_dishes_carry_portions_left(monkeypatch):
-    cart = {"cart_items": [{"quantity": 3, "food_items": {"id": "f1", "daily_portions": 5, "preorder_day": 0}},
-                           {"quantity": 1, "food_items": {"id": "f2", "daily_portions": None, "preorder_day": 0}}]}
+    cart = {"cart_items": [{"quantity": 3, "food_items": {"id": "f1", "name": "A", "price": 1, "daily_portions": 5, "preorder_day": 0}},
+                           {"quantity": 1, "food_items": {"id": "f2", "name": "B", "price": 1, "daily_portions": None, "preorder_day": 0}}]}
     monkeypatch.setattr(cart_api, "DAOCartItems", lambda: type("D", (), {"read_cart_items_by_user_id": lambda self, user_id: cart})())
     monkeypatch.setattr(cart_api.DAOFoodItems, "__init__", lambda self: None)
     monkeypatch.setattr(cart_api.DAOFoodItems, "read_portions_left", lambda self, ids, day: {"f1": 2})

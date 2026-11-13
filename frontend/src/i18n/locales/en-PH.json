@@ -82,7 +82,13 @@
         "invalid_file_type": "Use JPG, PNG or PDF files (photos only for dishes).",
         "too_many_files": "Up to {limit} files per document type.",
         "id_document_required": "Upload your passport or CCCD.",
-        "dish_photo_missing": "Some dishes have no photo."
+        "dish_photo_missing": "Some dishes have no photo.",
+        "options_sold_out": "Sold out: {name}",
+        "option_unknown": "Some choices for {name} are no longer offered. Please choose again.",
+        "option_unavailable": "{option} is no longer available. Please choose again.",
+        "option_required": "Choose an option in {group} for {name}",
+        "option_max": "Choose at most {max} in {group} for {name}",
+        "cart_max_lines": "At most {max} different dishes in one cart"
     },
     "breadcrumbs": {
         "cart_page": "Cart",
@@ -290,7 +296,13 @@
         "reviews_title": "Reviews",
         "reviews_empty": "No reviews for this dish yet.",
         "review_anonymous": "Customer",
-        "label_choose_option": "Choose an option"
+        "options_required": "Required",
+        "options_optional": "Optional",
+        "options_choose_one": "Choose 1",
+        "options_up_to": "Up to {n}",
+        "option_not_available": "Not available",
+        "options_missing": "Choose 1 in {group}",
+        "label_price_levels": "Price option"
     },
     "cart_page": {
         "dish_sold_out": "This dish is sold out.",
@@ -317,7 +329,8 @@
             "missing_address": "Delivery address is required.",
             "missing_appointment": "Please select a delivery date and time.",
             "remove_unavailable": "Remove sold-out items from your cart: {names}",
-            "fix": "Fix →"
+            "fix": "Fix →",
+            "fix_options": "Some dishes need their options chosen again."
         },
         "preorder": {
             "label_delivery_date": "Delivery Date & Time",
@@ -337,7 +350,8 @@
         "empty_subtitle": "Discover delicious homemade Filipino food from community sellers near you.",
         "empty_button": "Browse Sellers",
         "note_label": "Note",
-        "note_placeholder": "Allergies, spice level, gate code..."
+        "note_placeholder": "Allergies, spice level, gate code...",
+        "choose_again": "Choose again"
     },
     "checkout_page": {
         "section_cart_review": {
@@ -833,25 +847,35 @@
     "seller_menu": {
         "page_title": "Menu Management",
         "category_add": "Add Category",
-        "category_edit": "Edit",
         "category_add_title": "Add Category",
         "category_edit_title": "Edit Category",
         "category_name_label": "Category Name",
         "category_name_placeholder": "E.g. Mains, Desserts...",
-        "category_delete": "Delete Category",
         "category_delete_confirm_title": "Delete category?",
         "category_delete_confirm_body": "This empty category will be permanently deleted.",
         "category_delete_has_items": "Remove all {count} item(s) from this category before deleting it.",
         "category_delete_confirm_action": "Delete",
         "category_empty": "No items in this category yet",
-        "category_move_up": "Move category up",
-        "category_move_down": "Move category down",
+        "category_move_up": "Move up",
+        "category_move_down": "Move down",
         "category_move_failed": "Couldn't save the new order. Please try again.",
+        "item_off": "Off",
+        "dish_count": "{count} dish | {count} dishes",
+        "category_collapse": "Collapse category",
+        "category_expand": "Expand category",
+        "category_edit_label": "Edit category",
+        "category_delete_label": "Delete category",
+        "category_name_hint": "Your dishes are grouped under this name on your store page.",
+        "category_position": "Position",
+        "group_dish": "Dish",
+        "group_price": "Price",
+        "group_selling": "Selling",
         "load_error": "Couldn't load your menu",
         "load_error_sub": "Check your connection and try again.",
         "retry": "Try again",
-        "item_add": "Add Item",
         "item_edit": "Edit",
+        "item_add_dish": "Add dish",
+        "category_new_option": "+ New category",
         "item_add_title": "Add New Item",
         "item_edit_title": "Edit Item",
         "item_delete": "Delete Item",

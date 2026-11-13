@@ -1,6 +1,5 @@
 <script>
 import { useMenuStore } from '@/stores/seller/menuStore'
-import { Pencil } from 'lucide-vue-next'
 import ModalEditItem from './ModalEditItem.vue'
 import { foodPriceDisplay, hasVariants } from '@/utils/priceDisplay';
 import { dayMonth } from '@/utils/portions';
@@ -8,7 +7,7 @@ import { dayMonth } from '@/utils/portions';
 export default {
     name: 'SellerMenuFoodItem',
 
-    components: { ModalEditItem, Pencil },
+    components: { ModalEditItem },
 
     props: {
         item: { type: Object, required: true },
@@ -39,7 +38,7 @@ export default {
 </script>
 
 <template>
-    <div class="food-item-row">
+    <div class="food-card" :class="{ off: !item.is_available }" @click="showEditModal = true">
         <img
             :src="item.image_url || '/images/default-food-image.webp'"
             class="food-thumb"
@@ -47,26 +46,25 @@ export default {
         />
         <div class="food-info">
             <div class="food-name">{{ item.name }}</div>
-            <div class="food-price">{{ foodPriceDisplay(item) }}</div>
-            <div v-if="item.unit_label && !hasVariants(item)" class="food-unit">/ {{ item.unit_label }}</div>
+            <div class="food-sub">
+                <span class="food-price">{{ foodPriceDisplay(item) }}</span>
+                <template v-if="item.unit_label && !hasVariants(item)"> / {{ item.unit_label }}</template>
+                <span v-if="!item.is_available" class="food-tag-off">{{ $t('seller_menu.item_off') }}</span>
+            </div>
             <div v-if="item.daily_portions" class="food-portions" :class="{ 'food-portions--out': (item.portions_date ? item.remaining_preorder : item.remaining_today) === 0 }">
                 <!-- a pre-order dish counts its first delivery day, not today (T181 A34) -->
                 <template v-if="item.portions_date">{{ $t('seller_menu.portions_left_on', { left: item.remaining_preorder, total: item.daily_portions, date: dayMonth(item.portions_date) }) }}</template>
                 <template v-else>{{ $t('seller_menu.portions_left_today', { left: item.remaining_today ?? item.daily_portions, total: item.daily_portions }) }}</template>
             </div>
         </div>
-        <div class="food-actions">
-            <button class="btn-edit" @click="showEditModal = true">
-                <Pencil :size="13" />
-            </button>
-            <q-toggle
-                :model-value="item.is_available"
-                color="positive"
-                dense
-                :disable="toggling"
-                @update:model-value="onToggleAvailable"
-            />
-        </div>
+        <q-toggle
+            :model-value="item.is_available"
+            color="positive"
+            dense
+            :disable="toggling"
+            @click.stop
+            @update:model-value="onToggleAvailable"
+        />
 
         <ModalEditItem
             v-model="showEditModal"
@@ -76,19 +74,24 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-.food-item-row {
+.food-card {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    &:last-child { border-bottom: none; }
+    padding: 12px;
+    margin-bottom: 14px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    cursor: pointer;
+    &.off .food-thumb { opacity: 0.4; }
+    &.off .food-name { color: var(--text-muted); }
 }
 
 .food-thumb {
-    width: 52px;
-    height: 52px;
-    border-radius: 10px;
+    width: 72px;
+    height: 72px;
+    border-radius: 12px;
     object-fit: cover;
     flex-shrink: 0;
     background: rgba(255,255,255,0.05);
@@ -100,7 +103,7 @@ export default {
 }
 
 .food-name {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
     white-space: nowrap;
@@ -108,43 +111,32 @@ export default {
     text-overflow: ellipsis;
 }
 
-.food-price {
+.food-sub {
     font-size: 13px;
-    color: var(--color-accent);
-    margin-top: 2px;
+    color: var(--text-secondary);
+    margin-top: 4px;
 }
 
-.food-unit {
+.food-price {
+    color: var(--color-accent);
+    font-weight: 600;
+}
+
+.food-tag-off {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 7px;
     font-size: 11px;
+    line-height: 18px;
     color: var(--text-muted);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 6px;
 }
 
 .food-portions {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text-muted);
-    margin-top: 2px;
+    margin-top: 3px;
     &--out { color: var(--color-error); }
-}
-
-.food-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-}
-
-.btn-edit {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    color: var(--text-secondary);
-    background: rgba(255,255,255,0.07);
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    flex-shrink: 0;
-    &:active { background: rgba(255,255,255,0.12); }
 }
 </style>

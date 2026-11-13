@@ -82,7 +82,13 @@
         "invalid_file_type": "Dùng tệp JPG, PNG hoặc PDF (ảnh món chỉ nhận ảnh).",
         "too_many_files": "Mỗi loại giấy tờ tối đa {limit} tệp.",
         "id_document_required": "Tải lên hộ chiếu hoặc CCCD.",
-        "dish_photo_missing": "Còn món chưa có ảnh."
+        "dish_photo_missing": "Còn món chưa có ảnh.",
+        "options_sold_out": "Hết món: {name}",
+        "option_unknown": "Một số lựa chọn của {name} không còn nữa. Vui lòng chọn lại.",
+        "option_unavailable": "{option} hiện không còn. Vui lòng chọn lại.",
+        "option_required": "Chọn một mục trong {group} cho {name}",
+        "option_max": "Chọn tối đa {max} mục trong {group} cho {name}",
+        "cart_max_lines": "Mỗi giỏ tối đa {max} món khác nhau"
     },
     "breadcrumbs": {
         "cart_page": "Giỏ hàng",
@@ -290,7 +296,13 @@
         "reviews_title": "Đánh giá",
         "reviews_empty": "Chưa có đánh giá nào cho món này.",
         "review_anonymous": "Khách hàng",
-        "label_choose_option": "Chọn mức giá"
+        "options_required": "Bắt buộc",
+        "options_optional": "Không bắt buộc",
+        "options_choose_one": "Chọn 1",
+        "options_up_to": "Tối đa {n}",
+        "option_not_available": "Tạm hết",
+        "options_missing": "Chọn 1 mục trong {group}",
+        "label_price_levels": "Mức giá"
     },
     "cart_page": {
         "dish_sold_out": "Món này đã bán hết.",
@@ -317,7 +329,8 @@
             "missing_address": "Cần có địa chỉ giao hàng.",
             "missing_appointment": "Vui lòng chọn ngày và giờ nhận hàng.",
             "remove_unavailable": "Bỏ món đã hết khỏi giỏ: {names}",
-            "fix": "Cập nhật →"
+            "fix": "Cập nhật →",
+            "fix_options": "Có món cần chọn lại lựa chọn."
         },
         "preorder": {
             "label_delivery_date": "Ngày & giờ nhận hàng",
@@ -337,7 +350,8 @@
         "empty_subtitle": "Khám phá món Filipino nhà làm từ các người bán gần bạn.",
         "empty_button": "Xem người bán",
         "note_label": "Ghi chú",
-        "note_placeholder": "Dị ứng, độ cay, mã cổng..."
+        "note_placeholder": "Dị ứng, độ cay, mã cổng...",
+        "choose_again": "Chọn lại"
     },
     "checkout_page": {
         "section_cart_review": {
@@ -836,25 +850,35 @@
     "seller_menu": {
         "page_title": "Quản lý thực đơn",
         "category_add": "Thêm danh mục",
-        "category_edit": "Sửa",
         "category_add_title": "Thêm danh mục",
         "category_edit_title": "Sửa danh mục",
         "category_name_label": "Tên danh mục",
         "category_name_placeholder": "VD: Món chính, Tráng miệng...",
-        "category_delete": "Xóa danh mục",
         "category_delete_confirm_title": "Xóa danh mục?",
         "category_delete_confirm_body": "Danh mục trống này sẽ bị xóa vĩnh viễn.",
         "category_delete_has_items": "Hãy xóa hết {count} món trong danh mục này trước khi xóa.",
         "category_delete_confirm_action": "Xóa",
         "category_empty": "Chưa có món nào trong danh mục này",
-        "category_move_up": "Đưa danh mục lên",
-        "category_move_down": "Đưa danh mục xuống",
+        "category_move_up": "Lên",
+        "category_move_down": "Xuống",
         "category_move_failed": "Không lưu được thứ tự mới. Vui lòng thử lại.",
+        "item_off": "Tắt",
+        "dish_count": "{count} món",
+        "category_collapse": "Thu gọn danh mục",
+        "category_expand": "Mở danh mục",
+        "category_edit_label": "Sửa danh mục",
+        "category_delete_label": "Xóa danh mục",
+        "category_name_hint": "Các món được xếp dưới tên này trên trang quán của bạn.",
+        "category_position": "Vị trí",
+        "group_dish": "Món",
+        "group_price": "Giá",
+        "group_selling": "Bán hàng",
         "load_error": "Không tải được menu",
         "load_error_sub": "Kiểm tra kết nối mạng rồi thử lại.",
         "retry": "Thử lại",
-        "item_add": "Thêm món",
         "item_edit": "Sửa",
+        "item_add_dish": "Thêm món",
+        "category_new_option": "+ Danh mục mới",
         "item_add_title": "Thêm món mới",
         "item_edit_title": "Sửa món",
         "item_delete": "Xóa món",

@@ -146,7 +146,7 @@ def _portions_left(monkeypatch, module, left, asked):
 
 def _cart(qty_by_variant, preorder_day=0):
     return {"id": "cart", "seller_id": "seller", "cart_items": [
-        {"quantity": q, "food_items": {"id": "food-1", "name": "Adobo", "price": 50000, "is_available": True,
+        {"quantity": q, "food_items": {"id": "food-1", "seller_id": "seller", "name": "Adobo", "price": 50000, "is_available": True,
                                        "preorder_day": preorder_day, "daily_portions": 5},
          "food_item_variants": None} for q in qty_by_variant]}
 
@@ -183,11 +183,10 @@ def add_to_cart(monkeypatch):
         "read_cart_by_user_id_seller_id": lambda self, user_id: {"id": "cart", "seller_id": "seller-1"}})())
     monkeypatch.setattr("apis.cart.DAOCartItems", lambda: type("CI", (), {
         "read_cart_items_by_user_id": lambda self, user_id: _cart([2]),
-        "find_item": lambda self, **kw: None,
-        "update_food_item_by_cart_id": lambda self, **kw: added.append(kw["quantity"])})())
+        "add_item": lambda self, cart_id, food_item_id, variant_id, option_ids, quantity, *caps: added.append(quantity)})())
 
     def call(quantity, left, preorder_day=0):
-        gate = {"name": "Adobo", "is_available": True, "preorder_day": preorder_day, "daily_portions": 5,
+        gate = {"seller_id": "seller-1", "name": "Adobo", "is_available": True, "preorder_day": preorder_day, "daily_portions": 5,
                 "seller_profiles": {"status": "active", "lat": 10.77, "lon": 106.70, "is_open": True}}
         monkeypatch.setattr("apis.cart.DAOFoodItems", lambda: type("G", (), {"read_order_gate": lambda self, i: gate})())
         asked = []

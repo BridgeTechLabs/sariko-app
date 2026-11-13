@@ -1,12 +1,13 @@
 <script>
 import { Store, Star } from 'lucide-vue-next';
+import FoodOptions from '@/components/food-detail/FoodOptions.vue';
 import { useSellerStore } from '@/stores/seller/sellerStore';
-import { foodPriceDisplay, formatVnd } from '@/utils/priceDisplay';
+import { foodPriceDisplay } from '@/utils/priceDisplay';
 import { portionsLeftToday, preorderPortions } from '@/utils/portions';
 import { ratingText } from '@/utils/rating';
 
 export default {
-    components: { Store, Star },
+    components: { Store, Star, FoodOptions },
 
     computed: {
         sellerStore() {
@@ -29,9 +30,6 @@ export default {
         levels() {
             return (this.food?.food_item_variants || []).filter(v => v.is_available !== false)
         },
-        selectedVariantId() {
-            return this.sellerStore.selectedVariantId
-        },
         hasRating() {
             return this.food?.rating_count > 0 && this.food?.rating_avg != null
         },
@@ -45,10 +43,6 @@ export default {
 
     methods: {
         ratingText,
-        formatVnd,
-        selectVariant(id) {
-            this.sellerStore.selectedVariantId = id
-        },
         goToSeller() {
             if (this.seller?.slug) {
                 this.$router.push(`/seller/${this.seller.slug}`)
@@ -89,22 +83,7 @@ export default {
             </div>
             <span class="food-price">{{ priceText }}</span>
 
-            <div v-if="levels.length" class="level-picker">
-                <div class="level-label">{{ $t('food_detail_page.label_choose_option') }}</div>
-                <div class="level-chips">
-                    <button
-                        v-for="v in levels"
-                        :key="v.id"
-                        class="level-chip"
-                        :class="{ 'level-chip--on': v.id === selectedVariantId }"
-                        :aria-pressed="v.id === selectedVariantId"
-                        @click="selectVariant(v.id)"
-                    >
-                        <span class="level-chip__name">{{ v.name }}</span>
-                        <span class="level-chip__price">{{ formatVnd(v.price) }}</span>
-                    </button>
-                </div>
-            </div>
+            <FoodOptions />
             <p v-if="food.description" class="food-description">{{ food.description }}</p>
         </template>
 
@@ -123,48 +102,6 @@ export default {
 .food-info {
     display: flex;
     flex-direction: column;
-}
-
-.level-picker {
-    margin-top: 12px;
-}
-
-.level-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-muted, #9aa3b2);
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    margin-bottom: 8px;
-}
-
-.level-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.level-chip {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    padding: 8px 14px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    font-family: inherit;
-
-    &__name { font-size: 14px; font-weight: 600; }
-    &__price { font-size: 12px; opacity: 0.75; }
-
-    &--on {
-        border-color: #f5A623;
-        background: rgba(245, 166, 35, 0.12);
-        .level-chip__price { opacity: 1; color: #f5A623; }
-    }
 }
 
 .food-name {

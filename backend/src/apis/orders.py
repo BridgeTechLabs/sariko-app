@@ -26,7 +26,7 @@ from schemas import Schema
 from services import push_service
 from services.order_expiry import confirm_window
 from services.lalamove_service import get_lalamove_service
-from utils.pricing import order_amounts
+from utils.pricing import chosen_options, dish_groups, options_sold_out, order_amounts
 
 router = APIRouter(prefix="/orders")
 logger = logging.getLogger(__name__)
@@ -69,13 +69,71 @@ def portions_error(wanted: dict, names: dict, sale_date):
     return None
 
 
+def max_per_dish() -> int:
+    return DAOAdminConfig().get_positive_int("cart_max_quantity_per_item", 50)
+
+
+def max_lines() -> int:
+    return DAOAdminConfig().get_positive_int("cart_max_lines", 20)
+
+
+def quantity_max_error(most: int) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
+        "code": "quantity_max", "message": f"At most {most} of each dish", "max": most})
+
+
+def lines_max_error(most: int) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
+        "code": "cart_max_lines", "message": f"At most {most} different dishes in one cart", "max": most})
+
+
 def check_quantities(quantities) -> None:
-    """400 when one cart row (dish + price option) asks more than cart_max_quantity_per_item.
-    A bot put ~22 billion ₫ orders through with no cap (docs/dev/20261102-security-fixes S1)."""
-    most = DAOAdminConfig().get_positive_int("cart_max_quantity_per_item", 50)
+    """400 when one dish (all its cart rows: price options and option choices together) asks more than
+    cart_max_quantity_per_item. A bot put ~22 billion ₫ orders through with no cap (docs/dev/20261102-security-fixes S1)."""
+    most = max_per_dish()
     if max(quantities, default=0) > most:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
-            "code": "quantity_max", "message": f"At most {most} of each dish", "max": most})
+        raise quantity_max_error(most)
+
+
+def dish_totals(cart_items: list) -> list:
+    """Quantity of each dish over all its cart rows."""
+    totals = {}
+    for item in cart_items:
+        food_id = (item.get("food_items") or {}).get("id")
+        totals[food_id] = totals.get(food_id, 0) + item["quantity"]
+    return list(totals.values())
+
+
+def option_problem(cart_item: dict):
+    """None, or the error detail of a cart row's options (QĐ3-4), the one check of POST /cart/add, GET /cart and
+    POST /orders. options_sold_out means the dish can't be ordered at all (409); the others ask the buyer to
+    choose again (400). The row's option_ids are already de-duplicated (add_cart_item)."""
+    food = cart_item["food_items"]
+    dish = food.get("name")
+    if options_sold_out(food):
+        return {"code": "options_sold_out", "message": f"Sold out: {dish}", "name": dish}
+    chosen = chosen_options(cart_item)
+    if len(chosen) < len(set(cart_item.get("option_ids") or [])):
+        return {"code": "option_unknown", "message": f"Some choices for {dish} are no longer offered. Please choose again.",
+                "name": dish}
+    off = next((o for _, o in chosen if not o["is_available"]), None)
+    if off:
+        return {"code": "option_unavailable", "message": f"{off['name']} is no longer available. Please choose again.",
+                "name": dish, "option": off["name"]}
+    for group in dish_groups(food):
+        picked = sum(1 for g, _ in chosen if g["id"] == group["id"])
+        if group["is_required"] and not picked:
+            return {"code": "option_required", "message": f"Choose an option in {group['name']} for {dish}",
+                    "name": dish, "group": group["name"]}
+        if picked > group["max_select"]:
+            return {"code": "option_max", "message": f"Choose at most {group['max_select']} in {group['name']} for {dish}",
+                    "name": dish, "group": group["name"], "max": group["max_select"]}
+    return None
+
+
+def option_error(problem: dict) -> HTTPException:
+    code = status.HTTP_409_CONFLICT if problem["code"] == "options_sold_out" else status.HTTP_400_BAD_REQUEST
+    return HTTPException(status_code=code, detail=problem)
 
 
 # Shared with POST /cart/add. A closed store still takes pre-orders (delivered on a later
@@ -139,7 +197,13 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
 
     # 2. Check the cart is still sellable
     cart_items = cart["cart_items"]
-    check_quantities(item["quantity"] for item in cart_items)   # a cart filled before the cap existed
+    # A cart filled before the caps existed, or two adds that raced past them (TC3-65)
+    check_quantities(dish_totals(cart_items))
+    if len(cart_items) > (most := max_lines()):
+        raise lines_max_error(most)
+    # The cart's store, not the dish's, was chosen by the client at /cart/add before this check existed (BM2)
+    if any((item.get("food_items") or {}).get("seller_id") != cart["seller_id"] for item in cart_items):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart contains a dish of another store")
 
     appointment = request.delivery_appointment
     if appointment is not None and appointment.tzinfo is None:
@@ -168,6 +232,11 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
             detail={"code": "no_longer_available", "message": f"No longer available: {', '.join(sold_out)}",
                     "names": ", ".join(sold_out)},
         )
+
+    for item in cart_items:
+        problem = option_problem(item)
+        if problem:
+            raise option_error(problem | {"cart_item_id": item["id"]})
 
     wanted, names = {}, {}
     for item in cart_items:

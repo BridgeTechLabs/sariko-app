@@ -18,6 +18,7 @@ export const useCartStore = defineStore("cartStore", {
             pendingSellerId: null,
             pendingFoodItemId: null,
             pendingVariantId: null,
+            pendingOptionIds: [],
             pendingSellerName: null,
 
             // note
@@ -42,6 +43,10 @@ export const useCartStore = defineStore("cartStore", {
         unavailableNames(state) {
             return state.cartItems.filter(i => i.unavailable).map(i => i.variantName ? `${i.name} (${i.variantName})` : i.name)
         },
+        // Rows whose options no longer fit the dish (the server's check, GET /cart): fixed before ordering
+        hasOptionProblem(state) {
+            return state.cartItems.some(i => i.problem)
+        },
         maxPreorderDay(state) {
             return Math.max(0, ...state.cartItems.map(i => i.preorder_day ?? 0))
         }
@@ -60,13 +65,16 @@ export const useCartStore = defineStore("cartStore", {
                         const _variant = _cartItems[i]?.food_item_variants || null
                         this.cartItems.push({
                             "id": _cartItems[i]?.food_items?.id,
-                            // Same dish at two levels = two rows sharing one id, so
-                            // every local lookup and :key must use rowKey, not id.
-                            "rowKey": `${_cartItems[i]?.food_items?.id}::${_variant?.id || ''}`,
+                            // One dish can be several rows (other level or options): the row's own id
+                            // is the key and what +/- and remove send.
+                            "rowKey": _cartItems[i]?.id,
                             "variantId": _variant?.id || null,
                             "variantName": _variant?.name || null,
                             "name": _cartItems[i]?.food_items?.name,
-                            "price": _variant ? _variant.price : _cartItems[i]?.food_items?.price,
+                            // Priced by the server (level or dish + options): what the order will charge
+                            "price": _cartItems[i]?.unit_price,
+                            "options": _cartItems[i]?.options || [],
+                            "problem": _cartItems[i]?.problem || null,
                             "imgSrc": _cartItems[i]?.food_items?.image_url,
                             "category":  _cartItems[i]?.food_items?.menu_categories?.name,
                             "quantity": _cartItems[i]?.quantity,
@@ -85,9 +93,9 @@ export const useCartStore = defineStore("cartStore", {
             }
         },
 
-        async addItem(sellerId, foodItemId, newSellerName, quantity = 1, variantId = null) {
+        async addItem(sellerId, foodItemId, newSellerName, quantity = 1, variantId = null, optionIds = []) {
             try {
-                await apiCarts.addItem(sellerId, foodItemId, quantity, variantId)
+                await apiCarts.addItem(sellerId, foodItemId, quantity, variantId, optionIds)
                 await this.refreshCart()
                 return true
             } catch (e) {
@@ -95,9 +103,10 @@ export const useCartStore = defineStore("cartStore", {
                     this.pendingSellerId = sellerId
                     this.pendingFoodItemId = foodItemId
                     this.pendingVariantId = variantId
+                    this.pendingOptionIds = optionIds
                     this.pendingSellerName = newSellerName
                     this.showConflictModal(e.currentSellerName || '', newSellerName || '')
-                } else if (['portions_left', 'quantity_max'].includes(e.detail?.code)) {
+                } else if (e.detail?.code) {   // portions_left, quantity_max, the option checks...: translated by code
                     Notify.create({ classes: 'quasar-notify-negative', message: apiErrorMessage({ detail: e.detail }), position: 'bottom', timeout: 3000 })
                 } else if (e.message.includes('sold out')) {
                     Notify.create({ classes: 'quasar-notify-negative', message: i18n.global.t('cart_page.dish_sold_out'), position: 'bottom', timeout: 3000 })
@@ -118,13 +127,14 @@ export const useCartStore = defineStore("cartStore", {
                 this.isShowModalCartConflict = false
 
                 if (this.pendingSellerId && this.pendingFoodItemId) {
-                    await apiCarts.addItem(this.pendingSellerId, this.pendingFoodItemId, 1, this.pendingVariantId)
+                    await apiCarts.addItem(this.pendingSellerId, this.pendingFoodItemId, 1, this.pendingVariantId, this.pendingOptionIds)
                     await this.refreshCart()
                 }
 
                 this.pendingSellerId = null
                 this.pendingFoodItemId = null
                 this.pendingVariantId = null
+                this.pendingOptionIds = []
                 this.pendingSellerName = null
             } catch (e) {
                 console.error(`cartStore - clearCartAndAddItem - ${e}`)
@@ -137,10 +147,9 @@ export const useCartStore = defineStore("cartStore", {
             await this.getCurrentCart()
         },
 
-        async updateQuantity(foodItemId, newQuantity, variantId = null) {
+        async updateQuantity(rowKey, newQuantity) {
             try {
-                await apiCarts.updateQuantity(foodItemId, newQuantity, variantId)
-                const rowKey = `${foodItemId}::${variantId || ''}`
+                await apiCarts.updateQuantity(rowKey, newQuantity)
                 const item = this.cartItems.find(i => i.rowKey === rowKey)
                 if (item) item.quantity = newQuantity
             } catch (e) {
@@ -148,10 +157,9 @@ export const useCartStore = defineStore("cartStore", {
             }
         },
 
-        async removeItem(foodItemId, variantId = null) {
+        async removeItem(rowKey) {
             try {
-                await apiCarts.removeItem(foodItemId, variantId)
-                const rowKey = `${foodItemId}::${variantId || ''}`
+                await apiCarts.removeItem(rowKey)
                 this.cartItems = this.cartItems.filter(i => i.rowKey !== rowKey)
             } catch (e) {
                 console.error(`cartStore - removeItem - ${e}`);

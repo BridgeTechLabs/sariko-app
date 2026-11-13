@@ -2,6 +2,7 @@
 import { Phone } from 'lucide-vue-next';
 import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { orderCode } from '@/utils/orderCode';
+import { optionsLines } from '@/utils/priceDisplay';
 import { cancelReasonText } from '@/utils/cancelReason';
 
 const STATUS_DISPLAY_KEY = {
@@ -187,6 +188,7 @@ export default {
     },
 
     methods: {
+        optionsLines,
         // When the order reached this status (history_order_status), Vietnam time;
         // the date too unless it was today (with the year: vi-VN writes day + month
         // alone as "16-10"). Orders before 2026-10-16 have no history.
@@ -280,10 +282,15 @@ export default {
         <!-- Items -->
         <div class="card">
             <div class="section-label" style="margin-bottom:12px;">{{ $t('seller_order_detail.section_items') }}</div>
-            <div v-for="item in order.order_items" :key="item.id" class="item-row">
+            <template v-for="item in order.order_items" :key="item.id">
+            <div class="item-row">
                 <span class="item-name">{{ item.quantity }}x {{ item.name_snapshot }}<span v-if="item.variant_name_snapshot" class="order-variant"> ({{ item.variant_name_snapshot }})</span></span>
                 <span class="item-price">{{ fmt(item.price_snapshot * item.quantity) }}</span>
             </div>
+            <div v-for="line in optionsLines(item.options_snapshot)" :key="line.label" class="option-row" :class="{ 'option-row--sub': line.sub }">
+                <span>{{ line.label }}</span><span v-if="line.extra !== null">+{{ fmt(line.extra) }}</span>
+            </div>
+            </template>
             <q-separator style="background:rgba(255,255,255,0.08);margin:12px 0;" />
             <div class="item-row">
                 <span class="info-key">{{ $t('seller_order_detail.label_subtotal') }}</span>
@@ -436,7 +443,7 @@ export default {
 }
 
 .item-name  { font-size: 14px; color: var(--text-primary); }
-.item-price { font-size: 14px; color: var(--text-secondary); }
+.item-price { font-size: 14px; color: var(--text-secondary); flex-shrink: 0; padding-left: 12px; white-space: nowrap; }
 
 .total-row {
     font-size: 15px;
@@ -518,4 +525,17 @@ export default {
     color: #f5A623;
     font-weight: 600;
 }
+
+.option-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin: -2px 0 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+
+    span:last-child { flex-shrink: 0; white-space: nowrap; }
+}
+
+.option-row--sub { padding-left: 12px; }
 </style>
