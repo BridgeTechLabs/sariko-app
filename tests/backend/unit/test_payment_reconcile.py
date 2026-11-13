@@ -38,6 +38,7 @@ class FakeOrders:
                       "payment_create_date": link_made(minutes_ago), "vnpay_checked_at": None, "vnpay_check": None,
                       "vnpay_fail_notified_at": None, "refunds": [], "payments": [], **over}
         self.paid, self.saved, self.links, self.claims, self.rows = [], [], [], 0, []
+        self.cancel_on_mark = False
 
     # reconcile / check
     def read_unpaid_vnpay_orders(self, created_since):
@@ -73,8 +74,13 @@ class FakeOrders:
         return dict(self.order)
 
     def update_payment_status(self, order_id, payment_status, transaction_ref=None):
+        if self.cancel_on_mark:   # T208: cancelled after the IPN / reconcile read it
+            self.order["status"] = "cancelled"
+        if self.order["status"] != "pending":
+            return False
         self.paid.append((payment_status, transaction_ref))
         self.order.update(payment_status=payment_status, transaction_ref=transaction_ref)
+        return True
 
     def update_ipn_data(self, order_id, ipn_data):
         self.order["ipn_data"] = ipn_data
@@ -142,6 +148,17 @@ def test_t175_a5a_paid_after_the_cancel_is_refunded_and_told_once(env):
     # the IPN arrives after the job: same TxnRef -> no second refund, no second push
     assert b'"02"' in payments.apply_vnpay_result(payments.querydr_params(answer(env.txn))).body
     assert len(env.refunds) == 1 and env.pushes == ["after_cancel"]
+
+
+def test_tc4_26_cancelled_while_reconcile_marks_paid(env):   # T208 (QĐ4-8)
+    env.orders.cancel_on_mark = True   # the run read it pending; the buyer cancelled before the paid write
+    env.answers = [answer(env.txn)]
+    payment_reconcile.reconcile_payments(NOW)
+    assert [(r["reason"], r["amount"]) for r in env.refunds] == [("late_payment", 60000)]
+    assert env.pushes == ["after_cancel"] and env.orders.paid == []          # not "Your order is with the seller"
+    assert env.orders.order["payment_status"] == "pending"
+    assert b'"02"' in payments.apply_vnpay_result(payments.querydr_params(answer(env.txn))).body   # the IPN after it
+    assert len(env.refunds) == 1
 
 
 def test_t175_a5_second_payment_of_a_paid_order_is_not_after_cancel(env):   # QA nên sửa 1

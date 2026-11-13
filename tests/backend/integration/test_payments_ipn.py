@@ -64,6 +64,7 @@ class _FakeOrderDAO:
         self.last_payment_status = payment_status
         if self._order:
             self._order["payment_status"] = payment_status
+        return True   # T208: the order still waits (pending)
 
     def update_ipn_data(self, order_id, ipn_data):
         self.update_ipn_data_called = True

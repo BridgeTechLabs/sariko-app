@@ -55,6 +55,7 @@ class FakeOrders:
 
     def update_payment_status(self, order_id, payment_status, transaction_ref):
         self.order.update(payment_status=payment_status, transaction_ref=transaction_ref)
+        return True   # T208: the order still waits (pending)
 
     def update_ipn_data(self, order_id, ipn_data):
         pass

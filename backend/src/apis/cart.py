@@ -4,7 +4,7 @@ from typing import List, Optional
 import json
 import logging
 
-from dao.dao_cart_items import CartLimit, DAOCartItems
+from dao.dao_cart_items import CartGone, CartLimit, DAOCartItems
 from dao.dao_carts import DAOCarts
 from dao.dao_food_item_variants import DAOFoodItemVariants
 from dao.dao_food_items import DAOFoodItems
@@ -106,12 +106,31 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
         if short:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=short)
 
-    dao_cart = DAOCarts()    
+    def add():
+        cart_id = _cart_id(user_id, request.seller_id)   # the store rule first, as before
+        most, lines = max_per_dish(), max_lines()
+        try:
+            DAOCartItems().add_item(cart_id, request.food_item_id, request.variant_id, option_ids, request.quantity,
+                                    most, lines)
+        except CartLimit as e:
+            raise quantity_max_error(most) if str(e) == "quantity_max" else lines_max_error(lines)
+
+    try:
+        add()
+    except CartGone:
+        # T210: the cart went between the read and the add (the same buyer cleared it or placed the order in another
+        # tab): nothing was written, so the cart is read / made again and the add tried once more, as a second tap
+        # would. Its store rule holds (_cart_id); failing again is an error as before.
+        add()
+    return {"success": True}
+
+
+def _cart_id(user_id: str, seller_id: str) -> str:
+    """The buyer's cart for this store, made when there is none; 400 when the cart holds another store's dishes."""
+    dao_cart = DAOCarts()
     cart = dao_cart.read_cart_by_user_id_seller_id(user_id=user_id)
     if cart:
-        cart_id = cart["id"]
-        seller_id = cart["seller_id"]
-        if not seller_id == request.seller_id:
+        if not cart["seller_id"] == seller_id:
             current_seller_name = cart.get("seller_profiles", {}).get("store_name", "")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -120,20 +139,11 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
                     "current_seller_name": current_seller_name
                 }
             )
-    else:
-        new_cart = dao_cart.create_cart(user_id=user_id, seller_id=request.seller_id)
-        if not new_cart:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create cart")
-        cart_id = new_cart["id"]
-        
-    most, lines = max_per_dish(), max_lines()
-    try:
-        DAOCartItems().add_item(cart_id, request.food_item_id, request.variant_id, option_ids, request.quantity,
-                                most, lines)
-    except CartLimit as e:
-        raise quantity_max_error(most) if str(e) == "quantity_max" else lines_max_error(lines)
-
-    return {"success": True}
+        return cart["id"]
+    new_cart = dao_cart.create_cart(user_id=user_id, seller_id=seller_id)
+    if not new_cart:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to create cart")
+    return new_cart["id"]
 
 
 def _cart_line(user_id: str, item_id, food_item_id=None, variant_id=None):
