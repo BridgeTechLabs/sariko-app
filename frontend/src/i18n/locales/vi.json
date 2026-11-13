@@ -296,13 +296,13 @@
         "reviews_title": "Đánh giá",
         "reviews_empty": "Chưa có đánh giá nào cho món này.",
         "review_anonymous": "Khách hàng",
-        "label_choose_option": "Chọn mức giá",
         "options_required": "Bắt buộc",
         "options_optional": "Không bắt buộc",
         "options_choose_one": "Chọn 1",
         "options_up_to": "Tối đa {n}",
         "option_not_available": "Tạm hết",
-        "options_missing": "Chọn 1 mục trong {group}"
+        "options_missing": "Chọn 1 mục trong {group}",
+        "label_price_levels": "Mức giá"
     },
     "cart_page": {
         "dish_sold_out": "Món này đã bán hết.",

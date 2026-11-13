@@ -3,15 +3,31 @@ import { mapActions, mapState } from 'pinia';
 import { useSellerStore } from '@/stores/seller/sellerStore';
 import { formatVnd } from '@/utils/priceDisplay';
 
-// The dish's option groups (seller-menu đợt 3): radio for a required "choose 1", checkbox otherwise.
+// The dish's price levels and option groups (seller-menu đợt 3): radio for a required "choose 1", checkbox otherwise.
 // Every row is one tappable label; an option the seller switched off stays visible as "Not available".
+// The price levels are one more required "choose 1" group on top, each row with the level's full price (Jack 13/11);
+// a level that is off stays hidden, as before.
 export default {
     computed: {
-        ...mapState(useSellerStore, ['foodGroups', 'selectedOptionIds']),
+        ...mapState(useSellerStore, ['currentFood', 'foodGroups', 'selectedOptionIds', 'selectedVariantId']),
+        groups() {
+            const levels = (this.currentFood?.food_item_variants || []).filter(v => v.is_available !== false)
+            if (!levels.length) return this.foodGroups
+            const levelGroup = { id: 'levels', isLevel: true, name: this.$t('food_detail_page.label_price_levels'),
+                is_required: true, max_select: 1, menu_options: levels.map(v => ({ ...v, is_available: true })) }
+            return [levelGroup, ...this.foodGroups]
+        },
     },
 
     methods: {
         ...mapActions(useSellerStore, ['toggleOption']),
+        checked(group, option) {
+            return group.isLevel ? option.id === this.selectedVariantId : this.selectedOptionIds.includes(option.id)
+        },
+        pick(group, option) {
+            if (group.isLevel) useSellerStore().selectedVariantId = option.id
+            else this.toggleOption(group, option.id)
+        },
         formatVnd,
         isRadio(group) {
             return group.is_required && group.max_select === 1
@@ -30,8 +46,8 @@ export default {
 </script>
 
 <template>
-    <div v-if="foodGroups.length" class="food-options">
-        <fieldset v-for="group in foodGroups" :key="group.id" class="group">
+    <div v-if="groups.length" class="food-options">
+        <fieldset v-for="group in groups" :key="group.id" class="group">
             <legend class="group-head">
                 <span class="group-name">{{ group.name }}</span>
                 <span class="group-rule" :class="{ 'group-rule--on': group.is_required }">{{ rule(group) }}</span>
@@ -45,15 +61,15 @@ export default {
                 <input
                     :type="isRadio(group) ? 'radio' : 'checkbox'"
                     :name="group.id"
-                    :checked="selectedOptionIds.includes(option.id)"
+                    :checked="checked(group, option)"
                     :disabled="!option.is_available || full(group, option)"
-                    @change="toggleOption(group, option.id)"
+                    @change="pick(group, option)"
                 />
                 <span class="option-name">
                     {{ option.name }}
                     <small v-if="!option.is_available">{{ $t('food_detail_page.option_not_available') }}</small>
                 </span>
-                <span class="option-price">+{{ formatVnd(option.extra_price) }}</span>
+                <span class="option-price">{{ group.isLevel ? formatVnd(option.price) : '+' + formatVnd(option.extra_price) }}</span>
             </label>
         </fieldset>
     </div>

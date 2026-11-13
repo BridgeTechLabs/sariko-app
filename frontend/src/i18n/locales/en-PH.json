@@ -296,13 +296,13 @@
         "reviews_title": "Reviews",
         "reviews_empty": "No reviews for this dish yet.",
         "review_anonymous": "Customer",
-        "label_choose_option": "Choose an option",
         "options_required": "Required",
         "options_optional": "Optional",
         "options_choose_one": "Choose 1",
         "options_up_to": "Up to {n}",
         "option_not_available": "Not available",
-        "options_missing": "Choose 1 in {group}"
+        "options_missing": "Choose 1 in {group}",
+        "label_price_levels": "Price option"
     },
     "cart_page": {
         "dish_sold_out": "This dish is sold out.",
