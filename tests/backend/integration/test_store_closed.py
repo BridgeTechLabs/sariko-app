@@ -16,11 +16,8 @@ class _FakeCarts:
 class _FakeCartItems:
     added = []
 
-    def find_item(self, **kw):
-        return None
-
-    def update_food_item_by_cart_id(self, **kw):
-        _FakeCartItems.added.append(kw["food_item_id"])
+    def add_item(self, cart_id, food_item_id, *rest):
+        _FakeCartItems.added.append(food_item_id)
 
 
 @pytest.fixture
@@ -37,7 +34,7 @@ def add_to_cart(monkeypatch):
 
     def call(preorder_day, is_open, weekly_hours=None, is_available=True):
         _FakeCartItems.added = []
-        gate = {"is_available": is_available, "preorder_day": preorder_day,
+        gate = {"seller_id": "seller-1", "is_available": is_available, "preorder_day": preorder_day,
                 "seller_profiles": {"status": "active", "lat": 10.77, "lon": 106.70,
                                     "is_open": is_open, "weekly_hours": weekly_hours}}
         monkeypatch.setattr("apis.cart.DAOFoodItems", lambda: type("D", (), {"read_order_gate": lambda self, i: gate})())

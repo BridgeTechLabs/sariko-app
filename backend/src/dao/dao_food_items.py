@@ -5,6 +5,7 @@ from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
 from core.store_hours import VN_TZ
 from dao.dao_base import DAOBase
+from utils.pricing import OPTION_GROUPS_EMBED, options_sold_out
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ class DAOFoodItems(DAOBase):
     def read_featured_dishes(self, limit: int = 12):
         result = (
             self._supabase_client.table(self._table_name)
-            .select("id, name, price, price_text, image_url, rating_avg, rating_count, food_item_variants(price, is_available), seller_profiles!inner(id, slug, store_name)")
+            .select("id, name, price, price_text, image_url, rating_avg, rating_count, food_item_variants(price, is_available), seller_profiles!inner(id, slug, store_name), food_item_option_groups(group_id)")
             .eq("is_featured", True)
             .eq("is_available", True)
             .eq("seller_profiles.is_listed", True)
@@ -65,14 +66,17 @@ class DAOFoodItems(DAOBase):
     def read_menu_by_seller_id(self, seller_id: str):
         result = (
             self._supabase_client.table("menu_categories")
-            .select("id, name, sort_order, is_active, food_items(id, name, description, price, price_text, unit_label, min_quantity, quantity_step, preorder_day, is_available, is_featured, daily_portions, image_url, category_id, rating_avg, rating_count, food_item_variants(id, name, price, price_text, sort_order, is_available))")
+            .select("id, name, sort_order, is_active, food_items(id, name, description, price, price_text, unit_label, min_quantity, quantity_step, preorder_day, is_available, is_featured, daily_portions, image_url, category_id, rating_avg, rating_count, food_item_variants(id, name, price, price_text, sort_order, is_available), " + OPTION_GROUPS_EMBED + ")")
             .eq("seller_id", seller_id)
             .order("sort_order")
             .order("sort_order", foreign_table="food_items.food_item_variants")
             .execute()
         )
         menu = result.data or []
-        self.add_remaining_today([f for c in menu for f in c.get("food_items") or []])
+        foods = [f for c in menu for f in c.get("food_items") or []]
+        for f in foods:   # options_sold_out also puts the groups on the dish as option_groups
+            f["options_sold_out"] = options_sold_out(f)   # a required group with every option off (ADR 0003 point 8)
+        self.add_remaining_today(foods)
         return menu
 
     def add_remaining_today(self, items: list) -> list:
@@ -116,10 +120,10 @@ class DAOFoodItems(DAOBase):
         return result.data[0] if result.data else None
 
     def read_order_gate(self, item_id: str):
-        """is_available + preorder_day + the seller's switch and hours: enough to decide if the dish can be ordered now."""
+        """is_available + preorder_day + the seller's switch and hours + the option groups: enough to decide if the dish can be ordered now."""
         result = (
             self._supabase_client.table(self._table_name)
-            .select("name, is_available, preorder_day, daily_portions, seller_profiles(status, lat, lon, is_open, weekly_hours)")
+            .select("seller_id, name, is_available, preorder_day, daily_portions, seller_profiles(status, lat, lon, is_open, weekly_hours), " + OPTION_GROUPS_EMBED)
             .eq("id", item_id)
             .limit(1)
             .execute()

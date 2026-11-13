@@ -4,6 +4,8 @@ error-block cleanup keeps them. DAOs and storage are faked; no DB, no network.
 
 Run from tests/backend:  pytest integration/test_api_baseline_users_sellers.py
 """
+from types import SimpleNamespace
+
 import pytest
 
 from apis import sellers, users
@@ -233,7 +235,10 @@ def test_sellers_menu(api, monkeypatch, profiles):
             return [{"id": "f1", "seller_id": seller_id}]
 
     monkeypatch.setattr(sellers, "DAOFoodItems", Items)
-    assert api(sellers.router).get("/sellers/me/menu").json() == {"success": True, "menu": [{"id": "f1", "seller_id": "s1"}]}
+    monkeypatch.setattr(sellers, "DAOMenuOptionGroups", lambda: SimpleNamespace(read_store_groups=lambda seller_id: []))
+    monkeypatch.setattr(sellers, "_menu_limits", lambda: sellers.MENU_LIMITS)
+    assert api(sellers.router).get("/sellers/me/menu").json() == {
+        "success": True, "menu": [{"id": "f1", "seller_id": "s1"}], "option_groups": [], "option_limits": sellers.MENU_LIMITS}
 
 
 @pytest.mark.parametrize("method,path", [("get", "/sellers/me/orders/head"), ("get", "/sellers/me/menu"),
