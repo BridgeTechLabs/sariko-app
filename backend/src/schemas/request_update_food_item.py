@@ -13,6 +13,5 @@ class RequestUpdateFoodItem(BaseModel):
     preorder_day: Optional[int] = Field(default=None, ge=0)
     is_available: Optional[bool] = None
     stock: Optional[int] = Field(default=None, ge=0, le=100000)   # portions left to sell; null = no limit (QĐ2-11)
-    daily_portions: Optional[int] = None   # ignored: an app from before the stock (one release), then drop it
     is_featured: Optional[bool] = None
     image_url: Optional[str] = None

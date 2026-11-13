@@ -16,6 +16,7 @@ class _Client:
         self.rpcs.append((name, params))
         if name == "compute_order_withholding" and self.fail_compute:
             raise RuntimeError("admin_tax_config missing a rate")
+        self.data = name == "update_order_payment_status" or []   # T208: the order still waits; reserve: []
         return self
 
     def execute(self):

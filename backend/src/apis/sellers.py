@@ -528,7 +528,7 @@ def delete_category(cat_id: str, user=Depends(verify_token)):
 def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
-        fields = body.model_dump(exclude_none=True, exclude={"daily_portions"})   # stock replaces it (QĐ2-11)
+        fields = body.model_dump(exclude_none=True)
         fields["price_text"] = _make_price_text(body.price)
         item = DAOFoodItems().create(seller_id, fields)
         add_sold_out([item])   # a dish made with stock below its minimum shows sold out at once, as PATCH does
@@ -546,7 +546,7 @@ def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_tok
 def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
-        fields = body.model_dump(exclude_none=True, exclude={"daily_portions"})   # stock replaces it (QĐ2-11)
+        fields = body.model_dump(exclude_none=True)
         # Stock only when sent: null clears the limit, left out keeps it, so saving a price never writes back a
         # stock the form read before paid orders took from it (BM12). A stock the seller enters starts a new round:
         # the next sell-out pushes again whatever the cooldown (P1; a buyer's pay + cancel never clears it, BM13).

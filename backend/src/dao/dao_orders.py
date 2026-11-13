@@ -410,20 +410,23 @@ class DAOOrders(DAOBase):
                     'p_cooldown_minutes': DAOAdminConfig().get_positive_int('stock_alert_cooldown_minutes', 30),
                 }).execute().data
             sold_out = crossed is None
-            self._supabase_client.rpc(
+            # T208: false = the order was no longer pending (cancelled while the buyer paid): nothing written
+            marked = self._supabase_client.rpc(
                 'update_order_payment_status',
                 {
                     'p_order_id': order_id,
                     'p_status': payment_status,
                     'p_transaction_ref': transaction_ref
                 }
-            ).execute()
+            ).execute().data
 
             # The most important invalidation of the lot: pending -> paid is what
             # makes an order enter the seller's list in the first place. The RPC
-            # returns void, so seller_id costs one primary-key read — once per
-            # payment, against a cache that serves every poll tick in between.
+            # answers only "still pending", so seller_id costs one primary-key read
+            # — once per payment, against a cache that serves every poll tick in between.
             self._invalidate_cache_for_order(order_id)
+            if marked is False:   # no seller push, no withholding: the caller refunds it (late_payment)
+                return False
 
             if sold_out:
                 self._cancel_sold_out(order_id)
