@@ -1,10 +1,8 @@
 <script>
-import { mapState, mapWritableState } from 'pinia';
+import { mapState } from 'pinia';
 import { useSellerStore } from '@/stores/seller/sellerStore';
-import { useCartStore } from '@/stores/cart/cartStore';
 import FoodCard from '@/components/seller/seller-page/FoodCard.vue'
 import MenuEmptyState from '@/components/seller/seller-page/MenuEmptyState.vue'
-import ModalCartConflict from '@/components/order-cart/ModalCartConflict.vue';
 import { foodPriceDisplay, picksOnDetail } from '@/utils/priceDisplay';
 import { portionsLeftToday, preorderPortions } from '@/utils/portions';
 
@@ -13,7 +11,6 @@ export default {
     components: {
         FoodCard,
         MenuEmptyState,
-        ModalCartConflict
     },
 
     computed: {
@@ -21,10 +18,6 @@ export default {
             "menu",
             "selectedCategoryMenu"
         ]),
-
-        ...mapWritableState(useCartStore, [
-            "isShowModalCartConflict"
-        ])
     }
 }
 </script>
@@ -56,10 +49,6 @@ export default {
         </div>
 
     </div>
-
-    <q-dialog v-model="isShowModalCartConflict">
-        <ModalCartConflict />
-    </q-dialog>
 
 </template>
 

@@ -19,6 +19,7 @@ export const useCartStore = defineStore("cartStore", {
             pendingFoodItemId: null,
             pendingVariantId: null,
             pendingOptionIds: [],
+            pendingQuantity: 1,
             pendingSellerName: null,
 
             // note
@@ -104,6 +105,7 @@ export const useCartStore = defineStore("cartStore", {
                     this.pendingFoodItemId = foodItemId
                     this.pendingVariantId = variantId
                     this.pendingOptionIds = optionIds
+                    this.pendingQuantity = quantity
                     this.pendingSellerName = newSellerName
                     this.showConflictModal(e.currentSellerName || '', newSellerName || '')
                 } else if (e.detail?.code) {   // portions_left, quantity_max, the option checks...: translated by code
@@ -127,7 +129,7 @@ export const useCartStore = defineStore("cartStore", {
                 this.isShowModalCartConflict = false
 
                 if (this.pendingSellerId && this.pendingFoodItemId) {
-                    await apiCarts.addItem(this.pendingSellerId, this.pendingFoodItemId, 1, this.pendingVariantId, this.pendingOptionIds)
+                    await apiCarts.addItem(this.pendingSellerId, this.pendingFoodItemId, this.pendingQuantity, this.pendingVariantId, this.pendingOptionIds)
                     await this.refreshCart()
                 }
 
@@ -135,6 +137,7 @@ export const useCartStore = defineStore("cartStore", {
                 this.pendingFoodItemId = null
                 this.pendingVariantId = null
                 this.pendingOptionIds = []
+                this.pendingQuantity = 1
                 this.pendingSellerName = null
             } catch (e) {
                 console.error(`cartStore - clearCartAndAddItem - ${e}`)
