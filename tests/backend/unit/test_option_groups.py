@@ -34,7 +34,7 @@ def group(id_, name, options, is_required=False, max_select=1, sort_order=0):
 def combo(drinks_on=True, egg_on=True, max_extras=1, required=True):
     """Combo A 109.000: Drinks (choose 1, required) Coca / Pepsi 5.000; Extras (optional) Fried egg 5.000, Rice free."""
     return {"id": DISH, "seller_id": SELLER, "name": "Combo A", "price": 109000, "is_available": True,
-            "preorder_day": 0, "daily_portions": None,
+            "preorder_day": 0, "stock": None, "min_quantity": 1,
             "seller_profiles": {"status": "active", "lat": 10.77, "lon": 106.70, "is_open": True},
             "food_item_option_groups": [
                 group("g-extras", "Extras", [option(EGG, "Fried egg", 5000, egg_on), option(RICE, "Rice", 0, sort_order=1)],
@@ -152,8 +152,7 @@ def cart_api(api, monkeypatch):
             return [{"id": item_id}]
 
     monkeypatch.setattr(cart, "_validate_variant", lambda *a: None)
-    monkeypatch.setattr(cart, "DAOFoodItems", lambda: SimpleNamespace(read_order_gate=lambda i: state.food,
-                                                                        add_remaining_today=lambda items: items))
+    monkeypatch.setattr(cart, "DAOFoodItems", lambda: SimpleNamespace(read_order_gate=lambda i: state.food))
     monkeypatch.setattr(cart, "DAOCarts", lambda: SimpleNamespace(
         read_cart_by_user_id_seller_id=lambda user_id: {"id": "cart", "seller_id": SELLER}))
     monkeypatch.setattr(cart, "DAOCartItems", Items)

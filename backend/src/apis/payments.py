@@ -17,6 +17,7 @@ from dao.dao_payments import DAOPayments
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_refunds import DAORefunds
 from services import push_service, vnpay_query
+from utils.stock import stock_error
 
 router = APIRouter(prefix="/payments")
 logger = logging.getLogger(__name__)
@@ -137,6 +138,18 @@ def create_vnpay_payment(order_id: str, request: Request, user=Depends(verify_to
     if order["status"] != "pending":   # e.g. cancelled because nobody paid in time (T181 A28): no new pay link
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                             detail={"code": "order_cancelled", "message": "This order can no longer be paid."})
+
+    # QĐ2-8 c: a dish sold out since the order was placed: no pay link and no VNPay call. The order stays unpaid
+    # (an unpaid order holds no stock), so the buyer can still pay if the seller adds stock.
+    wanted, foods = {}, {}
+    for item in order.get("order_items") or []:
+        food_id = item["food_item_id"]
+        wanted[food_id] = wanted.get(food_id, 0) + item["quantity"]
+        foods[food_id] = {"stock": (item.get("food_items") or {}).get("stock"), "name": item.get("name_snapshot")}
+    short = stock_error(wanted, foods)
+    if short:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
+            "code": "stock_short", "message": f"{short['name']} just sold out", "name": short["name"]})
 
     # T125: the previous pay link may have been paid with the IPN late or lost: ask VNPay before a new
     # link, or the buyer pays twice.

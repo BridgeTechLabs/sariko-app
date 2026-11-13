@@ -144,7 +144,7 @@ class DAOOrders(DAOBase):
     def read_order_by_id(self, order_id: str, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, paid_at, seller_profiles(store_name, slug, avatar_url, is_open, weekly_hours, opened_at), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, options_snapshot, quantity, food_items(image_url, preorder_day)), refund_state, duplicate_refund") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, paid_at, seller_profiles(store_name, slug, avatar_url, is_open, weekly_hours, opened_at), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, options_snapshot, quantity, food_items(image_url, preorder_day, stock)), refund_state, duplicate_refund") \
                 .eq("id", order_id) \
                 .eq("user_id", user_id) \
                 .maybe_single() \
@@ -399,10 +399,17 @@ class DAOOrders(DAOBase):
 
     def update_payment_status(self, order_id: str, payment_status: str, transaction_ref: Optional[str] = None):
         try:
-            # T134: the order takes its dish portions before it reaches the seller. The last portion
-            # going while the buyer paid: still marked paid (the money came in), then cancelled + refunded.
-            sold_out = payment_status == "paid" and not self._supabase_client.rpc(
-                'reserve_order_portions', {'p_order_id': order_id}).execute().data
+            # Seller-menu đợt 2 (QĐ2-2): the order takes its dishes' stock before it reaches the seller. None = a dish
+            # was short (the last portion went while the buyer paid): still marked paid (the money came in), then
+            # cancelled + refunded. Else the dishes that just went below their minimum per order, mostly [] (not
+            # "falsy = short": [] is a normal payment, TC2-37).
+            crossed = []
+            if payment_status == "paid":
+                crossed = self._supabase_client.rpc('reserve_order_stock', {
+                    'p_order_id': order_id,
+                    'p_cooldown_minutes': DAOAdminConfig().get_positive_int('stock_alert_cooldown_minutes', 30),
+                }).execute().data
+            sold_out = crossed is None
             self._supabase_client.rpc(
                 'update_order_payment_status',
                 {
@@ -431,6 +438,7 @@ class DAOOrders(DAOBase):
                     self._supabase_client.rpc('compute_order_withholding', {'p_order_id': order_id}).execute()
                 except Exception as e:
                     logger.error(f"withholding not computed for order {order_id}, payout will compute it: {e}")
+                order = None
                 try:
                     order = self.read_order_by_id_raw(order_id)
                     if order:
@@ -440,6 +448,11 @@ class DAOOrders(DAOBase):
                             zalo.send("orders", zalo.new_order_text(order))
                 except Exception as e:
                     logger.warning(f"new-order push / Zalo skipped for order {order_id}: {e}")
+                try:   # QĐ2-10: one push per dish (cooldown applied in the SQL), apart from the new-order push
+                    for dish in crossed:
+                        push_service.notify_seller_stock((order or {}).get("seller_user_id"), dish)
+                except Exception as e:
+                    logger.warning(f"out-of-stock push skipped for order {order_id}: {e}")
             return True
 
         except PostgrestExceptionAPIError as e:

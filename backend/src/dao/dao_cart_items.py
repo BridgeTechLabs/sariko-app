@@ -23,7 +23,7 @@ class DAOCartItems(DAOBase):
 
         try:
             result = self._supabase_client.table("carts") \
-                .select("id, seller_id, seller_profiles(slug, store_name), cart_items(id, quantity, variant_id, option_ids, food_items(id, seller_id, name, price_text, price, unit_label, preorder_day, daily_portions, image_url, is_available, menu_categories(name), " + OPTION_GROUPS_EMBED + "), food_item_variants(id, name, price, price_text, is_available))") \
+                .select("id, seller_id, seller_profiles(slug, store_name), cart_items(id, quantity, variant_id, option_ids, food_items(id, seller_id, name, price_text, price, unit_label, preorder_day, stock, min_quantity, image_url, is_available, menu_categories(name), " + OPTION_GROUPS_EMBED + "), food_item_variants(id, name, price, price_text, is_available))") \
                 .eq("user_id", user_id) \
                 .limit(1) \
                 .execute()

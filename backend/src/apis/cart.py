@@ -1,4 +1,3 @@
-import datetime
 import uuid
 import traceback
 from typing import List, Optional
@@ -10,10 +9,11 @@ from dao.dao_carts import DAOCarts
 from dao.dao_food_item_variants import DAOFoodItemVariants
 from dao.dao_food_items import DAOFoodItems
 from apis.orders import (STORE_CLOSED_DETAIL, check_quantities, is_same_day, lines_max_error, max_lines,
-                         max_per_dish, option_error, option_problem, portions_error, quantity_max_error)
-from core.store_hours import VN_TZ, is_open_now
+                         max_per_dish, option_error, option_problem, quantity_max_error)
+from core.store_hours import is_open_now
 from core.seller_status import with_buyer_status
 from utils.pricing import cart_item_unit_price, options_snapshot
+from utils.stock import add_sold_out, stock_error, stock_sold_out
 from schemas import Schema
 
 from fastapi import (
@@ -36,8 +36,8 @@ def get_current_cart(user=Depends(verify_token)):
         
     dao_cart_items = DAOCartItems()
     cart = dao_cart_items.read_cart_items_by_user_id(user_id=user["id"])
-    if cart:   # T181 A49: the portions left, so the cart can show a dish that has fewer than the buyer wants
-        DAOFoodItems().add_remaining_today([ci["food_items"] for ci in cart["cart_items"]])
+    if cart:   # stock + min_quantity + sold_out: the cart shows a dish short of stock or under its minimum (QĐ2-12)
+        add_sold_out([ci["food_items"] for ci in cart["cart_items"]])
         # Priced here, the cart shows what POST /orders charges (QĐ3-3c); a row whose options no longer fit
         # carries the problem POST /orders would refuse it with, so the buyer can choose again first.
         for line in cart["cart_items"]:
@@ -84,8 +84,8 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
     # The cart's store comes from the dish, not from the client (BM2)
     if gate["seller_id"] != request.seller_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This dish is not on this store's menu")
-    # Off sale ("Đang bán" off): shown as Sold out in the menu; POST /orders would refuse it anyway
-    if gate.get("is_available") is False:
+    # Off sale ("Đang bán" off), or fewer left than one order takes (QĐ2-7): shown as Sold out in the menu
+    if gate.get("is_available") is False or stock_sold_out(gate):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This dish is sold out")
     option_ids = sorted({str(i) for i in request.option_ids})
     problem = option_problem({"food_items": gate, "option_ids": option_ids})
@@ -97,13 +97,12 @@ def add_item_to_cart(request: Schema.RequestAddCartItem, user=Depends(verify_tok
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This store is not taking orders yet")
     if is_same_day(gate.get("preorder_day")) and not is_open_now(seller.get("is_open"), seller.get("weekly_hours"), seller_id=request.seller_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=STORE_CLOSED_DETAIL)
-    # T134: today's portions of a same-day dish (a pre-order dish is checked for its delivery day at POST /orders)
-    if gate.get("daily_portions") and is_same_day(gate.get("preorder_day")):
+    # The dish's stock against all its rows in the cart, same-day and pre-order alike (QĐ2-8 a)
+    if gate.get("stock") is not None:
         cart_now = DAOCartItems().read_cart_items_by_user_id(user_id=user_id) or {}
         in_cart = sum(i["quantity"] for i in cart_now.get("cart_items") or []
                       if (i.get("food_items") or {}).get("id") == request.food_item_id)
-        short = portions_error({request.food_item_id: in_cart + request.quantity}, {request.food_item_id: gate.get("name")},
-                               datetime.datetime.now(VN_TZ).date())
+        short = stock_error({request.food_item_id: in_cart + request.quantity}, {request.food_item_id: gate})
         if short:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=short)
 

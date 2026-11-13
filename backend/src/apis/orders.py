@@ -18,7 +18,6 @@ from core.store_hours import VN_TZ, confirm_deadline, is_open_now
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_carts import DAOCarts
 from dao.dao_cart_items import DAOCartItems
-from dao.dao_food_items import DAOFoodItems
 from dao.dao_orders import DAOOrders
 from dao.dao_order_items import DAOOrderItems
 from dao.dao_seller_profiles import DAOSellerProfiles
@@ -27,6 +26,7 @@ from services import push_service
 from services.order_expiry import confirm_window
 from services.lalamove_service import get_lalamove_service
 from utils.pricing import chosen_options, dish_groups, options_sold_out, order_amounts
+from utils.stock import min_qty, stock_error, stock_sold_out
 
 router = APIRouter(prefix="/orders")
 logger = logging.getLogger(__name__)
@@ -48,25 +48,11 @@ def unavailable_names(cart_items: list) -> list:
     for item in cart_items:
         food = item.get("food_items") or {}
         variant = item.get("food_item_variants")
-        if food.get("is_available") is False:
+        if food.get("is_available") is False or stock_sold_out(food):   # fewer left than one order takes (QĐ2-7)
             names.append(food.get("name"))
         elif variant and variant.get("is_available") is False:
             names.append(f"{food.get('name')} ({variant.get('name')})")
     return names
-
-
-def portions_error(wanted: dict, names: dict, sale_date):
-    """T134 Q4: the 409 detail for the first dish asked beyond its portions left on sale_date (Vietnam day),
-    wanted = {food_item_id: quantity} of dishes with a daily limit. Only tells the buyer early: the portions
-    are taken when the money comes in (reserve_order_portions)."""
-    if not wanted:
-        return None
-    left = DAOFoodItems().read_portions_left(list(wanted), sale_date)
-    for food_id, qty in wanted.items():
-        if food_id in left and qty > left[food_id]:
-            return {"code": "portions_left", "message": f"Only {left[food_id]} portion(s) left: {names[food_id]}",
-                    "name": names[food_id], "remaining": left[food_id]}
-    return None
 
 
 def max_per_dish() -> int:
@@ -95,13 +81,13 @@ def check_quantities(quantities) -> None:
         raise quantity_max_error(most)
 
 
-def dish_totals(cart_items: list) -> list:
-    """Quantity of each dish over all its cart rows."""
+def dish_totals(cart_items: list) -> dict:
+    """{food_item_id: quantity of the dish over all its cart rows}."""
     totals = {}
     for item in cart_items:
         food_id = (item.get("food_items") or {}).get("id")
         totals[food_id] = totals.get(food_id, 0) + item["quantity"]
-    return list(totals.values())
+    return totals
 
 
 def option_problem(cart_item: dict):
@@ -198,7 +184,7 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
     # 2. Check the cart is still sellable
     cart_items = cart["cart_items"]
     # A cart filled before the caps existed, or two adds that raced past them (TC3-65)
-    check_quantities(dish_totals(cart_items))
+    check_quantities(dish_totals(cart_items).values())
     if len(cart_items) > (most := max_lines()):
         raise lines_max_error(most)
     # The cart's store, not the dish's, was chosen by the client at /cart/add before this check existed (BM2)
@@ -238,16 +224,17 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
         if problem:
             raise option_error(problem | {"cart_item_id": item["id"]})
 
-    wanted, names = {}, {}
-    for item in cart_items:
-        food = item.get("food_items") or {}
-        if food.get("daily_portions"):
-            wanted[food["id"]] = wanted.get(food["id"], 0) + item["quantity"]
-            names[food["id"]] = food.get("name")
-    sale_date = (appointment or datetime.now(timezone.utc)).astimezone(VN_TZ).date()
-    short = portions_error(wanted, names, sale_date)
+    # Sold out (above), then short of stock, then under the minimum per order (QĐ2-12), each over all of a dish's rows
+    wanted = dish_totals(cart_items)
+    foods = {(item.get("food_items") or {}).get("id"): item.get("food_items") or {} for item in cart_items}
+    short = stock_error(wanted, foods)
     if short:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=short)
+    low = next((foods[f] for f, qty in wanted.items() if qty < min_qty(foods[f])), None)
+    if low:   # QĐ2-9: only here; the cart lets a buyer split it (1 Coca + 1 Pepsi)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={
+            "code": "min_quantity", "message": f"At least {min_qty(low)} of {low.get('name')} in one order",
+            "name": low.get("name"), "min": min_qty(low)})
 
     # 3. Get seller user_id + effective commission rate in one query
     dao_seller_profile = DAOSellerProfiles()
