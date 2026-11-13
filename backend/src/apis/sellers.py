@@ -531,6 +531,7 @@ def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_tok
         fields = body.model_dump(exclude_none=True, exclude={"daily_portions"})   # stock replaces it (QĐ2-11)
         fields["price_text"] = _make_price_text(body.price)
         item = DAOFoodItems().create(seller_id, fields)
+        add_sold_out([item])   # a dish made with stock below its minimum shows sold out at once, as PATCH does
         return {"success": True, "item": item}
     except HTTPException:
         raise

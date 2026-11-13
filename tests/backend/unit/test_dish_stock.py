@@ -363,6 +363,11 @@ def test_create_ignores_daily_portions(monkeypatch):
         "create": lambda self, seller_id, fields: sent.append(fields) or {"id": "food-1", **fields}})())
     res = TestClient(app).post("/sellers/me/menu/items", json={"name": "Adobo", "price": 50000, "stock": 4, "daily_portions": 9})
     assert res.status_code == 200 and sent[0]["stock"] == 4 and "daily_portions" not in sent[0]
+    assert res.json()["item"]["sold_out"] is False
+    # S1b: made with stock 0, or below its minimum per order: sold out in the answer, no reload needed
+    for body in ({"stock": 0}, {"stock": 2, "min_quantity": 3}):
+        res = TestClient(app).post("/sellers/me/menu/items", json={"name": "Adobo", "price": 50000, **body})
+        assert res.status_code == 200 and res.json()["item"]["sold_out"] is True
 
 
 # ─── Reads: sold_out from the row, no RPC (TC2-23, TC2-42) ────────────────────
