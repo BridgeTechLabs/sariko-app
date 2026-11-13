@@ -90,7 +90,7 @@ export default {
                 <Plus :size="16" /> {{ $t('seller_menu.options_add_group') }}
             </button>
             <div class="hint">
-                {{ atDishMax ? $t('api_errors.groups_per_dish_max', { max: limits.menu_max_groups_per_dish }) : $t('seller_menu.options_hint') }}
+                {{ atDishMax ? $t('api_errors.groups_per_dish_max', { max: limits.menu_max_groups_per_dish, count: limits.menu_max_groups_per_dish }) : $t('seller_menu.options_hint') }}
             </div>
         </template>
 
@@ -105,7 +105,7 @@ export default {
                     <span class="create-icon"><Plus :size="18" /></span>
                     <span>
                         <span class="create-title">{{ $t('seller_menu.og_create') }}</span>
-                        <span class="create-sub">{{ atStoreMax ? $t('api_errors.groups_per_store_max', { max: limits.menu_max_groups_per_store }) : $t('seller_menu.og_create_sub') }}</span>
+                        <span class="create-sub">{{ atStoreMax ? $t('api_errors.groups_per_store_max', { max: limits.menu_max_groups_per_store, count: limits.menu_max_groups_per_store }) : $t('seller_menu.og_create_sub') }}</span>
                     </span>
                 </button>
 
