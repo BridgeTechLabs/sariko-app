@@ -54,11 +54,15 @@ jobs:
     environment:
       name: production
     steps:
-      - name: Deploy app
+      - name: Deploy, check readiness, clean up
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
+          # One docker deploy per host at a time (app + admin share this EC2 and the image store): a second one waits.
+          # The lock is held until this step ends, so pull/up, readiness (+ rollback) and cleanup are never interleaved.
+          exec 9>~/.sariko-docker.lock
+          flock -n 9 || { echo "Waiting for the other deploy on this host..."; flock -w 900 9 || { echo "::error::another deploy holds the lock"; exit 1; }; }
           export IMAGE_TAG=${GITHUB_SHA::7}
           cd ~/deploy
           ./get_prev_image_tag.sh
@@ -68,16 +72,12 @@ jobs:
           docker compose pull
           docker compose up -d
 
-      - name: check readiness and rollback
-        run: |
-          cd ~/deploy
+          # The script rolls back by itself on a failed readiness; then record the rollback and fail the job
           ./check_readiness_and_rollback.sh || {
             printf 'IMAGE_TAG=%s\nROLLED_BACK_FROM=%s\n' "$(cat /tmp/previous_tag.txt)" "${GITHUB_SHA::7}" > image_tags.env
             exit 1
           }
-          
-      - name: Clean up old images
-        run: |
-          cd ~/deploy
+
+          # Only after a healthy deploy (skipped on rollback). Keeps current + previous tag for the next rollback.
           ./cleanup_docker_images.sh
           docker image prune -f
