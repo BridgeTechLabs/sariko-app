@@ -2,9 +2,14 @@ import { defineStore } from "pinia"
 import { supabase } from "@/lib/supabase"
 import { useAuthStore } from "@/stores/auth/authStore"
 import apiChat from "@/apis/chat/apiChat"
+import { createPoller } from "@/composables/createPoller"
 
-// Reads/subscribes to messages go DIRECT to Supabase (RLS-protected, low latency).
-// Conversation list, unread counts and mark-read go through the backend.
+// Messages are read and sent DIRECT to Supabase (RLS-protected). Conversation list, unread counts and mark-read go
+// through the backend. New messages arrive by polling (createPoller: paused while the tab is hidden), and only while
+// the screen that shows them is open; the app-wide unread badge has no poll, see refreshUnread.
+const CONVERSATIONS_POLL_MS = 15_000   // the conversation list, while ChatListPage is open
+const MESSAGES_POLL_MS = 10_000        // the open conversation
+const UNREAD_REFRESH_MIN_MS = 60_000   // the badge refreshes (app open, tab shown, page change) at most this often
 
 export const useChatStore = defineStore("chatStore", {
     state() {
@@ -18,8 +23,9 @@ export const useChatStore = defineStore("chatStore", {
             loadingMessages: false,
             sending: false,
 
-            _messageChannel: null,      // realtime channel for the open conversation
-            _globalChannel: null,       // realtime channel for app-wide unread badge
+            _messagesPoller: null,      // new messages of the open conversation
+            _conversationsPoller: null, // conversation list, while ChatListPage is open
+            _conversationsLoadedAt: 0,  // last time the list was read, any source
         }
     },
 
@@ -37,13 +43,14 @@ export const useChatStore = defineStore("chatStore", {
             return res?.data?.conversation || null
         },
 
-        async loadConversations(asSeller = false) {
+        async loadConversations(asSeller = false, { silent = false } = {}) {
             try {
-                this.loadingConversations = true
+                if (!silent) this.loadingConversations = true
                 const res = await apiChat.getConversations(asSeller)
                 const list = res?.data?.conversations || []
                 this.conversations = list
                 this.totalUnread = list.reduce((sum, c) => sum + (c.unread_count || 0), 0)
+                this._conversationsLoadedAt = Date.now()
                 return list
             } catch (e) {
                 console.error(`chatStore - loadConversations - ${e}`)
@@ -56,7 +63,7 @@ export const useChatStore = defineStore("chatStore", {
         async openConversation(conversationId) {
             this.currentConversationId = conversationId
             await this.loadMessages(conversationId)
-            this.subscribeToConversation(conversationId)
+            this.startWatchingMessages(conversationId)
             this.markRead(conversationId)
         },
 
@@ -93,7 +100,7 @@ export const useChatStore = defineStore("chatStore", {
                     .select('id, conversation_id, sender_id, body, created_at, read_at')
                     .single()
                 if (error) throw error
-                this._pushMessage(data)   // instant local echo; realtime echo is de-duped
+                this._pushMessage(data)   // instant local echo; the poll may bring it again, de-duped
             } catch (e) {
                 console.error(`chatStore - sendMessage - ${e}`)
                 throw e
@@ -102,78 +109,76 @@ export const useChatStore = defineStore("chatStore", {
             }
         },
 
-        // Realtime + RLS: the socket must carry the user's JWT, otherwise the
-        // server treats it as anon and RLS drops every change event. supabase-js
-        // usually sets this on sign-in, but we re-assert it before subscribing to
-        // avoid a race with async session restore.
-        _ensureRealtimeAuth() {
-            const token = useAuthStore().session?.access_token
-            if (token) supabase.realtime.setAuth(token)
+        startWatchingMessages(conversationId) {
+            this.stopWatchingMessages()
+            this._messagesPoller = createPoller({
+                name: 'chat-messages',
+                intervalMs: MESSAGES_POLL_MS,
+                fetch: () => this.fetchNewMessages(conversationId),
+            })
+            this._messagesPoller.start()
         },
 
-        subscribeToConversation(conversationId) {
-            this.unsubscribeFromConversation()
-            this._ensureRealtimeAuth()
-            this._messageChannel = supabase
-                .channel(`conv:${conversationId}`)
-                .on('postgres_changes',
-                    { event: 'INSERT', schema: 'public', table: 'chat_messages',
-                      filter: `conversation_id=eq.${conversationId}` },
-                    ({ new: msg }) => {
-                        this._pushMessage(msg)
-                        // incoming message while the thread is open → read immediately
-                        if (msg.sender_id !== this.myId) this.markRead(conversationId)
-                    })
-                .subscribe()
-        },
-
-        unsubscribeFromConversation() {
-            if (this._messageChannel) {
-                supabase.removeChannel(this._messageChannel)
-                this._messageChannel = null
+        stopWatchingMessages() {
+            if (this._messagesPoller) {
+                this._messagesPoller.stop()
+                this._messagesPoller = null
             }
         },
 
-        // Sign-out: close both realtime channels, then drop the old account's conversations
+        // Messages newer than the last one on screen; an incoming one in the open thread is read at once.
+        async fetchNewMessages(conversationId) {
+            const last = this.messages[this.messages.length - 1]?.created_at
+            let query = supabase
+                .from('chat_messages')
+                .select('id, conversation_id, sender_id, body, created_at, read_at')
+                .eq('conversation_id', conversationId)
+                .order('created_at', { ascending: true })
+            if (last) query = query.gt('created_at', last)
+            const { data, error } = await query
+            if (error) throw error
+            if (conversationId !== this.currentConversationId) return
+            const fresh = (data || []).filter(m => !this.messages.some(x => x.id === m.id))
+            fresh.forEach(m => this._pushMessage(m))
+            if (fresh.some(m => m.sender_id !== this.myId)) this.markRead(conversationId)
+        },
+
+        // Sign-out: stop both polls, then drop the old account's conversations
         reset() {
-            this.unsubscribeFromConversation()
-            this.unsubscribeGlobalUnread()
+            this.stopWatchingMessages()
+            this.stopWatchingConversations()
             this.$reset()
         },
 
         closeConversation() {
-            this.unsubscribeFromConversation()
+            this.stopWatchingMessages()
             this.currentConversationId = null
             this.messages = []
         },
 
-        // App-wide unread badge. A broad subscription with no conversation filter —
-        // RLS on chat_messages delivers only rows in the caller's own conversations.
-        subscribeGlobalUnread() {
-            if (this._globalChannel) return
-            this._ensureRealtimeAuth()
-            this._globalChannel = supabase
-                .channel('chat:global-unread')
-                .on('postgres_changes',
-                    { event: 'INSERT', schema: 'public', table: 'chat_messages' },
-                    ({ new: msg }) => {
-                        if (msg.sender_id === this.myId) return
-                        if (msg.conversation_id === this.currentConversationId) return
-                        this.totalUnread += 1
-                        const conv = this.conversations.find(c => c.id === msg.conversation_id)
-                        if (conv) {
-                            conv.unread_count = (conv.unread_count || 0) + 1
-                            conv.last_message_text = msg.body
-                            conv.last_message_at = msg.created_at
-                        }
-                    })
-                .subscribe()
+        // Unread badge: no background poll. Called when the app opens, the tab is shown again and the page changes;
+        // a read of the list from any source in the last minute is reused.
+        refreshUnread() {
+            if (Date.now() - this._conversationsLoadedAt < UNREAD_REFRESH_MIN_MS) return
+            this._conversationsLoadedAt = Date.now()   // now, not on the answer: the app-open and first-page triggers fire together
+            return this.loadConversations(!!useAuthStore().user?.isSeller, { silent: true }).catch(() => {})
         },
 
-        unsubscribeGlobalUnread() {
-            if (this._globalChannel) {
-                supabase.removeChannel(this._globalChannel)
-                this._globalChannel = null
+        // The conversation list screen: poll while it is open.
+        startWatchingConversations() {
+            if (this._conversationsPoller) return
+            this._conversationsPoller = createPoller({
+                name: 'chat-conversations',
+                intervalMs: CONVERSATIONS_POLL_MS,
+                fetch: () => this.loadConversations(!!useAuthStore().user?.isSeller, { silent: this.conversations.length > 0 }),
+            })
+            this._conversationsPoller.start()
+        },
+
+        stopWatchingConversations() {
+            if (this._conversationsPoller) {
+                this._conversationsPoller.stop()
+                this._conversationsPoller = null
             }
         },
 
@@ -231,7 +236,7 @@ export const useChatStore = defineStore("chatStore", {
 
         _pushMessage(msg) {
             if (!msg) return
-            if (this.messages.some(m => m.id === msg.id)) return   // de-dupe realtime echo
+            if (this.messages.some(m => m.id === msg.id)) return   // de-dupe the local echo
             this.messages.push(msg)
         },
     },
