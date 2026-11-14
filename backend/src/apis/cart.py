@@ -146,17 +146,13 @@ def _cart_id(user_id: str, seller_id: str) -> str:
     return new_cart["id"]
 
 
-def _cart_line(user_id: str, item_id, food_item_id=None, variant_id=None):
-    """(cart id, the caller's cart rows, the row asked for): by cart_items.id, or the old way (food_item_id +
-    variant_id, from a page still running the JS before option groups) = that dish's row without options.
-    404 when the caller's cart has no such row. TODO: drop the old way one release after option groups (QĐ3-3d)."""
+def _cart_line(user_id: str, item_id):
+    """(cart id, the caller's cart rows, the row asked for): by cart_items.id; 404 when the caller's cart has no such row."""
     cart = DAOCarts().read_cart_by_user_id_seller_id(user_id=user_id)
     if not cart:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cart not found")
     lines = DAOCartItems().read_lines(cart["id"])
-    line = next((l for l in lines if l["id"] == str(item_id)), None) or \
-        next((l for l in lines if l["food_item_id"] == str(food_item_id) and l["variant_id"] == variant_id
-              and not l["option_ids"]), None)
+    line = next((l for l in lines if l["id"] == str(item_id)), None)
     if not line:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="This item is no longer in your cart")
     return cart["id"], lines, line
@@ -166,7 +162,7 @@ def _cart_line(user_id: str, item_id, food_item_id=None, variant_id=None):
 def update_food_item_quantity(request: Schema.RequestUpdateCartItem, user=Depends(verify_token)):
 
     check_quantities([request.quantity])
-    cart_id, lines, line = _cart_line(user["id"], request.id, request.food_item_id, request.variant_id)
+    cart_id, lines, line = _cart_line(user["id"], request.id)
     # The cap is on the dish over all its rows (QĐ3-4b)
     check_quantities([request.quantity + sum(l["quantity"] for l in lines
                                              if l["food_item_id"] == line["food_item_id"] and l["id"] != line["id"])])
@@ -176,9 +172,9 @@ def update_food_item_quantity(request: Schema.RequestUpdateCartItem, user=Depend
 
 
 @router.delete("/remove/{item_id}")
-def remove_item_from_cart(item_id: uuid.UUID, variant_id: Optional[str] = None, user=Depends(verify_token)):
-    """item_id = cart_items.id; the old JS sends the dish id here (+ variant_id): see _cart_line."""
-    cart_id, _, line = _cart_line(user["id"], item_id, item_id, variant_id)
+def remove_item_from_cart(item_id: uuid.UUID, user=Depends(verify_token)):
+    """item_id = cart_items.id"""
+    cart_id, _, line = _cart_line(user["id"], item_id)
     DAOCartItems().remove_item(cart_id, line["id"])
 
     return {"success": True}

@@ -110,7 +110,7 @@ def env(monkeypatch):
     monkeypatch.setattr(payments, "DAOPayments", lambda: type("P", (), {
         "create_payment": lambda self, **kw: e.orders.rows.append(kw),
         "has_transaction": lambda self, ref: any(r["transaction_ref"] == ref for r in e.orders.rows)})())
-    cfg = type("C", (), {"get_positive_int": lambda self, k, d: d})
+    cfg = type("C", (), {"get_positive_int": lambda self, k, d: d, "get_positive_ints": lambda self, defaults: dict(defaults)})
     monkeypatch.setattr(payment_reconcile, "DAOAdminConfig", cfg)
     monkeypatch.setattr(payment_reconcile.push_service, "notify_payment_confirmed", lambda o: e.pushes.append("confirmed"))
     monkeypatch.setattr(payment_reconcile.push_service, "notify_payment_failed", lambda o: e.pushes.append("failed"))

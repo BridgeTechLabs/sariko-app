@@ -26,7 +26,7 @@ from apis.reviews import mask_reviewer
 from core.auth import verify_token
 from core.payout_cycle import expected_payout_date
 from core.sariko_cache import cache
-from dao.dao_orders import DAOOrders, TRIP_ENDED, seller_orders_key
+from dao.dao_orders import DAOOrders, TRIP_ENDED, seller_orders_key, seller_orders_list_key
 from schemas import Schema
 from services import allingo_service
 from services.allingo_service import AllingoError
@@ -193,13 +193,37 @@ def set_store_hours(body: Schema.RequestSetStoreHours, user=Depends(verify_token
         raise HTTPException(status_code=500, detail=str(e))
 
 
+ORDERS_LIST_TTL_SECONDS = 3600   # technical constant: only drops an idle seller's list and lets orders age out of the history window
+
+
+def _orders_signature(seller_id: str):
+    """The seller's order-list signature through the shared 30 s cache: (signature, was_cached)."""
+    key = seller_orders_key(seller_id)
+    signature = cache.get(key)
+    cached = signature is not None
+    if not cached:
+        signature = DAOOrders().read_orders_head_by_seller_id(seller_id)
+        cache.put(key, signature)
+    return signature, cached
+
+
 @router.get("/me/orders")
 def get_seller_orders(user=Depends(verify_token)):
     try:
         seller = _get_seller(user)
         history_days = DAOAdminConfig().get_positive_int("seller_order_history_days", 30)
-        since = datetime.now(timezone.utc) - timedelta(days=history_days)
-        orders = DAOOrders().read_orders_by_seller_id(seller["id"], since)
+        # The list is kept with the signature it was read under: a poll that finds the same signature (the one /head
+        # serves) gets it back without a query, any order change moves the signature. The signature is read first,
+        # so a write between the two reads only makes the next call read again.
+        signature, _ = _orders_signature(seller["id"])
+        list_key = seller_orders_list_key(seller["id"])
+        stored = cache.get(list_key)
+        if stored and stored[0] == signature:
+            orders = [dict(o) for o in stored[1]]   # _with_deadlines writes into the orders: never the cached ones
+        else:
+            since = datetime.now(timezone.utc) - timedelta(days=history_days)
+            orders = DAOOrders().read_orders_by_seller_id(seller["id"], since)
+            cache.put(list_key, (signature, [dict(o) for o in orders]), ORDERS_LIST_TTL_SECONDS)
         return {"success": True, "orders": _with_deadlines(orders, seller), "seller_id": seller["id"],
                 "history_days": history_days}
     except HTTPException:
@@ -221,15 +245,7 @@ def get_seller_orders_head(user=Depends(verify_token)):
     dao_orders invalidates the key on every write.
     """
     try:
-        seller_id = _get_seller_id(user)
-        key = seller_orders_key(seller_id)
-
-        signature = cache.get(key)
-        cached = signature is not None
-        if not cached:
-            signature = DAOOrders().read_orders_head_by_seller_id(seller_id)
-            cache.put(key, signature)
-
+        signature, cached = _orders_signature(_get_seller_id(user))
         return {"success": True, "cached": cached, **signature}
     except HTTPException:
         raise

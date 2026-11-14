@@ -21,9 +21,11 @@ logger = logging.getLogger(__name__)
 
 def reconcile_payments(now: datetime = None) -> dict:
     now = now or datetime.now(timezone.utc)
-    config = DAOAdminConfig()
-    after = timedelta(minutes=config.get_positive_int("payment_reconcile_after_minutes", 5))
-    window = timedelta(hours=config.get_positive_int("payment_reconcile_window_hours", 24))
+    # One read for the whole run: expire_unpaid_orders (right after) finds its key in the settings cache.
+    settings = DAOAdminConfig().get_positive_ints({"payment_reconcile_after_minutes": 5, "payment_reconcile_window_hours": 24,
+                                                   "unpaid_order_expire_minutes": 30})
+    after = timedelta(minutes=settings["payment_reconcile_after_minutes"])
+    window = timedelta(hours=settings["payment_reconcile_window_hours"])
     dao = DAOOrders()
     # tried: orders in the window; asked: VNPay really asked this run (not a recent answer reused); errors: failed asks
     counts = {"paid": 0, "failed": 0, "checked": 0, "tried": 0, "asked": 0, "errors": 0}
