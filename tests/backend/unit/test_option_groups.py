@@ -216,15 +216,10 @@ def test_tc3_42_tc3_13_rows_of_another_cart_are_404(cart_api):
     assert c.patch("/cart/update", json={"id": LINE2, "quantity": 2}).status_code == 404   # not in the caller's cart
     assert c.delete(f"/cart/remove/{LINE2}").status_code == 404
     assert c.patch("/cart/update", json={"id": "x", "quantity": 2}).status_code == 422
-    assert c.patch("/cart/update", json={"quantity": 2}).status_code == 404   # no row named
+    assert c.patch("/cart/update", json={"quantity": 2}).status_code == 422   # no row named
+    assert c.patch("/cart/update", json={"food_item_id": DISH, "quantity": 2}).status_code == 422   # the old way is gone (T202)
+    assert c.delete(f"/cart/remove/{DISH}").status_code == 404
     assert c.delete("/cart/remove/x").status_code == 422
-    assert cart_api.writes == []
-
-
-def test_tc3_63_old_way_never_touches_a_row_with_options(cart_api):
-    cart_api.lines = [{"id": LINE, "food_item_id": DISH, "variant_id": None, "option_ids": [COCA], "quantity": 1}]
-    assert cart_api.client.delete(f"/cart/remove/{DISH}").status_code == 404
-    assert cart_api.client.patch("/cart/update", json={"food_item_id": DISH, "quantity": 2}).status_code == 404
     assert cart_api.writes == []
 
 
