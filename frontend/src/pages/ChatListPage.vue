@@ -10,10 +10,11 @@ export default {
     components: { LayoutBaseChatList, ConversationList, ArrowLeft },
 
     mounted() {
-        const asSeller = !!useAuthStore().user?.isSeller;
-        const chat = useChatStore();
-        chat.loadConversations(asSeller);
-        chat.subscribeGlobalUnread();
+        useChatStore().startWatchingConversations();   // first read now, then every 15 s while this page is open
+    },
+
+    beforeUnmount() {
+        useChatStore().stopWatchingConversations();
     },
 
     methods: {

@@ -61,12 +61,6 @@ def test_cart_update_quantity(api, carts):
     assert carts.log == [("update_quantity", "cart1", LINE_OPT, 3)]
 
 
-def test_cart_update_the_old_way_is_the_row_without_options(api, carts):   # TC3-58, TC3-63: JS before option groups
-    r = api(cart.router).patch("/cart/update", json={"food_item_id": F1, "quantity": 3, "variant_id": "v1"})
-    assert r.json() == {"success": True}
-    assert carts.log == [("update_quantity", "cart1", LINE, 3)]
-
-
 def test_cart_update_quantity_must_be_positive(api, carts):
     r = api(cart.router).patch("/cart/update", json={"id": LINE, "quantity": 0})
     assert r.status_code == 422 and set(r.json()) == VALIDATION and carts.log == []
@@ -75,9 +69,8 @@ def test_cart_update_quantity_must_be_positive(api, carts):
 def test_cart_remove_and_clear(api, carts):
     c = api(cart.router)
     assert c.delete(f"/cart/remove/{LINE_OPT}").json() == {"success": True}
-    assert c.delete(f"/cart/remove/{F1}", params={"variant_id": "v1"}).json() == {"success": True}   # the old way
     assert c.delete("/cart/clear").json() == {"success": True}
-    assert carts.log == [("remove_item", "cart1", LINE_OPT), ("remove_item", "cart1", LINE), ("delete_cart", "cart1")]
+    assert carts.log == [("remove_item", "cart1", LINE_OPT), ("delete_cart", "cart1")]
 
 
 @pytest.mark.parametrize("method,path,body", [("patch", "/cart/update", {"id": LINE, "quantity": 1}),

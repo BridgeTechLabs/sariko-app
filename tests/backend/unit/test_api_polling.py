@@ -219,3 +219,52 @@ def test_admin_change_applies_to_the_next_request(settings):  # TC-23 (B2 = no c
     second = sellers._with_deadlines([confirmed(0)], SELLER)[0]["deadline"]
     assert datetime.fromisoformat(second) - datetime.fromisoformat(first) == timedelta(minutes=30)
     assert settings.reads.count("buyer_cancel_late_confirmed_minutes") == 2
+
+
+# ── GET /sellers/me/orders keeps the list under the /head signature (docs/dev/20261114-supabase-cost QĐ-7) ──
+
+@pytest.fixture
+def seller_list(monkeypatch):
+    from core.sariko_cache import cache
+    cache.clear()
+    state = {"signature": {"latest": "t1", "count": 1}, "list_reads": 0, "head_reads": 0}
+
+    class FakeOrders:
+        def read_orders_head_by_seller_id(self, seller_id):
+            state["head_reads"] += 1
+            return dict(state["signature"])
+
+        def read_orders_by_seller_id(self, seller_id, since):
+            state["list_reads"] += 1
+            return [{"id": "o1", "status": "done", "payment_status": "paid"}]
+
+    monkeypatch.setattr(sellers, "DAOOrders", FakeOrders)
+    monkeypatch.setattr(sellers, "DAOSellerProfiles", lambda: type("P", (), {
+        "read_seller_profile_by_user_id": lambda self, uid: {"id": "s1"}})())
+    monkeypatch.setattr(sellers, "DAOAdminConfig", lambda: type("C", (), {"get_positive_int": lambda self, k, d: d,
+                                                                   "get_minutes": lambda self, k, d: timedelta(minutes=d)})())
+    yield state
+    cache.clear()
+
+
+def test_same_signature_returns_the_stored_list_without_a_query(seller_list):
+    first = sellers.get_seller_orders(user={"id": "u1"})
+    second = sellers.get_seller_orders(user={"id": "u1"})
+    assert seller_list["list_reads"] == 1 and first == second
+    first["orders"][0]["deadline"] = "x"   # a caller's edit never reaches the stored list
+    assert "deadline" not in sellers.cache.get("seller_s1_orders_list")[1][0]
+
+
+def test_moved_signature_reads_the_list_again(seller_list):
+    sellers.get_seller_orders(user={"id": "u1"})
+    seller_list["signature"] = {"latest": "t2", "count": 2}
+    sellers.cache.invalidate("seller_s1_orders")   # the 30 s signature cache expiring
+    sellers.get_seller_orders(user={"id": "u1"})
+    assert seller_list["list_reads"] == 2
+
+
+def test_an_order_write_through_dao_orders_drops_the_list(seller_list):
+    sellers.get_seller_orders(user={"id": "u1"})
+    dao_orders._invalidate_seller_orders("s1")
+    sellers.get_seller_orders(user={"id": "u1"})
+    assert seller_list["list_reads"] == 2 and seller_list["head_reads"] == 2

@@ -32,4 +32,23 @@ if (import.meta.env.VITE_DEV_PANEL === 'true') import('@/lib/devSessionBridge.js
 // Service worker via vite-plugin-pwa (registerType 'autoUpdate'): when a deploy ships a new
 // sw.js it takes over and the open page reloads, so nobody keeps running the old bundle.
 // The /join draft is kept in localStorage, so that reload loses no typed form data.
-registerSW({ immediate: true })
+// A tab that stays open also asks for a new sw.js: every 30 minutes and when it is shown again (at most every
+// 5 minutes), never while a text field holds typed text, because the takeover reloads the page (autoUpdate cannot wait).
+const SW_CHECK_EVERY_MS = 30 * 60_000
+const SW_CHECK_MIN_GAP_MS = 5 * 60_000
+const typing = () => [...document.querySelectorAll('input, textarea')].some(el => el.value !== el.defaultValue)
+
+registerSW({
+    immediate: true,
+    onRegisteredSW(_url, registration) {
+        if (!registration) return
+        let last = Date.now()
+        const check = () => {
+            if (typing() || Date.now() - last < SW_CHECK_MIN_GAP_MS) return
+            last = Date.now()
+            registration.update().catch(() => {})
+        }
+        setInterval(check, SW_CHECK_EVERY_MS)
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check() })
+    },
+})

@@ -61,6 +61,9 @@ class FakeConfig(DAOAdminConfig):
     def get_setting(self, key):
         return {"order_confirm_minutes": self.value, "order_confirm_reminder_minutes": self.reminder}[key]
 
+    def get_positive_ints(self, defaults):
+        return {k: self._positive_int(k, self.get_setting(k), d) for k, d in defaults.items()}
+
 
 @pytest.fixture
 def config(monkeypatch):

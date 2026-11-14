@@ -44,22 +44,28 @@ export default {
         }
     },
     watch: {
-        // Keep the app-wide unread badge live: load counts + open the global
-        // subscription once logged in, tear it down on logout.
+        // The unread badge refreshes when the app opens or the user logs in, when the tab is shown again and on a page change
+        // (at most once a minute, see chatStore.refreshUnread); there is no background poll.
         userId: {
             immediate: true,
             handler(id) {
-                const chat = useChatStore()
-                if (id) {
-                    chat.loadConversations(this.isSeller)
-                    chat.subscribeGlobalUnread()
-                } else {
-                    chat.unsubscribeGlobalUnread()
-                }
+                if (id) useChatStore().refreshUnread()
             }
         }
     },
-    methods: {}
+    mounted() {
+        this._removeAfterEach = this.$router.afterEach(() => { if (this.userId) useChatStore().refreshUnread() })
+        document.addEventListener('visibilitychange', this.onVisible)
+    },
+    beforeUnmount() {
+        this._removeAfterEach?.()
+        document.removeEventListener('visibilitychange', this.onVisible)
+    },
+    methods: {
+        onVisible() {
+            if (document.visibilityState === 'visible' && this.userId) useChatStore().refreshUnread()
+        },
+    }
 }
 </script>
 

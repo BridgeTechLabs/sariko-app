@@ -26,14 +26,20 @@ def seller_orders_key(seller_id: str) -> str:
     return f"seller_{seller_id}_orders"
 
 
+def seller_orders_list_key(seller_id: str) -> str:
+    """Cache key for a seller's raw order list, stored with the signature it was read under (GET /sellers/me/orders)."""
+    return f"seller_{seller_id}_orders_list"
+
+
 def _invalidate_seller_orders(seller_id: Optional[str]) -> None:
-    """Drop a seller's cached signature so the next probe re-reads the database.
+    """Drop a seller's cached signature and order list so the next call re-reads the database.
 
     Tolerates None so callers can pass a column straight off an updated row
     without a guard — an order with no seller_id has no cache entry anyway.
     """
     if seller_id:
         cache.invalidate(seller_orders_key(seller_id))
+        cache.invalidate(seller_orders_list_key(seller_id))
 
 
 def with_current_trip(order: dict) -> dict:

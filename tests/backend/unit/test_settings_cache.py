@@ -81,6 +81,24 @@ def test_tc11_missing_key_in_positive_ints_is_cached_as_default(dao):
     assert ints(dao, "zzz") == {"zzz": 1} and len(dao._supabase_client.queries) == 1
 
 
+def test_tc6_order_expiry_reads_its_two_keys_in_one_query(dao, monkeypatch):  # T200 TC-6
+    from services import order_expiry
+    monkeypatch.setattr(order_expiry, "DAOAdminConfig", lambda: dao)
+    monkeypatch.setattr(order_expiry, "DAOOrders", lambda: type("O", (), {"read_unconfirmed_paid_orders": lambda s, paid_before: []})())
+    order_expiry.expire_unconfirmed_orders()
+    assert dao._supabase_client.queries == [["order_confirm_minutes", "order_confirm_reminder_minutes"]]
+
+
+def test_tc6_payment_reconcile_reads_its_three_keys_in_one_query(dao, monkeypatch):  # T200 TC-6
+    from services import payment_reconcile
+    monkeypatch.setattr(payment_reconcile, "DAOAdminConfig", lambda: dao)
+    monkeypatch.setattr(payment_reconcile, "DAOOrders", lambda: type("O", (), {
+        "read_unpaid_vnpay_orders": lambda s, created_since: [], "read_expirable_unpaid_orders": lambda s, created_before: []})())
+    payment_reconcile.reconcile_payments()
+    payment_reconcile.expire_unpaid_orders()
+    assert dao._supabase_client.queries == [["payment_reconcile_after_minutes", "payment_reconcile_window_hours", "unpaid_order_expire_minutes"]]
+
+
 def test_tc12_db_error_raises_and_is_not_cached(dao):  # TC-12
     dao._supabase_client.down = True
     with pytest.raises(Exception):

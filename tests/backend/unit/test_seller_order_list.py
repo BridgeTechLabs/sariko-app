@@ -63,7 +63,12 @@ def test_history_days_setting(client, monkeypatch, setting, days):  # TC-8, TC-9
     monkeypatch.setattr(DAOAdminConfig, "__init__", lambda self: None)
     monkeypatch.setattr(DAOAdminConfig, "get_setting", lambda self, key: setting)
 
+    sellers.cache.clear()   # the list of an earlier case must not answer this one
+
     class Orders:
+        def read_orders_head_by_seller_id(self, seller_id):
+            return {"latest": None, "count": 0}
+
         def read_orders_by_seller_id(self, seller_id, since):
             seen["since"] = since
             return []
