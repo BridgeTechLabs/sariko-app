@@ -33,10 +33,12 @@ if (import.meta.env.VITE_DEV_PANEL === 'true') import('@/lib/devSessionBridge.js
 // sw.js it takes over and the open page reloads, so nobody keeps running the old bundle.
 // The /join draft is kept in localStorage, so that reload loses no typed form data.
 // A tab that stays open also asks for a new sw.js: every 30 minutes and when it is shown again (at most every
-// 5 minutes), never while a text field holds typed text, because the takeover reloads the page (autoUpdate cannot wait).
+// 5 minutes), never while a text field the user touched holds typed text (a field filled in by the page and never
+// touched does not count), because the takeover reloads the page (autoUpdate cannot wait).
 const SW_CHECK_EVERY_MS = 30 * 60_000
 const SW_CHECK_MIN_GAP_MS = 5 * 60_000
-const typing = () => [...document.querySelectorAll('input, textarea')].some(el => el.value !== el.defaultValue)
+document.addEventListener('focusin', (e) => { if (e.target.matches?.('input, textarea')) e.target.dataset.touched = '1' })
+const typing = () => [...document.querySelectorAll('input[data-touched], textarea[data-touched]')].some(el => el.value !== el.defaultValue)
 
 registerSW({
     immediate: true,
