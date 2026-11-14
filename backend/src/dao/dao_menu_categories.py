@@ -32,6 +32,17 @@ class DAOMenuCategories(DAOBase):
         )
         return result.data or []
 
+    def is_owned_by_seller(self, category_id: str, seller_id: str) -> bool:
+        result = (
+            self._supabase_client.table(self._table_name)
+            .select("id")
+            .eq("id", category_id)
+            .eq("seller_id", seller_id)
+            .limit(1)
+            .execute()
+        )
+        return bool(result.data)
+
     def create(self, seller_id: str, name: str, sort_order: int = 0):
         result = (
             self._supabase_client.table(self._table_name)

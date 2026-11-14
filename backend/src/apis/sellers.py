@@ -540,11 +540,25 @@ def delete_category(cat_id: str, user=Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _assert_own_category(seller_id: str, category_id):
+    """A dish goes in a category of its own store: the foreign key only checks the id exists, and the menu reads
+    dishes by category, so another store's category would show this dish on that store's menu."""
+    if not category_id:
+        return
+    try:
+        uuid.UUID(category_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Category not found")
+    if not DAOMenuCategories().is_owned_by_seller(category_id, seller_id):
+        raise HTTPException(status_code=404, detail="Category not found")
+
+
 @router.post("/me/menu/items")
 def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
         fields = body.model_dump(exclude_none=True)
+        _assert_own_category(seller_id, fields.get("category_id"))
         fields["price_text"] = _make_price_text(body.price)
         item = DAOFoodItems().create(seller_id, fields)
         add_sold_out([item])   # a dish made with stock below its minimum shows sold out at once, as PATCH does
@@ -560,8 +574,12 @@ def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_tok
 
 @router.patch("/me/menu/items/{item_id}")
 def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depends(verify_token)):
+    return update_food_item_for(_get_seller_id(user), item_id, body)
+
+
+def update_food_item_for(seller_id: str, item_id: str, body):
+    """The body of PATCH /me/menu/items/{item_id}; the Admin Gateway calls it with the seller_id of its path."""
     try:
-        seller_id = _get_seller_id(user)
         fields = body.model_dump(exclude_none=True)
         # Stock only when sent: null clears the limit, left out keeps it, so saving a price never writes back a
         # stock the form read before paid orders took from it (BM12). A stock the seller enters starts a new round:
@@ -570,6 +588,7 @@ def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depe
             fields["stock"], fields["stock_alert_at"] = body.stock, None
         if not fields:
             raise HTTPException(status_code=400, detail="No fields to update")
+        _assert_own_category(seller_id, fields.get("category_id"))
         if "price" in fields:
             fields["price_text"] = _make_price_text(fields["price"])
         dao = DAOFoodItems()
@@ -705,7 +724,10 @@ def _save_group(seller_id: str, group_id, body, current: list, limits: dict) -> 
 @router.post("/me/menu/items/{item_id}/option-groups")
 def create_option_group(item_id: uuid.UUID, body: Schema.RequestOptionGroup, user=Depends(verify_token)):
     """A new group, made from the dish form and put on that dish (Q4: groups are created from a dish)."""
-    seller_id, item_id = _get_seller_id(user), str(item_id)
+    return create_option_group_for(_get_seller_id(user), str(item_id), body)
+
+
+def create_option_group_for(seller_id: str, item_id: str, body):
     dao = DAOMenuOptionGroups()
     if not DAOFoodItems().read_owned_by_seller(item_id, seller_id):
         raise _not_found()
@@ -726,23 +748,30 @@ def create_option_group(item_id: uuid.UUID, body: Schema.RequestOptionGroup, use
 @router.put("/me/menu/option-groups/{group_id}")
 def update_option_group(group_id: uuid.UUID, body: Schema.RequestOptionGroup, user=Depends(verify_token)):
     """Name, required, how many, and the options (add / edit / turn off / remove): for every dish using it."""
-    seller_id = _get_seller_id(user)
-    current = DAOMenuOptionGroups().read_group(str(group_id), seller_id)
+    return update_option_group_for(_get_seller_id(user), str(group_id), body)
+
+
+def update_option_group_for(seller_id: str, group_id: str, body):
+    current = DAOMenuOptionGroups().read_group(group_id, seller_id)
     if not current:
         raise _not_found()
-    return {"success": True, "group": _save_group(seller_id, str(group_id), body, current["menu_options"], _menu_limits())}
+    return {"success": True, "group": _save_group(seller_id, group_id, body, current["menu_options"], _menu_limits())}
 
 
 @router.delete("/me/menu/option-groups/{group_id}")
 def delete_option_group(group_id: uuid.UUID, user=Depends(verify_token)):
     """Only a group no dish uses (ADR 0003 point 11)."""
-    seller_id, dao = _get_seller_id(user), DAOMenuOptionGroups()
-    group = dao.read_group(str(group_id), seller_id)
+    return delete_option_group_for(_get_seller_id(user), str(group_id))
+
+
+def delete_option_group_for(seller_id: str, group_id: str):
+    dao = DAOMenuOptionGroups()
+    group = dao.read_group(group_id, seller_id)
     if not group:
         raise _not_found()
     if group["dish_ids"]:
         raise HTTPException(status_code=409, detail={"code": "group_in_use", "message": "Remove this group from its dishes first"})
-    dao.delete_group(str(group_id), seller_id)
+    dao.delete_group(group_id, seller_id)
     return {"success": True}
 
 
@@ -753,7 +782,10 @@ def _owned_dish_and_group(item_id: str, group_id: str, seller_id: str):
 
 @router.post("/me/menu/items/{item_id}/option-groups/{group_id}")
 def attach_option_group(item_id: uuid.UUID, group_id: uuid.UUID, user=Depends(verify_token)):
-    seller_id, item_id, group_id = _get_seller_id(user), str(item_id), str(group_id)
+    return attach_option_group_for(_get_seller_id(user), str(item_id), str(group_id))
+
+
+def attach_option_group_for(seller_id: str, item_id: str, group_id: str):
     _owned_dish_and_group(item_id, group_id, seller_id)
     dao = DAOMenuOptionGroups()
     links = dao.read_dish_links(item_id, seller_id)
@@ -768,7 +800,10 @@ def attach_option_group(item_id: uuid.UUID, group_id: uuid.UUID, user=Depends(ve
 @router.delete("/me/menu/items/{item_id}/option-groups/{group_id}")
 def detach_option_group(item_id: uuid.UUID, group_id: uuid.UUID, user=Depends(verify_token)):
     """Takes the group off this dish; the group stays (ADR 0003 point 11)."""
-    seller_id, item_id, group_id = _get_seller_id(user), str(item_id), str(group_id)
+    return detach_option_group_for(_get_seller_id(user), str(item_id), str(group_id))
+
+
+def detach_option_group_for(seller_id: str, item_id: str, group_id: str):
     _owned_dish_and_group(item_id, group_id, seller_id)
     dao = DAOMenuOptionGroups()
     dao.detach(item_id, group_id, seller_id)
@@ -780,7 +815,10 @@ def detach_option_group(item_id: uuid.UUID, group_id: uuid.UUID, user=Depends(ve
 @router.put("/me/menu/items/{item_id}/option-groups")
 def order_option_groups(item_id: uuid.UUID, body: Schema.RequestDishGroupOrder, user=Depends(verify_token)):
     """The dish's groups in a new order: the list must be exactly the groups the dish uses."""
-    seller_id, item_id = _get_seller_id(user), str(item_id)
+    return order_option_groups_for(_get_seller_id(user), str(item_id), body)
+
+
+def order_option_groups_for(seller_id: str, item_id: str, body):
     if not DAOFoodItems().read_owned_by_seller(item_id, seller_id):
         raise _not_found()
     dao = DAOMenuOptionGroups()
