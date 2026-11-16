@@ -204,7 +204,7 @@ def test_tc4_duplicate_option_names_are_409(env):
 # ── an edit leaves a line in the app log ──
 
 def test_every_edit_is_logged_with_the_store(env, caplog):
-    with caplog.at_level(logging.INFO, logger=admin_gateway.logger.name):
+    with caplog.at_level(logging.WARNING, logger=admin_gateway.logger.name):   # WARNING = the level the app logs from (main.py)
         assert call(env, "post", f"{GW}/{SELLER}/menu/items/{DISH}/option-groups/{G}").status_code == 200
         assert call(env, "patch", f"{GW}/{SELLER}/menu/items/{DISH_B}", {"stock": 1}).status_code == 404
     lines = [r.getMessage() for r in caplog.records if "admin edit" in r.getMessage()]
