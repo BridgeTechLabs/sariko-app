@@ -53,7 +53,7 @@ def cancelled_notify(order_id: UUID):
 
 def _menu_edit(what: str, seller_id: UUID, edit, *args):
     result = edit(str(seller_id), *args)
-    logger.info(f"admin edit seller={seller_id} {what}")
+    logger.warning(f"admin edit seller={seller_id} {what}")   # warning: main.py logs from WARNING up, as the cancel push does
     return result
 
 
