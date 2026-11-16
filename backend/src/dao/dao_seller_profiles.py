@@ -22,7 +22,7 @@ class DAOSellerProfiles(DAOBase):
             query = self._supabase_client.table(self._table_name)
             query = query.select("id, user_id, store_name, slug, avatar_url, status, is_open, weekly_hours, lat, lon")
             query = query.eq("is_listed", True)
-            query = query.order("status").order("display_order").order("created_at")
+            query = query.order("display_order").order("created_at")
 
             result = query.execute()
             
