@@ -28,7 +28,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.118.0   # pinned: "latest" asks the GitHub API for the newest release and fails when its rate limit is hit
 
       - name: Apply DB migrations
         env:
