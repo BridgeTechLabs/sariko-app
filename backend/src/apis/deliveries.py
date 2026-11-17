@@ -1,9 +1,10 @@
-import asyncio
+import functools
 import hashlib
 import hmac
 import json
 import logging
 import os
+import threading
 import time
 import uuid
 from decimal import Decimal
@@ -257,11 +258,29 @@ def get_delivery_status(order_id: str, user=Depends(verify_token)):
 # --------------------------------------------------------------------------
 # POST /deliveries/webhook — Lalamove status callback (public, v3)
 # --------------------------------------------------------------------------
+async def _raw_body(request: Request) -> bytes:
+    """The exact bytes, for the webhook signatures. Read on the event loop here, so the webhooks can be plain def:
+    FastAPI runs them in its threadpool and their DB / push calls do not hold up every other request."""
+    return await request.body()
+
+
+# Two events of one trip must not interleave: each reads the delivery, then writes it (QA-1, T212).
+# ponytail: one lock per process, enough with the single gunicorn worker; more workers need a conditional update in the DB.
+_webhook_lock = threading.Lock()
+
+
+def _one_at_a_time(handler):
+    @functools.wraps(handler)
+    def run(*args, **kwargs):
+        with _webhook_lock:
+            return handler(*args, **kwargs)
+    return run
+
+
 @router.post("/webhook")
-async def delivery_webhook(request: Request):
+@_one_at_a_time
+def delivery_webhook(request: Request, raw_body: bytes = Depends(_raw_body)):
     try:
-        # Read raw bytes first — needed for exact HMAC verification
-        raw_body = await request.body()
         body = json.loads(raw_body)
 
         api_key    = body.get("apiKey", "")
@@ -472,8 +491,8 @@ def stray_trip(dao_orders, dao_deliveries, trip: dict) -> bool:
 # Errors answer 5xx on purpose (unlike Lalamove's 200): AllinGo resends up to 8 times over 44 hours.
 # --------------------------------------------------------------------------
 @router.post("/webhook/allingo")
-async def allingo_webhook(request: Request):
-    raw_body = await request.body()
+@_one_at_a_time
+def allingo_webhook(request: Request, raw_body: bytes = Depends(_raw_body)):
     secret = os.getenv("ALLINGO_WEBHOOK_SECRET", "")
     if not secret:
         logger.error("AllinGo webhook: ALLINGO_WEBHOOK_SECRET not configured — rejecting")
@@ -495,7 +514,7 @@ async def allingo_webhook(request: Request):
                 logger.error(f"AllinGo webhook: stray AllinGo trip {trip['id']} for order={trip['external_reference']}; cancelling it")
                 # 409 = ended or picked up: resending will not change it, the log above is for a manual check (QA G1)
                 cancel = allingo_service.get_allingo_service().cancel_order
-                if not await asyncio.to_thread(lambda: cancel(trip["id"], attempts=1, done_on_409=True)):
+                if not cancel(trip["id"], attempts=1, done_on_409=True):
                     raise HTTPException(status_code=503, detail="Stray trip not cancelled yet")   # AllinGo resends
                 return {"success": True}
             logger.warning(f"AllinGo webhook: no delivery row for {trip.get('id')} ({event.get('type')})")
