@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIRM_MINUTES = 30
 DEFAULT_REMINDER_MINUTES = 10
-TIMEOUT_REASON = "Seller did not confirm in time"  # the buyer UI translates this exact text (OrderStatusHeader.vue)
+TIMEOUT_REASON = "seller_timeout"  # orders.cancellation_reason code, translated by each viewer's app (T178)
 
 
 def _ts(value):
@@ -38,8 +38,10 @@ _reminded: set = set()
 
 def expire_unconfirmed_orders(now: datetime = None) -> int:
     now = now or datetime.now(timezone.utc)
-    window = confirm_window()
-    reminder = DAOAdminConfig().get_minutes("order_confirm_reminder_minutes", DEFAULT_REMINDER_MINUTES)
+    minutes = DAOAdminConfig().get_positive_ints({"order_confirm_minutes": DEFAULT_CONFIRM_MINUTES,
+                                                  "order_confirm_reminder_minutes": DEFAULT_REMINDER_MINUTES})
+    window = timedelta(minutes=minutes["order_confirm_minutes"])
+    reminder = timedelta(minutes=minutes["order_confirm_reminder_minutes"])
     dao_orders = DAOOrders()
     expired = 0
     waiting = dao_orders.read_unconfirmed_paid_orders(paid_before=now - max(window - reminder, timedelta(0)))

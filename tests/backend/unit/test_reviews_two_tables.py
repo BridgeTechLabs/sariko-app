@@ -79,7 +79,7 @@ class _Query:
             out = []
             for r in new:
                 self.db.next_id += 1
-                out.append({**r, "id": f"{self.name}-{self.db.next_id}", "created_at": self.db.next_id})
+                out.append({"is_hidden": False, **r, "id": f"{self.name}-{self.db.next_id}", "created_at": self.db.next_id})   # DB default
             rows.extend(out)
             return type("R", (), {"data": out})()
         match = [r for r in rows if all(f(r) for f in self.filters)]
@@ -112,6 +112,11 @@ class FakeOrders:
         return order if order and order["user_id"] == user_id else None
 
 
+class FakeSellers:
+    def read_seller_user_id_by_seller_id(self, seller_id):
+        return {"user_id": f"owner-{seller_id}"}
+
+
 @pytest.fixture
 def db(monkeypatch):
     fake = FakeDB()
@@ -129,7 +134,9 @@ def _client(user_id):
 
 
 @pytest.fixture
-def buyer(db):
+def buyer(db, monkeypatch):
+    monkeypatch.setattr(reviews, "DAOSellerProfiles", FakeSellers)
+    monkeypatch.setattr(reviews, "notify_seller_new_review", lambda seller_user_id: None)   # T181 A33, see below
     return _client("buyer")
 
 
@@ -249,3 +256,22 @@ def test_r15_orders_list_embeds_review_stores():
     import inspect
     src = inspect.getsource(dao_orders_module.DAOOrders.read_orders_by_user_id)
     assert "review_stores(id)" in src and "reviews(id)" not in src
+
+
+def test_t181_a33_hidden_reviews_leave_the_public_and_the_seller(buyer, db, monkeypatch):   # TC-A33e
+    buyer.post("/reviews", json={"order_id": "o1", "overall_rating": 4, "items": [{"food_item_id": "adobo", "rating": 3}]})
+    buyer.post("/reviews", json={"order_id": "o4", "overall_rating": 1, "items": [{"food_item_id": "adobo", "rating": 5}]})
+    for table in ("review_stores", "review_items"):   # o1 hidden by an admin (or its order cancelled later)
+        for r in db.tables[table]:
+            r["is_hidden"] = r["order_id"] == "o1"
+    monkeypatch.setattr(sellers, "_get_seller_id", lambda user: "s1")
+    assert [r["rating"] for r in buyer.get("/reviews/food/adobo").json()["reviews"]] == [5]
+    assert _client("seller-user").get("/sellers/me/reviews").json()["reviews"] == []   # s1 has only the hidden one
+
+
+def test_t181_a33_new_review_tells_the_seller_once(buyer, db, monkeypatch):   # TC-A33f
+    told = []
+    monkeypatch.setattr(reviews, "notify_seller_new_review", told.append)
+    assert buyer.post("/reviews", json={"order_id": "o1", "overall_rating": 5}).status_code == 200
+    assert buyer.post("/reviews", json={"order_id": "o1", "overall_rating": 3}).status_code == 409   # a second submit
+    assert told == ["owner-s1"]

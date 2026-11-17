@@ -25,7 +25,7 @@ def mark_done(monkeypatch):
             def read_order_by_id_for_seller(self, order_id, seller_id):
                 return order
 
-            def update_order_status(self, order_id, status, reason=None, expected_status=None):
+            def update_order_status(self, order_id, status, reason=None, expected_status=None, cancellation_note=None):
                 written.append(status)
                 return {**order, "status": status}
 
@@ -72,7 +72,7 @@ def test_unpaid_order_never_moves_forward(monkeypatch, move):
         def read_order_by_id_for_seller(self, order_id, seller_id):
             return order
 
-        def update_order_status(self, order_id, status, reason=None, expected_status=None):
+        def update_order_status(self, order_id, status, reason=None, expected_status=None, cancellation_note=None):
             written.append(status)
 
     monkeypatch.setattr("apis.sellers.DAOOrders", FakeOrders)

@@ -115,8 +115,9 @@ def test_tc3_window_closed(env):
     assert res.json()["detail"]["hours"] == 24 and env.dao.rows == {}
 
 
-def test_open_order_has_no_window(env):
-    env.dao.orders["o1"].update(status="confirmed", status_changed_at=_ago(100))
+@pytest.mark.parametrize("status", ["confirmed", "delivery_failed"])   # T177 TC-A13c: a failed delivery is not an end
+def test_open_order_has_no_window(env, status):
+    env.dao.orders["o1"].update(status=status, status_changed_at=_ago(100))
     assert post(env).status_code == 200
 
 

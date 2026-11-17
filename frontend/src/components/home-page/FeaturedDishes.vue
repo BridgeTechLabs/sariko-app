@@ -70,6 +70,7 @@ export default {
                 :name="dish.name"
                 :price="dish.price"
                 :hasVariants="dish.hasVariants"
+                :soldOut="dish.soldOut"
                 :imgSrc="dish.imgSrc"
                 :sellerSlug="dish.sellerSlug"
                 :sellerId="dish.sellerId"

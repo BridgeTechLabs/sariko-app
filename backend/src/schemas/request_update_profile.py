@@ -13,3 +13,5 @@ class RequestUpdateProfile(BaseModel):
     lon: Optional[float] = None
     # Sellers only (ignored for buyers). Display name only, the slug never changes, so shared links keep working.
     store_name: Optional[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]] = None
+    # Sellers only. "" clears it (stored as null); the limit matches /join's store_description.
+    description: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)]] = None

@@ -38,7 +38,7 @@ export default {
         </template>
 
         <template #Earnings>
-            <SellerMeEarnings />
+            <SellerMeEarnings :preview="3" />
         </template>
 
         <template #Reviews>

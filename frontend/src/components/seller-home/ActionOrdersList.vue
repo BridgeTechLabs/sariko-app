@@ -4,9 +4,10 @@ import { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin } from 'l
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
 import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
 import { minutesUntilReady, formatWait, confirmEarlyReady, deadlineHint } from '@/utils/readyWindow';
-import { formatVnTime } from '@/utils/vnTime';
+import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
 import { orderCode } from '@/utils/orderCode';
+import OptionLines from '@/components/shared/OptionLines.vue';
 
 const STATUS_DISPLAY_KEY = {
     pending:          'seller_home.status_new',
@@ -29,7 +30,7 @@ const REJECT_REASONS = [
 export default {
     name: 'ActionOrdersList',
 
-    components: { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin },
+    components: { Check, X, AlertTriangle, RefreshCw, Copy, User, Phone, MapPin, OptionLines },
 
     props: {
         orders: {
@@ -65,29 +66,29 @@ export default {
             return useDashboardStore().deliveryStatuses
         },
 
-        todayStr() {
-            return new Date().toDateString()
+        todayStr() {   // Vietnam day, like the buyer's app, whatever the phone's time zone (T178 A47)
+            return vnDay(new Date())
         },
         hasUpcoming() {
-            return this.orders.some(o => o.delivery_appointment && new Date(o.delivery_appointment).toDateString() !== this.todayStr)
+            return this.orders.some(o => o.delivery_appointment && vnDay(o.delivery_appointment) !== this.todayStr)
         },
         todayCount() {
             return this.orders.filter(o => {
-                const isToday = !o.delivery_appointment || new Date(o.delivery_appointment).toDateString() === this.todayStr
+                const isToday = !o.delivery_appointment || vnDay(o.delivery_appointment) === this.todayStr
                 return isToday && ['pending', 'confirmed', 'delivery_failed'].includes(o.status)
             }).length
         },
         upcomingCount() {
             return this.orders.filter(o => {
                 if (!o.delivery_appointment) return false
-                if (new Date(o.delivery_appointment).toDateString() === this.todayStr) return false
+                if (vnDay(o.delivery_appointment) === this.todayStr) return false
                 return ['pending', 'confirmed', 'delivery_failed'].includes(o.status)
             }).length
         },
         filteredByTab() {
             return this.orders.filter(order => {
                 if (!order.delivery_appointment) return this.activeTab === 'today'
-                const apptDay = new Date(order.delivery_appointment).toDateString()
+                const apptDay = vnDay(order.delivery_appointment)
                 return this.activeTab === 'today' ? apptDay === this.todayStr : apptDay !== this.todayStr
             })
         },
@@ -350,7 +351,8 @@ export default {
                 <q-separator style="background: rgba(255,255,255,0.08); margin: 10px 0;" />
 
                 <!-- Items list -->
-                <div v-for="item in order.items" :key="item.id" class="item-row">
+                <template v-for="item in order.items" :key="item.id">
+                <div class="item-row">
                     <div class="item-left">
                         <span class="item-qty">{{ item.quantity }}</span>
                         <span class="item-sep">×</span>
@@ -358,6 +360,8 @@ export default {
                     </div>
                     <span class="item-price">{{ fmt(item.price_snapshot * item.quantity) }}</span>
                 </div>
+                <OptionLines :options="item.options_snapshot" />
+                </template>
 
                 <q-separator style="background: rgba(255,255,255,0.08); margin: 10px 0;" />
 
@@ -689,6 +693,9 @@ export default {
 .item-price {
     font-size: 13px;
     color: var(--text-secondary);
+    flex-shrink: 0;
+    padding-left: 12px;
+    white-space: nowrap;
 }
 
 .total-row {

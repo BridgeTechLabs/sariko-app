@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class _RetryOnDisconnectTransport(HTTPTransport):
-    """Retry once when an idle pooled HTTP/2 connection is closed by the server.
+    """Retry once when an idle pooled connection is closed by the server.
 
     Why: PostgREST/CloudFront may close idle keep-alive connections; httpx hands
     out the stale connection and the next request fails with RemoteProtocolError
@@ -36,7 +36,13 @@ class SupabaseService:
             raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in environment variables.")
 
         self.client: Client = create_client(supabase_url, supabase_key)
-        self.client.postgrest.session._transport = _RetryOnDisconnectTransport(http2=True)
+        # HTTP/1.1, not HTTP/2 (T209): one client serves FastAPI's whole threadpool, and httpcore's sync HTTP/2
+        # connection is not safe for threads sharing it: two threads send their stream headers out of order
+        # (StreamIDTooLowError), Supabase closes the connection with PROTOCOL_ERROR and every request on it fails
+        # (LocalProtocolError, Broken pipe). HTTP/1.1 gives each request its own pooled connection. Storage (image
+        # uploads, signed URLs) is the other shared client the backend uses; auth / functions are never called here.
+        self.client.postgrest.session._transport = _RetryOnDisconnectTransport(http2=False)
+        self.client.storage.session._transport = _RetryOnDisconnectTransport(http2=False)
         
         
 _service: Optional[SupabaseService] = None

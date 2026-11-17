@@ -62,7 +62,7 @@ export function apiErrorMessage(data, fallbackKey = "generic") {
     const t = i18n.global.t;
     const detail = data?.detail;
     if (detail && typeof detail === "object" && !Array.isArray(detail)) {
-        if (detail.code && i18n.global.te(`api_errors.${detail.code}`)) return t(`api_errors.${detail.code}`, detail);
+        if (detail.code && i18n.global.te(`api_errors.${detail.code}`)) return t(`api_errors.${detail.code}`, { count: detail.max, ...detail });   // count picks the singular / plural form of "At most {max} option(s)"
         if (ERROR_KEYS[detail.message]) return t(`api_errors.${ERROR_KEYS[detail.message]}`);
     }
     if (typeof detail === "string" && ERROR_KEYS[detail]) return t(`api_errors.${ERROR_KEYS[detail]}`);

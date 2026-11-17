@@ -72,7 +72,13 @@ class DAORefunds(DAOBase):
                 payment_create_date=order.get("payment_create_date"),
             )
         except Exception as e:
-            logger.error(f"Failed to create {reason} refund for order {order['id']}: {e}")
+            logger.error(f"Failed to create {reason} refund for order {order['id']}: {type(e).__name__}")
+            # The order already has its main refund (refunds_order_id_key): nothing is missing, no alarm
+            if "23505" not in str(e) and "duplicate key" not in str(e):
+                try:
+                    zalo.send("support", zalo.refund_not_created_text(order["id"], reason))
+                except Exception as z:
+                    logger.error(f"[Zalo] refund-not-created message for order {order['id']} skipped: {type(z).__name__}")
             return None
 
     def read_txn_refs(self, order_id: str) -> set:

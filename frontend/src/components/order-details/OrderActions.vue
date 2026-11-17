@@ -1,7 +1,6 @@
 <script>
 import { CreditCard } from 'lucide-vue-next';
 import { useOrderStore } from '@/stores/order/orderStore.js';
-import apiPayments from '@/apis/payments/apiPayments.js';
 import { formatVnTime, vnDay } from '@/utils/vnTime';
 
 export default {
@@ -76,10 +75,9 @@ export default {
         async onPayNow() {
             this.payingNow = true
             try {
-                const res = await apiPayments.createVnpayPayment(this.order.id)
-                if (res?.data?.payment_url) {
-                    // window.open(res.data.payment_url, '_blank')
-                    window.location.href = res.data.payment_url
+                const payUrl = await this.orderStore.createPaymentLink(this.order.id)
+                if (payUrl) {
+                    window.location.href = payUrl
                     return
                 }
                 this.$q.notify({ type: 'negative', message: this.$t('order_detail.error_payment_create'), position: 'top' })

@@ -100,6 +100,9 @@ def fake_orders(order):
 
         def update_order_status(self, *args, **kwargs):
             return order
+
+        def touch_order(self, order_id):
+            pass
     return FakeOrders
 
 

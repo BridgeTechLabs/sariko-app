@@ -16,7 +16,8 @@ from dao.dao_orders import DAOOrders
 from dao.dao_payments import DAOPayments
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_refunds import DAORefunds
-from services import vnpay_query
+from services import push_service, vnpay_query
+from utils.stock import stock_error
 
 router = APIRouter(prefix="/payments")
 logger = logging.getLogger(__name__)
@@ -114,6 +115,8 @@ def _refund_extra_payment(order: dict, params: dict, txn_ref: str, reason: str) 
         )
     except Exception as e:   # the refund (with the IPN data) is what matters; keep the ack
         logger.error(f"VNPay IPN: late payment row not saved for order {order_id}: {type(e).__name__}")
+    if reason == "late_payment":   # IPN or the reconcile job, whichever comes first: one refund, one push (T175 A5)
+        push_service.notify_payment_after_cancel(order)
     logger.warning(f"VNPay IPN: {reason}: order {order_id} ({order.get('status')}, {order.get('payment_status')}) unchanged, "
                    f"refund {(refund or {}).get('id')} queued, txn_ref={txn_ref}")
     return JSONResponse(content={"RspCode": "00", "Message": "Confirm Success"})
@@ -132,6 +135,21 @@ def create_vnpay_payment(order_id: str, request: Request, user=Depends(verify_to
 
     if order["payment_status"] == "paid":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order already paid")
+    if order["status"] != "pending":   # e.g. cancelled because nobody paid in time (T181 A28): no new pay link
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail={"code": "order_cancelled", "message": "This order can no longer be paid."})
+
+    # QĐ2-8 c: a dish sold out since the order was placed: no pay link and no VNPay call. The order stays unpaid
+    # (an unpaid order holds no stock), so the buyer can still pay if the seller adds stock.
+    wanted, foods = {}, {}
+    for item in order.get("order_items") or []:
+        food_id = item["food_item_id"]
+        wanted[food_id] = wanted.get(food_id, 0) + item["quantity"]
+        foods[food_id] = {"stock": (item.get("food_items") or {}).get("stock"), "name": item.get("name_snapshot")}
+    short = stock_error(wanted, foods)
+    if short:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
+            "code": "stock_short", "message": f"{short['name']} just sold out", "name": short["name"]})
 
     # T125: the previous pay link may have been paid with the IPN late or lost: ask VNPay before a new
     # link, or the buyer pays twice.
@@ -157,7 +175,7 @@ def create_vnpay_payment(order_id: str, request: Request, user=Depends(verify_to
     # Timestamps (GMT+7)
     now = datetime.utcnow() + timedelta(hours=7)
     create_date = now.strftime("%Y%m%d%H%M%S")
-    expire_date = (now + timedelta(minutes=15)).strftime("%Y%m%d%H%M%S")
+    expire_date = (now + vnpay_query.LINK_LIFETIME).strftime("%Y%m%d%H%M%S")
 
     # Unique txn ref: full order UUID (no dashes) + vnp_CreateDate. A refund / querydr must
     # send this URL's vnp_CreateDate as vnp_TransactionDate; the admin app reads it from here.
@@ -275,7 +293,9 @@ def apply_vnpay_result(params: dict) -> JSONResponse:
             # ipn_data first: a dish sold out meanwhile cancels the order inside update_payment_status, and
             # its refund needs the IPN data (vnp_TransactionNo) the admin sends to VNPay.
             dao_orders.update_ipn_data(order_id=order_id, ipn_data=params)
-            dao_orders.update_payment_status(order_id=order_id, payment_status="paid", transaction_ref=txn_ref)
+            if not dao_orders.update_payment_status(order_id=order_id, payment_status="paid", transaction_ref=txn_ref):
+                # T208: cancelled after the read above (the buyer, or the unpaid-order expiry): refund it
+                return _refund_extra_payment(order, params, txn_ref, "late_payment")
             DAOPayments().create_payment(
                 order_id=order_id,
                 method="vnpay",
@@ -377,6 +397,8 @@ def get_payment_status(order_id: str, user=Depends(verify_token)):
 
     return {
         "payment_status": order["payment_status"],
+        # T175 A50: a cancelled order (paid too late) sends the result page to the order and its refund
+        "status": order["status"],
         # T125: how long the result page waits before "waiting for VNPay" (never "failed")
         "wait_seconds": DAOAdminConfig().get_positive_int("payment_result_wait_seconds", 90),
     }

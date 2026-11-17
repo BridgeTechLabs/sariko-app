@@ -1,5 +1,5 @@
 <script>
-// The (i) button on the storefront and the "store info" sheet it opens: full name, address, weekly hours.
+// The (i) button in the storefront's top-right corner and the "store info" sheet it opens: full name, address, weekly hours.
 import { mapState } from 'pinia'
 import { Info, X, MapPin, UtensilsCrossed, Clock, BadgeCheck } from 'lucide-vue-next'
 import { useSellerStore } from '@/stores/seller/sellerStore'
@@ -41,6 +41,7 @@ export default {
                 <UtensilsCrossed :size="18" class="ic" />
                 <span>{{ $t('seller_page.item_count', totalItems, { count: totalItems }) }}</span>
             </div>
+            <p v-if="seller?.description?.trim()" class="desc">{{ seller.description }}</p>
             <div class="line">
                 <MapPin :size="18" class="ic" />
                 <span>{{ seller?.address || $t('seller_page.info_no_address') }}</span>
@@ -70,13 +71,14 @@ export default {
 
 <style lang="scss" scoped>
 .info-btn {
-    flex-shrink: 0;
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    border: 1px solid rgba(245, 166, 35, 0.5);
-    background: transparent;
-    color: #f5A623;
+    border: none;
+    background: rgba(18, 27, 47, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #fff;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -137,6 +139,15 @@ export default {
     color: #121b2f;
     font-weight: 700;
     padding: 4px 10px;
+}
+
+.desc {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text-muted);
+    white-space: pre-line;
+    overflow-wrap: anywhere;
 }
 
 .line {

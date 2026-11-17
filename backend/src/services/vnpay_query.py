@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 VN_TZ = timezone(timedelta(hours=7))
 QUERY_GAP = timedelta(minutes=15)       # VNPay protocol limit (94 within ~15 min), not a business parameter
 LINK_LIFETIME = timedelta(minutes=15)   # vnp_ExpireDate of a pay link, set in apis/payments.py create
+UNPAID_FLOOR = LINK_LIFETIME + QUERY_GAP   # T181 A28: an unpaid order is never expired before its link ends + one more check
 
 VNPAY_TMN_CODE = os.getenv("VNPAY_TMN_CODE", "")
 VNPAY_HASH_SECRET = os.getenv("VNPAY_HASH_SECRET", "")

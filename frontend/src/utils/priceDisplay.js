@@ -26,3 +26,24 @@ export function foodPriceDisplay(food) {
 export function hasVariants(food) {
     return (food?.food_item_variants || []).length > 0
 }
+
+// A level or options to pick: the quick "+" opens the dish page instead of adding (featured dishes carry
+// food_item_option_groups, the menu option_groups)
+export function picksOnDetail(food) {
+    return hasVariants(food) || (food?.option_groups || food?.food_item_option_groups || []).length > 0
+}
+
+/**
+ * The options of a cart or order line, [{group, option, extra_price}], as rows with the price apart (shown right,
+ * in the price column; a free option shows +0 ₫). One pick: one row "Drinks: Coca-cola". Several picks in a group:
+ * the group's name, then one indented row per pick with its own price (Jack 13/11).
+ * -> [{ label, extra, sub }], extra null = no price (the group's name row).
+ */
+export function optionsLines(options) {
+    const groups = new Map()
+    for (const o of options || []) groups.set(o.group, [...(groups.get(o.group) || []), o])
+    return [...groups].flatMap(([group, picks]) => picks.length === 1
+        ? [{ label: `${group}: ${picks[0].option}`, extra: Number(picks[0].extra_price), sub: false }]
+        : [{ label: group, extra: null, sub: false },
+           ...picks.map((o) => ({ label: o.option, extra: Number(o.extra_price), sub: true }))])
+}

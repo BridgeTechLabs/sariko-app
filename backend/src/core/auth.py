@@ -19,7 +19,9 @@ if SUPABASE_JWKS_URL is None:
         status_code=status.HTTP_401_UNAUTHORIZED
     )
     
-jwks_client = jwt.PyJWKClient(SUPABASE_JWKS_URL)
+# Keys cached 1 hour (default 5 minutes, ~340 ms to fetch). A token with an unknown kid still refetches at once,
+# so a key rotation works; a key Supabase revokes keeps working until the hour ends (docs/dev/api-perf 4C).
+jwks_client = jwt.PyJWKClient(SUPABASE_JWKS_URL, lifespan=3600)
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
 

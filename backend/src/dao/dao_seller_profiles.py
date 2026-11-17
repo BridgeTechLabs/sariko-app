@@ -22,7 +22,7 @@ class DAOSellerProfiles(DAOBase):
             query = self._supabase_client.table(self._table_name)
             query = query.select("id, user_id, store_name, slug, avatar_url, status, is_open, weekly_hours, lat, lon")
             query = query.eq("is_listed", True)
-            query = query.order("status").order("display_order").order("created_at")
+            query = query.order("display_order").order("created_at")
 
             result = query.execute()
             
@@ -67,7 +67,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("id, store_name, slug, avatar_url, address, phone, lat, lon, rating_avg, rating_count, is_open, weekly_hours, opened_at")
+                .select("id, store_name, slug, avatar_url, address, phone, lat, lon, rating_avg, rating_count, is_open, weekly_hours, opened_at, description")
                 .eq("user_id", user_id)
                 .maybe_single()
                 .execute()
@@ -82,7 +82,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("id, store_name, address, lat, lon")
+                .select("id, store_name, address, lat, lon, phone")
                 .eq("id", seller_id)
                 .maybe_single()
                 .execute()
@@ -133,7 +133,7 @@ class DAOSellerProfiles(DAOBase):
 
     def update_seller_profile_info(self, user_id: str, data: dict):
         try:
-            allowed = {"phone", "address", "lat", "lon", "store_name", "is_open", "weekly_hours"}
+            allowed = {"phone", "address", "lat", "lon", "store_name", "description", "is_open", "weekly_hours"}
             update_fields = {k: v for k, v in data.items() if k in allowed}
             if not update_fields:
                 return None
@@ -183,7 +183,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("user_id, is_open, weekly_hours, address, lat, lon, commission_rate_override, admin_tier_config(commission_rate)")
+                .select("user_id, is_open, weekly_hours, store_name, phone, address, lat, lon, commission_rate_override, admin_tier_config(commission_rate)")
                 .eq("id", seller_id)
                 .maybe_single()
                 .execute()
@@ -200,6 +200,8 @@ class DAOSellerProfiles(DAOBase):
                 "address": row["address"],
                 "lat": row["lat"],
                 "lon": row["lon"],
+                "store_name": row["store_name"],
+                "phone": row["phone"],
             }
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_seller_order_info: {e}")

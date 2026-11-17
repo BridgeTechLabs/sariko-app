@@ -1,9 +1,16 @@
 import { defineStore } from "pinia";
 import apiOrders from "@/apis/orders/apiOrders";
+import apiPayments from "@/apis/payments/apiPayments";
 import { createPoller } from "@/composables/createPoller";
 
 const ORDER_LIST_POLL_MS = 15_000
 const ORDER_DETAIL_POLL_MS = 10_000
+
+// Nothing left to change on the buyer's screen: done, or cancelled and either never paid or refunded.
+// A paid cancel gets its refund just after the status change, and a failed refund can be retried,
+// so only refund_state 'refunded' (T172) ends it.
+const isSettled = (order) => order?.status === 'done'
+    || (order?.status === 'cancelled' && (order.payment_status !== 'paid' || order.refund_state === 'refunded'))
 
 export const useOrderStore = defineStore("orderStore", {
     state() {
@@ -17,6 +24,7 @@ export const useOrderStore = defineStore("orderStore", {
             _ordersWatchers: 0,
             _orderDetailPoller: null,
             _orderDetailWatchedId: null,
+            _orderDetailId: null,   // the order the detail page last asked for
         }
     },
 
@@ -29,6 +37,13 @@ export const useOrderStore = defineStore("orderStore", {
     },
 
     actions: {
+        // The VNPay page to pay an order on, or null. Throws (with .status / .code) when refused, e.g. 409 stock_short:
+        // axiosPolicy has already toasted the translated message.
+        async createPaymentLink(orderId) {
+            const res = await apiPayments.createVnpayPayment(orderId)
+            return res?.data?.payment_url || null
+        },
+
         async placeOrder(deliveryMethod, deliveryAddress, note, deliveryOpts = {}, deliveryAppointment = null) {
             try {
                 this.loading = true
@@ -61,10 +76,14 @@ export const useOrderStore = defineStore("orderStore", {
         },
 
         async getOrderDetail(orderId, { silent = false } = {}) {
+            // A24a: never show another order here: drop it at once, and drop an older answer that lands later
+            // (the previous order's poll on a slow network).
+            this._orderDetailId = orderId
+            if (this.currentOrder?.id !== orderId) this.currentOrder = null
             try {
                 if (!silent) this.loading = true
                 const res = await apiOrders.getOrderDetail(orderId)
-                if (res?.data?.success) {
+                if (res?.data?.success && this._orderDetailId === orderId) {
                     this.currentOrder = res.data.order
                 }
             } catch (e) {
@@ -117,12 +136,16 @@ export const useOrderStore = defineStore("orderStore", {
                 this._orderDetailPoller = null
             }
             if (this._orderDetailPoller) return
+            if (this.currentOrder?.id === orderId && isSettled(this.currentOrder)) return
 
             this._orderDetailWatchedId = orderId
             this._orderDetailPoller = createPoller({
                 name: `buyer-order-${orderId}`,
                 intervalMs: ORDER_DETAIL_POLL_MS,
-                fetch: () => this.getOrderDetail(orderId, { silent: true }),
+                fetch: async () => {
+                    await this.getOrderDetail(orderId, { silent: true })
+                    if (isSettled(this.currentOrder)) this.stopWatchingOrderDetail()
+                },
             })
             this._orderDetailPoller.start()
         },

@@ -12,7 +12,9 @@ from core.auth import verify_token
 from core.display_name import mask_display_name
 from dao.dao_orders import DAOOrders
 from dao.dao_reviews import DAOReviews, ReviewAlreadyExists
+from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
+from services.push_service import notify_seller_new_review
 
 router = APIRouter(prefix="/reviews")
 logger = logging.getLogger(__name__)
@@ -82,6 +84,8 @@ def create_review(request: Schema.RequestCreateReview, user=Depends(verify_token
     except ReviewAlreadyExists:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Order already reviewed")
 
+    owner = DAOSellerProfiles().read_seller_user_id_by_seller_id(seller_id) or {}
+    notify_seller_new_review(owner.get("user_id"))   # T181 A33: once, on the first (and only) submit
     return {"success": True, "store_review": store, "items": items}
 
 

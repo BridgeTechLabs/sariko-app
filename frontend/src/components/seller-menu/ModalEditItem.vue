@@ -1,6 +1,16 @@
 <script>
 import { useMenuStore } from '@/stores/seller/menuStore'
 import { ImagePlus, X, Plus, Trash2 } from 'lucide-vue-next'
+import SectionTitle from '@/components/shared/SectionTitle.vue'
+import ModalEditCategory from './ModalEditCategory.vue'
+import DishOptionGroups from './DishOptionGroups.vue'
+
+// Last option of the category list: opens the new-category form instead of picking a category
+const NEW_CATEGORY = '__new__'
+
+// Stock is a whole number 0..100000 (an input limit of the API, not a business parameter); empty = no limit
+const STOCK_MAX = 100000
+const isStock = v => Number.isInteger(v) && v >= 0 && v <= STOCK_MAX
 
 // nginx client_max_body_size is 10m and base64 adds ~33%, so ~7.5 MB raw is the ceiling
 const MAX_IMAGE_MB = 7
@@ -14,14 +24,12 @@ const isFractional = p => typeof p === 'number' && !Number.isInteger(p)
 export default {
     name: 'ModalEditItem',
 
-    components: { ImagePlus, X, Plus, Trash2 },
+    components: { ImagePlus, X, Plus, Trash2, SectionTitle, ModalEditCategory, DishOptionGroups },
 
     props: {
         modelValue: { type: Boolean, default: false },
         // null = create, object = edit
         item: { type: Object, default: null },
-        // pre-select category when creating from a section
-        defaultCategoryId: { type: String, default: null },
     },
 
     emits: ['update:modelValue'],
@@ -34,6 +42,11 @@ export default {
             saving: false,
             deleting: false,
             showDeleteConfirm: false,
+            showNewCategory: false,
+            // BM12: the form opens with the stock of that moment; saving sends it only if the seller edited the field,
+            // or a paid order's deduction in the meantime would be overwritten by the old number
+            stockTouched: false,
+            STOCK_MAX,
             uploadProgress: false,
         }
     },
@@ -42,13 +55,23 @@ export default {
         isEdit() { return !!this.item },
         canSave() {
             const variantsOk = this.form.variants.every(v => v.name.trim() && isWholeVnd(v.price))
-            return this.form.name.trim() && isWholeVnd(this.form.price) && this.form.category_id && variantsOk && !this.saving
+            return this.form.name.trim() && isWholeVnd(this.form.price) && this.form.category_id && variantsOk && !this.stockInvalid && !this.saving
         },
-        // Typed but not a whole number: tell the seller right under the field
-        priceFractional() { return isFractional(this.form.price) },
+        stockInvalid() {
+            const v = this.form.stock
+            return this.stockTouched && v !== '' && v != null && !isStock(v)
+        },
         variantFractional() { return this.form.variants.some(v => isFractional(v.price)) },
+        // q-select shows no placeholder of its own for a plain (non-searchable) select
+        categoryLabel() {
+            const c = useMenuStore().categories.find(c => c.id === this.form.category_id)
+            return c ? c.name : this.$t('seller_menu.item_category_placeholder')
+        },
         categoryOptions() {
-            return useMenuStore().categories.map(c => ({ label: c.name, value: c.id }))
+            return [
+                ...useMenuStore().categories.map(c => ({ label: c.name, value: c.id })),
+                { label: this.$t('seller_menu.category_new_option'), value: NEW_CATEGORY },
+            ]
         },
     },
 
@@ -66,6 +89,11 @@ export default {
             if (/^[.,eE+-]$/.test(e.key)) e.preventDefault()
         },
 
+        // The mask keeps digits only (45.000 on screen), so the main price can never be fractional
+        onPriceInput(v) {
+            this.form.price = v ? Number(v) : null
+        },
+
         _emptyForm() {
             return {
                 category_id: null,
@@ -75,7 +103,7 @@ export default {
                 unit_label: '',
                 min_quantity: 1,
                 preorder_day: 0,
-                daily_portions: null,   // empty = no daily limit
+                stock: null,   // empty = no limit
                 is_preorder: false,   // UI only: off = instant (preorder_day 0), on = preorder_day ≥ 1
                 is_available: true,
                 is_featured: false,
@@ -85,6 +113,7 @@ export default {
         },
 
         _resetForm() {
+            this.stockTouched = false
             this.imageFile = null
             this.imagePreview = null
             if (this.isEdit) {
@@ -96,7 +125,7 @@ export default {
                     unit_label: this.item.unit_label || '',
                     min_quantity: this.item.min_quantity ?? 1,
                     preorder_day: this.item.preorder_day ?? 0,
-                    daily_portions: this.item.daily_portions ?? null,
+                    stock: this.item.stock ?? null,
                     is_preorder: (this.item.preorder_day ?? 0) > 0,
                     is_available: this.item.is_available ?? true,
                     is_featured: this.item.is_featured ?? false,
@@ -112,8 +141,14 @@ export default {
                 }
             } else {
                 this.form = this._emptyForm()
-                this.form.category_id = this.defaultCategoryId || null
+                const cats = useMenuStore().categories
+                this.form.category_id = cats.length === 1 ? cats[0].id : null
             }
+        },
+
+        onCategoryPick(v) {
+            if (v === NEW_CATEGORY) this.showNewCategory = true
+            else this.form.category_id = v
         },
 
         close() { this.$emit('update:modelValue', false) },
@@ -175,8 +210,8 @@ export default {
                     preorder_day: this.form.is_preorder ? Math.max(1, Number(this.form.preorder_day) || 1) : 0,
                     is_available: this.form.is_available,
                     is_featured: this.form.is_featured,
-                    daily_portions: this.form.daily_portions > 0 ? Math.floor(this.form.daily_portions) : null,
                 }
+                if (this.stockTouched) payload.stock = this.form.stock === '' || this.form.stock == null ? null : this.form.stock
 
                 // Clear image explicitly if removed
                 if (!this.form.image_url && !this.imageFile && this.isEdit && this.item.image_url) {
@@ -254,115 +289,135 @@ export default {
 
             <div class="sheet-body">
 
-                <!-- Image picker -->
-                <div class="image-section">
-                    <div v-if="imagePreview || form.image_url" class="image-preview-wrap">
-                        <img :src="imagePreview || form.image_url" class="image-preview" />
-                        <button class="btn-remove-img" @click="removeImage"><X :size="14" /></button>
+                <div class="group">
+                    <SectionTitle>{{ $t('seller_menu.group_dish') }}</SectionTitle>
+                    <!-- Image picker -->
+                    <div class="image-section">
+                        <div v-if="imagePreview || form.image_url" class="image-preview-wrap">
+                            <img :src="imagePreview || form.image_url" class="image-preview" />
+                            <button class="btn-remove-img" @click="removeImage"><X :size="14" /></button>
+                        </div>
+                        <label v-else class="image-placeholder">
+                            <ImagePlus :size="28" style="color:var(--text-muted);" />
+                            <span class="image-hint">{{ $t('seller_menu.image_pick') }}</span>
+                            <input type="file" accept="image/*" class="file-input" @change="onImagePick" />
+                        </label>
                     </div>
-                    <label v-else class="image-placeholder">
-                        <ImagePlus :size="28" style="color:var(--text-muted);" />
-                        <span class="image-hint">{{ $t('seller_menu.image_pick') }}</span>
-                        <input type="file" accept="image/*" class="file-input" @change="onImagePick" />
-                    </label>
-                </div>
 
-                <!-- Category -->
-                <div class="field-group">
-                    <div class="field-label">{{ $t('seller_menu.item_category') }}</div>
-                    <q-select
-                        v-model="form.category_id"
-                        :options="categoryOptions"
-                        emit-value map-options
-                        dense outlined dark
-                        :placeholder="$t('seller_menu.item_category_placeholder')"
-                        clearable
-                        popup-content-class="dark-popup"
-                    />
-                </div>
-
-                <!-- Name -->
-                <div class="field-group">
-                    <div class="field-label">{{ $t('seller_menu.item_name') }} *</div>
-                    <q-input v-model="form.name" dense outlined dark :placeholder="$t('seller_menu.item_name_placeholder')" />
-                </div>
-
-                <!-- Description -->
-                <div class="field-group">
-                    <div class="field-label">{{ $t('seller_menu.item_description') }}</div>
-                    <q-input v-model="form.description" dense outlined dark type="textarea" rows="2" :placeholder="$t('seller_menu.item_description_placeholder')" />
-                </div>
-
-                <!-- Price + Unit label -->
-                <div class="field-row">
-                    <div class="field-group flex-1">
-                        <div class="field-label">{{ $t('seller_menu.item_price') }} * (₫)</div>
-                        <q-input v-model.number="form.price" dense outlined dark type="number" step="1" min="1" inputmode="numeric" @keydown="blockNonDigit"
-                            :error="priceFractional" :error-message="$t('seller_menu.price_whole_error')"
-                            :placeholder="$t('seller_menu.item_price_placeholder')" />
+                    <!-- Category -->
+                    <div class="field-group">
+                        <div class="field-label">{{ $t('seller_menu.item_category') }}</div>
+                        <q-select
+                            :model-value="form.category_id"
+                            :options="categoryOptions"
+                            :display-value="categoryLabel"
+                            emit-value map-options
+                            dense outlined dark
+                            :placeholder="$t('seller_menu.item_category_placeholder')"
+                            clearable
+                            popup-content-class="dark-popup"
+                            @update:model-value="onCategoryPick"
+                        />
                     </div>
-                    <div class="field-group" style="width:110px;">
-                        <div class="field-label">{{ $t('seller_menu.item_unit_label') }}</div>
-                        <q-input v-model="form.unit_label" dense outlined dark :placeholder="$t('seller_menu.item_unit_label_placeholder')" />
+
+                    <!-- Name -->
+                    <div class="field-group">
+                        <div class="field-label">{{ $t('seller_menu.item_name') }} *</div>
+                        <q-input v-model="form.name" dense outlined dark :placeholder="$t('seller_menu.item_name_placeholder')" />
                     </div>
+
+                    <!-- Description -->
+                    <div class="field-group">
+                        <div class="field-label">{{ $t('seller_menu.item_description') }}</div>
+                        <q-input v-model="form.description" dense outlined dark type="textarea" rows="2" :placeholder="$t('seller_menu.item_description_placeholder')" />
+                    </div>
+
                 </div>
 
-                <!-- Price levels (S/M/L, 1-2-4 people, …) -->
-                <div class="field-group">
-                    <div class="field-label">{{ $t('seller_menu.variants_label') }}</div>
-                    <div v-if="form.variants.length" class="variant-list">
-                        <div v-for="(v, idx) in form.variants" :key="idx" class="variant-row">
-                            <q-input v-model="v.name" dense outlined dark class="variant-name"
-                                :placeholder="$t('seller_menu.variant_name_placeholder')" />
-                            <q-input v-model.number="v.price" dense outlined dark type="number" step="1" min="1" inputmode="numeric" @keydown="blockNonDigit" class="variant-price"
-                                :error="isFractional(v.price)" hide-bottom-space
-                                :placeholder="$t('seller_menu.variant_price_placeholder')" />
-                            <q-toggle v-model="v.is_available" dense color="amber" />
-                            <button class="btn-variant-remove" @click="removeVariant(idx)">
-                                <Trash2 :size="16" />
-                            </button>
+                <div class="group">
+                    <SectionTitle>{{ $t('seller_menu.group_price') }}</SectionTitle>
+                    <!-- Price + Unit label -->
+                    <div class="field-row">
+                        <div class="field-group flex-1">
+                            <div class="field-label">{{ $t('seller_menu.item_price') }} *</div>
+                            <q-input :model-value="form.price" dense outlined dark inputmode="numeric"
+                                mask="#.###.###.###" reverse-fill-mask unmasked-value suffix="₫"
+                                :placeholder="$t('seller_menu.item_price_placeholder')" @update:model-value="onPriceInput" />
+                        </div>
+                        <div class="field-group" style="width:110px;">
+                            <div class="field-label">{{ $t('seller_menu.item_unit_label') }}</div>
+                            <q-input v-model="form.unit_label" dense outlined dark :placeholder="$t('seller_menu.item_unit_label_placeholder')" />
                         </div>
                     </div>
-                    <button class="btn-variant-add" @click="addVariant">
-                        <Plus :size="16" /> {{ $t('seller_menu.variant_add') }}
-                    </button>
-                    <div v-if="variantFractional" class="variant-hint variant-error">{{ $t('seller_menu.price_whole_error') }}</div>
-                    <div class="variant-hint">
-                        {{ form.variants.length ? $t('seller_menu.variants_hint_active') : $t('seller_menu.variants_hint_empty') }}
+
+                    <!-- Price levels (S/M/L, 1-2-4 people, …) -->
+                    <div class="field-group">
+                        <div class="field-label">{{ $t('seller_menu.variants_label') }}</div>
+                        <div v-if="form.variants.length" class="variant-list">
+                            <div v-for="(v, idx) in form.variants" :key="idx" class="variant-row">
+                                <q-input v-model="v.name" dense outlined dark class="variant-name"
+                                    :placeholder="$t('seller_menu.variant_name_placeholder')" />
+                                <q-input v-model.number="v.price" dense outlined dark type="number" step="1" min="1" inputmode="numeric" @keydown="blockNonDigit" class="variant-price"
+                                    :error="isFractional(v.price)" hide-bottom-space
+                                    :placeholder="$t('seller_menu.variant_price_placeholder')" />
+                                <q-toggle v-model="v.is_available" dense color="amber" />
+                                <button class="btn-variant-remove" @click="removeVariant(idx)">
+                                    <Trash2 :size="16" />
+                                </button>
+                            </div>
+                        </div>
+                        <button class="btn-variant-add" @click="addVariant">
+                            <Plus :size="16" /> {{ $t('seller_menu.variant_add') }}
+                        </button>
+                        <div v-if="variantFractional" class="variant-hint variant-error">{{ $t('seller_menu.price_whole_error') }}</div>
+                        <div class="variant-hint">
+                            {{ form.variants.length ? $t('seller_menu.variants_hint_active') : $t('seller_menu.variants_hint_empty') }}
+                        </div>
                     </div>
+
                 </div>
 
-                <!-- Min qty -->
-                <div class="field-row">
-                    <div class="field-group flex-1">
-                        <div class="field-label">{{ $t('seller_menu.item_min_quantity') }}</div>
-                        <q-input v-model.number="form.min_quantity" dense outlined dark type="number" :min="1" />
-                    </div>
-                    <div class="field-group flex-1">
-                        <div class="field-label">{{ $t('seller_menu.item_daily_portions') }}</div>
-                        <q-input v-model.number="form.daily_portions" dense outlined dark type="number" step="1" min="1" inputmode="numeric" @keydown="blockNonDigit"
-                            :placeholder="$t('seller_menu.item_daily_portions_placeholder')" />
-                    </div>
+                <div class="group">
+                    <DishOptionGroups :dish-id="item?.id || null" />
                 </div>
 
-                <!-- Toggles -->
-                <div class="toggle-row">
-                    <div class="toggle-item">
-                        <span class="toggle-label">{{ $t('seller_menu.item_preorder') }}</span>
-                        <q-toggle v-model="form.is_preorder" color="warning" @update:model-value="onPreorderToggle" />
+                <div class="group">
+                    <SectionTitle>{{ $t('seller_menu.group_selling') }}</SectionTitle>
+                    <!-- Min qty -->
+                    <div class="field-row">
+                        <div class="field-group flex-1">
+                            <div class="field-label">{{ $t('seller_menu.item_min_quantity') }}</div>
+                            <q-input v-model.number="form.min_quantity" dense outlined dark type="number" :min="1" />
+                        </div>
+                        <div class="field-group flex-1">
+                            <div class="field-label">{{ $t('seller_menu.item_stock') }}</div>
+                            <q-input v-model.number="form.stock" dense outlined dark type="number" step="1" min="0" :max="STOCK_MAX" inputmode="numeric" @keydown="blockNonDigit"
+                                :error="stockInvalid" :error-message="$t('seller_menu.item_stock_error', { max: STOCK_MAX })" hide-bottom-space
+                                :placeholder="$t('seller_menu.item_stock_placeholder')" @update:model-value="stockTouched = true" />
+                        </div>
                     </div>
-                    <div v-if="form.is_preorder" class="field-group">
-                        <div class="field-label">{{ $t('seller_menu.item_preorder_day') }}</div>
-                        <q-input v-model.number="form.preorder_day" dense outlined dark type="number" :min="1" />
+                    <div class="variant-hint">{{ $t('seller_menu.item_stock_hint') }}</div>
+
+                    <!-- Toggles -->
+                    <div class="toggle-row">
+                        <div class="toggle-item">
+                            <span class="toggle-label">{{ $t('seller_menu.item_preorder') }}</span>
+                            <q-toggle v-model="form.is_preorder" color="warning" @update:model-value="onPreorderToggle" />
+                        </div>
+                        <div v-if="form.is_preorder" class="field-group">
+                            <div class="field-label">{{ $t('seller_menu.item_preorder_day') }}</div>
+                            <q-input v-model.number="form.preorder_day" dense outlined dark type="number" :min="1" />
+                        </div>
+                        <div class="toggle-item">
+                            <span class="toggle-label">{{ $t('seller_menu.item_available') }}</span>
+                            <q-toggle v-model="form.is_available" color="positive" />
+                        </div>
+                        <div class="toggle-item">
+                            <span class="toggle-label">{{ $t('seller_menu.item_featured') }}</span>
+                            <q-toggle v-model="form.is_featured" color="warning" />
+                        </div>
                     </div>
-                    <div class="toggle-item">
-                        <span class="toggle-label">{{ $t('seller_menu.item_available') }}</span>
-                        <q-toggle v-model="form.is_available" color="positive" />
-                    </div>
-                    <div class="toggle-item">
-                        <span class="toggle-label">{{ $t('seller_menu.item_featured') }}</span>
-                        <q-toggle v-model="form.is_featured" color="warning" />
-                    </div>
+
                 </div>
 
             </div>
@@ -377,13 +432,14 @@ export default {
                 >
                     {{ $t('seller_menu.item_delete') }}
                 </q-btn>
-                <div style="flex:1" />
                 <q-btn unelevated no-caps class="btn-save" :disable="!canSave" :loading="saving" @click="save">
                     {{ uploadProgress ? $t('seller_menu.uploading') : $t('common.button_label_save') }}
                 </q-btn>
             </div>
 
         </q-card>
+
+        <ModalEditCategory v-model="showNewCategory" :category="null" @saved="form.category_id = $event.id" />
 
         <!-- Delete confirm -->
         <q-dialog v-model="showDeleteConfirm">
@@ -603,7 +659,19 @@ export default {
     font-weight: 700;
     font-size: 14px;
     border-radius: 12px;
-    padding: 10px 24px;
+    padding: 12px;
+    flex: 1;
+}
+
+.group {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    :deep(.section-title) { margin-bottom: 0; }
 }
 
 .btn-delete {
@@ -621,9 +689,22 @@ export default {
 
 .dialog-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
 .dialog-sub   { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+</style>
 
-:deep(.dark-popup) {
-    background: #1f2940;
+<!-- Not scoped: the select's list is teleported out of this component -->
+<style lang="scss">
+.dark-popup {
+    background: #2a3654;   /* lighter than the sheet, so the list stands out from it */
     color: var(--text-primary);
+    border: 1px solid rgba(255,255,255,0.12);
+    /* the field's width: a long category name must not push the list past the sheet */
+    max-width: calc(100vw - 58px) !important;
+
+    .q-item {
+        min-height: 48px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        &:last-child { border-bottom: none; color: var(--color-accent); font-weight: 600; }   /* "+ New category" */
+    }
+    .q-item--active { background: rgba(250,204,21,0.14); color: var(--color-accent); }
 }
 </style>

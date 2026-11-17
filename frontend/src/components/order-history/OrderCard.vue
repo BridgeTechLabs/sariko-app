@@ -2,6 +2,7 @@
 import { liveDeliveryKey } from '@/utils/deliveryBadge';
 import { isScheduled } from '@/utils/orderStage';
 import { Store, Truck, ChevronRight, Star } from 'lucide-vue-next';
+import { refundChip } from '@/utils/refundChip';
 
 export default {
     components: {
@@ -48,11 +49,8 @@ export default {
             }
             return map[this.order.status] || this.order.status
         },
-        refundStatus() {
-            return this.order.refunds?.[0]?.status || null
-        },
-        showRefundChip() {
-            return this.refundStatus === 'pending'
+        refundChip() {   // same words as the order page (T178 A44)
+            return refundChip(this.order)
         },
         // review_stores(id) is embedded by the orders query, so this costs no extra request.
         // order_id is unique there, so PostgREST returns an object (null until reviewed);
@@ -89,8 +87,8 @@ export default {
             </div>
         </div>
 
-        <div v-if="showRefundChip" class="refund-chip refund-pending">
-            {{ $t('orders_page.refund_pending') }}
+        <div v-if="refundChip" class="refund-chip" :class="refundChip.cls">
+            {{ $t(refundChip.key) }}
         </div>
 
         <div v-if="needsReview" class="refund-chip needs-review">
@@ -234,6 +232,11 @@ export default {
 .refund-pending {
     background: rgba(245, 166, 35, 0.12);
     color: #f5a623;
+}
+
+.refund-processed {
+    background: rgba(34, 197, 94, 0.12);
+    color: #22c55e;
 }
 
 .needs-review {

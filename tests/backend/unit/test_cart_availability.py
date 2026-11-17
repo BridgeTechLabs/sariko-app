@@ -17,10 +17,10 @@ ROWS = {
     "id": "c1", "seller_id": "s1",
     "cart_items": [
         {"quantity": 1, "variant_id": None,
-         "food_items": {"id": "f1", "name": "Adobo", "is_available": False}, "food_item_variants": None},
+         "food_items": {"id": "f1", "name": "Adobo", "price": 50000, "is_available": False}, "food_item_variants": None},
         {"quantity": 2, "variant_id": "v1",
-         "food_items": {"id": "f2", "name": "Sinigang", "is_available": True},
-         "food_item_variants": {"id": "v1", "name": "Large", "is_available": False}},
+         "food_items": {"id": "f2", "name": "Sinigang", "price": 60000, "is_available": True},
+         "food_item_variants": {"id": "v1", "name": "Large", "price": 80000, "is_available": False}},
     ],
 }
 
@@ -44,7 +44,7 @@ def test_dao_selects_is_available_on_dish_and_level(monkeypatch):
     dao = DAOCartItems.__new__(DAOCartItems)
     dao._supabase_client = type("C", (), {"table": lambda self, name: query})()
     assert dao.read_cart_items_by_user_id("u") == ROWS
-    food, level = query.select_arg.split("food_items(")[1].split("food_item_variants(")
+    food, level = query.select_arg.split("food_items(", 1)[1].rsplit("food_item_variants(", 1)
     assert "is_available" in food and "is_available" in level
 
 

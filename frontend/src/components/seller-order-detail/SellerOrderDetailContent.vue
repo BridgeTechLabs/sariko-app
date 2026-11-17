@@ -2,6 +2,8 @@
 import { Phone } from 'lucide-vue-next';
 import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { orderCode } from '@/utils/orderCode';
+import OptionLines from '@/components/shared/OptionLines.vue';
+import { cancelReasonText } from '@/utils/cancelReason';
 
 const STATUS_DISPLAY_KEY = {
     pending:   'seller_order_detail.status_new',
@@ -24,10 +26,11 @@ const STATUS_CLASS = {
 const PAYMENT_METHOD_LABEL = { vnpay: 'VNPay' }
 
 const DELIVERY_STATUS_ORDER = ['ASSIGNING_DRIVER', 'ON_GOING', 'PICKED_UP', 'COMPLETED']
-const DELIVERY_CANCELLED_STATUSES = ['CANCELLED', 'CANCELED', 'REJECTED', 'EXPIRED']
+const DELIVERY_CANCELLED_STATUSES = ['CANCELLED', 'CANCELED', 'REJECTED', 'EXPIRED', 'LOST']
 const DELIVERY_CANCEL_ERROR_KEY = {
     REJECTED: 'seller_order_detail.delivery_rejected_error',
     EXPIRED:  'seller_order_detail.delivery_expired_error',
+    LOST:     'seller_order_detail.delivery_lost_error',
     CANCELED: 'seller_order_detail.delivery_canceled_error',
     CANCELLED: 'seller_order_detail.delivery_canceled_error',
 }
@@ -35,7 +38,7 @@ const DELIVERY_CANCEL_ERROR_KEY = {
 export default {
     name: 'SellerOrderDetailContent',
 
-    components: { Phone },
+    components: { Phone, OptionLines },
 
     props: {
         order: {
@@ -65,7 +68,21 @@ export default {
             return this.order.receiver_phone || this.order.users?.phone || null
         },
 
+        cancelReason() {   // a code in the seller's language (T178)
+            return cancelReasonText(this, this.order, 'seller')
+        },
+
         // From the charge row in payments; force-paid DEV orders have none, so the row hides.
+        // refund_state (backend, T172) before paid / pending; a failed refund is retried, so still in progress
+        paymentStatus() {
+            const state = this.order.refund_state
+            if (state === 'refunded') return { text: this.$t('seller_order_detail.payment_refunded'), color: 'var(--text-secondary)' }
+            if (state) return { text: this.$t('seller_order_detail.payment_refund_in_progress'), color: 'var(--color-warning)' }
+            return this.order.payment_status === 'paid'
+                ? { text: this.$t('seller_order_detail.payment_paid'), color: 'var(--color-success)' }
+                : { text: this.$t('seller_order_detail.payment_pending'), color: 'var(--color-warning)' }
+        },
+
         paymentMethod() {
             const method = (this.order.payments || []).find(p => p.type === 'charge')?.method
             return method ? (PAYMENT_METHOD_LABEL[method] || method) : null
@@ -129,11 +146,13 @@ export default {
                 if (deliveryCancelled) {
                     // Show assigning rider as the failed step, hide the rest
                     const errorKey = DELIVERY_CANCEL_ERROR_KEY[this.delivery.status] || 'seller_order_detail.delivery_cancelled_error'
+                    // An order that ended anyway (delivered by the seller, or cancelled) has nothing left to re-book (T177 A46)
+                    const open = !['done', 'cancelled'].includes(this.order.status)
                     steps.push({
                         key: 'ASSIGNING_DRIVER',
                         label: this.$t('seller_order_detail.delivery_step_assigning'),
-                        done: false, current: false, error: true,
-                        errorMessage: this.$t(errorKey),
+                        done: false, current: false, error: open,
+                        errorMessage: open ? this.$t(errorKey) : null,
                     })
                 } else {
                     const deliveryStepDefs = [
@@ -207,7 +226,7 @@ export default {
                 <span class="status-badge" :class="statusClass">{{ displayStatus }}</span>
             </div>
             <div v-if="order.status === 'cancelled' && order.cancellation_reason" class="cancellation-reason">
-                {{ $t('seller_order_detail.label_reason') }}: {{ order.cancellation_reason }}
+                {{ $t('seller_order_detail.label_reason') }}: {{ cancelReason }}
             </div>
             <div class="order-time-text">
                 {{ code }} · {{ $t('seller_order_detail.label_placed') }} {{ placedAt }}
@@ -262,10 +281,13 @@ export default {
         <!-- Items -->
         <div class="card">
             <div class="section-label" style="margin-bottom:12px;">{{ $t('seller_order_detail.section_items') }}</div>
-            <div v-for="item in order.order_items" :key="item.id" class="item-row">
+            <template v-for="item in order.order_items" :key="item.id">
+            <div class="item-row">
                 <span class="item-name">{{ item.quantity }}x {{ item.name_snapshot }}<span v-if="item.variant_name_snapshot" class="order-variant"> ({{ item.variant_name_snapshot }})</span></span>
                 <span class="item-price">{{ fmt(item.price_snapshot * item.quantity) }}</span>
             </div>
+            <OptionLines :options="item.options_snapshot" />
+            </template>
             <q-separator style="background:rgba(255,255,255,0.08);margin:12px 0;" />
             <div class="item-row">
                 <span class="info-key">{{ $t('seller_order_detail.label_subtotal') }}</span>
@@ -290,9 +312,7 @@ export default {
             </div>
             <div class="info-row">
                 <span class="info-key">{{ $t('seller_order_detail.label_status') }}</span>
-                <span class="info-val" :style="{ color: order.payment_status === 'paid' ? 'var(--color-success)' : 'var(--color-warning)' }">
-                    {{ order.payment_status === 'paid' ? $t('seller_order_detail.payment_paid') : $t('seller_order_detail.payment_pending') }}
-                </span>
+                <span class="info-val" :style="{ color: paymentStatus.color }">{{ paymentStatus.text }}</span>
             </div>
         </div>
 
@@ -420,7 +440,7 @@ export default {
 }
 
 .item-name  { font-size: 14px; color: var(--text-primary); }
-.item-price { font-size: 14px; color: var(--text-secondary); }
+.item-price { font-size: 14px; color: var(--text-secondary); flex-shrink: 0; padding-left: 12px; white-space: nowrap; }
 
 .total-row {
     font-size: 15px;

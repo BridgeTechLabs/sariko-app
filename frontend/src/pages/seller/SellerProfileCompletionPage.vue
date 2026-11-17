@@ -9,7 +9,7 @@ export default {
 </script>
 
 <template>
-    <LayoutBaseSettings :title="$t('seller_profile.page_title')" back-to="/seller/me">
+    <LayoutBaseSettings :title="$t('seller_profile.page_title')" back-to="/seller/me/profile">
         <template #Content>
             <ProfileCompletionForm />
         </template>

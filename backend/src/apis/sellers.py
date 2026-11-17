@@ -1,11 +1,13 @@
+import functools
 import logging
 import re
+import uuid
 
 from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 
 from apis.complaints import complaints_for_order
-from apis.deliveries import book_allingo, cancel_trip, keep_taken_trip, lalamove_recipient
+from apis.deliveries import book_allingo, cancel_trip, check_trip_addresses, keep_taken_trip, lalamove_recipient, seller_phone
 from apis.orders import cancel_after
 from core.store_hours import confirm_deadline, is_open_now
 from services.order_expiry import confirm_window
@@ -15,6 +17,7 @@ from dao.dao_admin_payouts import DAOAdminPayouts
 from dao.dao_seller_profiles import DAOSellerProfiles
 from dao.dao_food_items import DAOFoodItems, FoodItemNameTaken
 from dao.dao_menu_categories import DAOMenuCategories
+from dao.dao_menu_option_groups import DAOMenuOptionGroups, OptionNameTaken
 from dao.dao_reviews import DAOReviews
 
 from fastapi import APIRouter, HTTPException, Depends, Query, status
@@ -22,14 +25,14 @@ from fastapi import APIRouter, HTTPException, Depends, Query, status
 from apis.reviews import mask_reviewer
 from core.auth import verify_token
 from core.payout_cycle import expected_payout_date
-from core.phone import to_e164_vn
 from core.sariko_cache import cache
-from dao.dao_orders import DAOOrders, seller_orders_key
+from dao.dao_orders import DAOOrders, TRIP_ENDED, seller_orders_key, seller_orders_list_key
 from schemas import Schema
 from services import allingo_service
 from services.allingo_service import AllingoError
 from dao.dao_food_item_variants import DAOFoodItemVariants
 from utils.storage import upload_image_base64
+from utils.stock import add_sold_out
 
 router = APIRouter(prefix="/sellers")
 logger = logging.getLogger(__name__)
@@ -45,9 +48,16 @@ VALID_STATUS_TRANSITIONS = {
     "delivery_failed":  ["done", "cancelled"],
 }
 
+# What a seller may give as the cancel reason (T178): codes, translated per viewer; "other" carries the seller's
+# own words in cancellation_note. NO_DRIVER_REASON is also the automatic cancel after every booking attempt failed.
+NO_DRIVER_REASON = "no_driver"
+OTHER_REASON = "seller_reject_other"
+SELLER_CANCEL_REASONS = {"seller_reject_out_of_ingredients", "seller_reject_too_busy", "seller_reject_store_closing",
+                         OTHER_REASON, NO_DRIVER_REASON}
+
 # A Lalamove trip is over once it reaches one of these; before that the COMPLETED
 # webhook closes the order, so the seller can't mark it done (P0-6).
-DELIVERY_ENDED_STATUSES = {"COMPLETED", "REJECTED", "CANCELLED", "CANCELED", "EXPIRED"}
+DELIVERY_ENDED_STATUSES = TRIP_ENDED | {"COMPLETED"}
 
 # Rows one order search returns (a page size, not a business rule).
 SEARCH_LIMIT = 20
@@ -93,10 +103,11 @@ def _get_seller_id(user):
 def _with_deadlines(orders: list, seller: dict) -> list:
     """`deadline` shown under the seller's Accept / Ready buttons.
     pending (paid): when it auto-cancels; None while the store is closed, that clock is paused.
-    confirmed: when the buyer may cancel it for a full refund (R4)."""
+    confirmed / delivery_failed: when the buyer may cancel it for a full refund (R4, R6)."""
     now = datetime.now(timezone.utc)
     hours = seller.get("weekly_hours")
     window = None
+    get_minutes = functools.cache(DAOAdminConfig().get_minutes)   # each setting read once for the whole list
     for order in orders:
         order["deadline"] = None
         if (order["status"] == "pending" and order.get("payment_status") == "paid" and order.get("paid_at")
@@ -106,8 +117,8 @@ def _with_deadlines(orders: list, seller: dict) -> list:
             order["deadline"] = confirm_deadline(datetime.fromisoformat(order["paid_at"]), hours,
                                                  datetime.fromisoformat(opened_at) if opened_at else None,
                                                  now, window, seller.get("id")).isoformat()
-        elif order["status"] == "confirmed" and order.get("status_changed_at"):
-            order["deadline"] = cancel_after(order).isoformat()
+        elif order["status"] in ("confirmed", "delivery_failed") and order.get("status_changed_at"):
+            order["deadline"] = cancel_after(order, get_minutes).isoformat()
     return orders
 
 
@@ -123,6 +134,7 @@ def get_seller_info(user=Depends(verify_token)):
             "seller_id": profile["id"],
             "slug": profile.get("slug"),
             "store_name": profile.get("store_name"),
+            "description": profile.get("description"),
             "address": profile.get("address"),
             "lat": profile.get("lat"),
             "lon": profile.get("lon"),
@@ -181,13 +193,37 @@ def set_store_hours(body: Schema.RequestSetStoreHours, user=Depends(verify_token
         raise HTTPException(status_code=500, detail=str(e))
 
 
+ORDERS_LIST_TTL_SECONDS = 3600   # technical constant: only drops an idle seller's list and lets orders age out of the history window
+
+
+def _orders_signature(seller_id: str):
+    """The seller's order-list signature through the shared 30 s cache: (signature, was_cached)."""
+    key = seller_orders_key(seller_id)
+    signature = cache.get(key)
+    cached = signature is not None
+    if not cached:
+        signature = DAOOrders().read_orders_head_by_seller_id(seller_id)
+        cache.put(key, signature)
+    return signature, cached
+
+
 @router.get("/me/orders")
 def get_seller_orders(user=Depends(verify_token)):
     try:
         seller = _get_seller(user)
         history_days = DAOAdminConfig().get_positive_int("seller_order_history_days", 30)
-        since = datetime.now(timezone.utc) - timedelta(days=history_days)
-        orders = DAOOrders().read_orders_by_seller_id(seller["id"], since)
+        # The list is kept with the signature it was read under: a poll that finds the same signature (the one /head
+        # serves) gets it back without a query, any order change moves the signature. The signature is read first,
+        # so a write between the two reads only makes the next call read again.
+        signature, _ = _orders_signature(seller["id"])
+        list_key = seller_orders_list_key(seller["id"])
+        stored = cache.get(list_key)
+        if stored and stored[0] == signature:
+            orders = [dict(o) for o in stored[1]]   # _with_deadlines writes into the orders: never the cached ones
+        else:
+            since = datetime.now(timezone.utc) - timedelta(days=history_days)
+            orders = DAOOrders().read_orders_by_seller_id(seller["id"], since)
+            cache.put(list_key, (signature, [dict(o) for o in orders]), ORDERS_LIST_TTL_SECONDS)
         return {"success": True, "orders": _with_deadlines(orders, seller), "seller_id": seller["id"],
                 "history_days": history_days}
     except HTTPException:
@@ -209,15 +245,7 @@ def get_seller_orders_head(user=Depends(verify_token)):
     dao_orders invalidates the key on every write.
     """
     try:
-        seller_id = _get_seller_id(user)
-        key = seller_orders_key(seller_id)
-
-        signature = cache.get(key)
-        cached = signature is not None
-        if not cached:
-            signature = DAOOrders().read_orders_head_by_seller_id(seller_id)
-            cache.put(key, signature)
-
+        signature, cached = _orders_signature(_get_seller_id(user))
         return {"success": True, "cached": cached, **signature}
     except HTTPException:
         raise
@@ -256,6 +284,8 @@ def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
         order = dao.read_order_by_id_for_seller(order_id, seller["id"])
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        if order.get("cancellation_reason") != OTHER_REASON:   # the seller gets only its own words, not an admin's (T178)
+            order.pop("cancellation_note", None)
         order["status_history"] = dao.read_status_history(order_id)
         order["delivery_history"] = dao.read_delivery_history(order_id)   # BUGS #39: times of the delivery steps
         order |= complaints_for_order(order, user["id"], "seller")   # T35
@@ -269,6 +299,7 @@ def get_seller_order_detail(order_id: str, user=Depends(verify_token)):
 
 @router.patch("/me/orders/{order_id}/status")
 def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderStatus, user=Depends(verify_token)):
+    until = allingo_service.deadline()   # AllinGo retries stop in time for the seller's answer (T191)
     try:
         seller_id = _get_seller_id(user)
         dao_orders = DAOOrders()
@@ -300,8 +331,13 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     "message": "The rider is still delivering; the order completes itself when the delivery is done.",
                 })
 
-        # Pass cancellation_reason when rejecting
-        cancellation_reason = body.cancellation_reason if body.status == "cancelled" else None
+        # Rejecting: a listed code; "other" needs the seller's own words (kept apart, never shown to the buyer)
+        cancellation_reason = cancellation_note = None
+        if body.status == "cancelled":
+            cancellation_reason = body.cancellation_reason
+            cancellation_note = (body.cancellation_note or "").strip() or None
+            if cancellation_reason not in SELLER_CANCEL_REASONS or (cancellation_reason == OTHER_REASON and not cancellation_note):
+                raise HTTPException(status_code=400, detail={"code": "invalid_reason", "message": "Pick a reason (write it for Other)"})
 
         # For "ready" + delivery: book Lalamove FIRST, only update status if booking succeeds
         booking_result = None
@@ -327,14 +363,9 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     "message": "Set your store address and phone before marking the order ready.",
                 })
 
+            check_trip_addresses(full_order)
             pickup_address  = seller.get("address") or ""
             dropoff_address = full_order.get("delivery_address") or ""
-
-            if not pickup_address.strip() or not dropoff_address.strip():
-                raise HTTPException(
-                    status_code=400,
-                    detail="Missing pickup or dropoff address. Please update your store address in settings."
-                )
 
             allingo = allingo_service.enabled()
             if not allingo:
@@ -350,10 +381,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                     dropoff_address=dropoff_address,
                 )
 
-            try:
-                sender_phone = to_e164_vn(seller.get("phone") or "")
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail={"code": "seller_phone_invalid", "message": f"Seller phone invalid: {e}. Update store phone in settings."})
+            sender_phone = seller_phone(seller)
             recipient = lalamove_recipient(full_order)
 
             logger.warning(f"[Delivery] order={order_id} sender_phone={sender_phone} recipient_phone=…{recipient['recipient_phone'][-4:]}")
@@ -364,7 +392,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
             taken = False
             if allingo:
                 try:
-                    booking_result, taken = book_allingo(full_order, sender_phone, recipient, attempts)
+                    booking_result, taken = book_allingo(full_order, sender_phone, recipient, attempts, until)
                 except AllingoError as e:   # an empty wallet goes the failed-booking way too (admins already told)
                     last_booking_error = e
             else:
@@ -378,7 +406,7 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                             sender_phone=sender_phone,
                             **recipient,
                         )
-                        booking_result = {"provider": "lalamove", "status": result.status,
+                        booking_result = {"provider": "lalamove", "status": result.status, "trip_fee": quotation.total_fee,
                                           "lalamove_order_id": result.lalamove_order_id, "share_link": result.share_link}
                         break
                     except Exception as e:
@@ -388,7 +416,10 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
             if booking_result is None:
                 logger.error(f"[Delivery] All {attempts} booking attempts failed for order={order_id}: {last_booking_error}")
                 # The buyer UI translates this exact text (OrderStatusHeader.vue); no count in it, it's a setting
-                dao_orders.update_order_status(order_id, "cancelled", "Driver booking failed")
+                # Conditional: the buyer may have cancelled (and been refunded) while the booking ran (T177 A32)
+                if not dao_orders.update_order_status(order_id, "cancelled", NO_DRIVER_REASON,
+                                                      expected_status=order["status"]):
+                    raise HTTPException(status_code=409, detail="Order status changed, please refresh")
                 from dao.dao_refunds import DAORefunds
                 DAORefunds().create_refund_for_order(order, "driver_booking_failed")
                 raise HTTPException(status_code=503, detail="Unable to book a delivery driver. Your order has been cancelled.")
@@ -409,9 +440,13 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
                 # DB insert failed but the trip is already booked — roll back to avoid orphan.
                 logger.error(f"[Delivery] create_delivery failed ({booking_result['provider']}={trip_id}); cancelling the trip")
                 try:
-                    cancel_trip(booking_result, get_lalamove_service)
+                    if not cancel_trip(booking_result, get_lalamove_service, until):   # a False answer too (T191 TC-35)
+                        logger.error(f"[Delivery] Rollback cancel failed for {trip_id} — MANUAL INTERVENTION NEEDED")
                 except Exception as cancel_err:
                     logger.error(f"[Delivery] Rollback cancel failed for {trip_id}: {cancel_err} — MANUAL INTERVENTION NEEDED")
+                if "deliveries_one_live_trip_per_order" in str(db_err):
+                    # T180 A26: a second Ready at the same moment; the first one's trip is the order's (the DB keeps one)
+                    raise HTTPException(status_code=409, detail="Order status changed, please refresh")
                 raise HTTPException(status_code=500, detail=f"Failed to record delivery: {db_err}")
             logger.warning(f"[Delivery] Auto-booked order={order_id} {booking_result['provider']}={trip_id}")
 
@@ -419,17 +454,18 @@ def update_seller_order_status(order_id: str, body: Schema.RequestUpdateOrderSta
         # Conditional on the status read above: the confirm-timeout job or a buyer
         # cancelling a late order may have cancelled (and refunded) it in between.
         updated = dao_orders.update_order_status(order_id, body.status, cancellation_reason,
-                                                 expected_status=order["status"])
+                                                 expected_status=order["status"], cancellation_note=cancellation_note)
         if not updated:
             # The trip was booked for an order that is no longer ours to send (R4.6).
             # It is still ASSIGNING_DRIVER, which the company lets us cancel.
-            if booking_result and not keep_taken_trip(taken, dao_orders, order_id) and not cancel_trip(booking_result, get_lalamove_service):
+            if booking_result and not keep_taken_trip(taken, dao_orders, order_id) and not cancel_trip(booking_result, get_lalamove_service, until):
                 logger.error(f"[Delivery] order={order_id} changed while booking; cancel of {trip_id} failed — MANUAL INTERVENTION NEEDED")
             raise HTTPException(status_code=409, detail="Order status changed, please refresh")
 
         if body.status == "cancelled":
             from dao.dao_refunds import DAORefunds
-            DAORefunds().create_refund_for_order(order, "seller_cancel")
+            # Cancelling a failed delivery = no rider, not the seller's choice (T177 A32)
+            DAORefunds().create_refund_for_order(order, "driver_booking_failed" if order["status"] == "delivery_failed" else "seller_cancel")
 
         return {"success": True, "order": updated}
     except HTTPException:
@@ -451,7 +487,8 @@ def _make_price_text(price: int) -> str:
 def get_seller_menu(user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
-        return {"success": True, "menu": DAOFoodItems().read_menu_by_seller_id(seller_id)}
+        return {"success": True, "menu": DAOFoodItems().read_menu_by_seller_id(seller_id),
+                "option_groups": DAOMenuOptionGroups().read_store_groups(seller_id), "option_limits": _menu_limits()}
     except HTTPException:
         raise
     except Exception as e:
@@ -503,13 +540,28 @@ def delete_category(cat_id: str, user=Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _assert_own_category(seller_id: str, category_id):
+    """A dish goes in a category of its own store: the foreign key only checks the id exists, and the menu reads
+    dishes by category, so another store's category would show this dish on that store's menu."""
+    if not category_id:
+        return
+    try:
+        uuid.UUID(category_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Category not found")
+    if not DAOMenuCategories().is_owned_by_seller(category_id, seller_id):
+        raise HTTPException(status_code=404, detail="Category not found")
+
+
 @router.post("/me/menu/items")
 def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_token)):
     try:
         seller_id = _get_seller_id(user)
         fields = body.model_dump(exclude_none=True)
+        _assert_own_category(seller_id, fields.get("category_id"))
         fields["price_text"] = _make_price_text(body.price)
         item = DAOFoodItems().create(seller_id, fields)
+        add_sold_out([item])   # a dish made with stock below its minimum shows sold out at once, as PATCH does
         return {"success": True, "item": item}
     except HTTPException:
         raise
@@ -522,20 +574,28 @@ def create_food_item(body: Schema.RequestCreateFoodItem, user=Depends(verify_tok
 
 @router.patch("/me/menu/items/{item_id}")
 def update_food_item(item_id: str, body: Schema.RequestUpdateFoodItem, user=Depends(verify_token)):
+    return update_food_item_for(_get_seller_id(user), item_id, body)
+
+
+def update_food_item_for(seller_id: str, item_id: str, body):
+    """The body of PATCH /me/menu/items/{item_id}; the Admin Gateway calls it with the seller_id of its path."""
     try:
-        seller_id = _get_seller_id(user)
         fields = body.model_dump(exclude_none=True)
-        if "daily_portions" in body.model_fields_set:   # null clears the daily limit
-            fields["daily_portions"] = body.daily_portions
+        # Stock only when sent: null clears the limit, left out keeps it, so saving a price never writes back a
+        # stock the form read before paid orders took from it (BM12). A stock the seller enters starts a new round:
+        # the next sell-out pushes again whatever the cooldown (P1; a buyer's pay + cancel never clears it, BM13).
+        if "stock" in body.model_fields_set:
+            fields["stock"], fields["stock_alert_at"] = body.stock, None
         if not fields:
             raise HTTPException(status_code=400, detail="No fields to update")
+        _assert_own_category(seller_id, fields.get("category_id"))
         if "price" in fields:
             fields["price_text"] = _make_price_text(fields["price"])
         dao = DAOFoodItems()
         item = dao.update(item_id, seller_id, fields)
         if not item:
             raise HTTPException(status_code=404, detail="Item not found")
-        dao.add_remaining_today([item])
+        add_sold_out([item])
         return {"success": True, "item": item}
     except HTTPException:
         raise
@@ -604,6 +664,169 @@ def delete_variant(variant_id: str, user=Depends(verify_token)):
     except Exception as e:
         logger.exception(f"Exception in DELETE /sellers/me/menu/variants/{variant_id}: {repr(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Option groups (seller-menu đợt 3, ADR 0003) ────────────────────────────────
+# A store's groups are shared by its dishes. Every id in these routes is checked against the caller's store
+# first and answers one 404 "Not found" otherwise (BM3); the composite FKs are the second line. Errors past
+# the checks reach main.py's handler: a plain 500, no database text (QĐ3-5b).
+
+MENU_LIMITS = {"menu_max_groups_per_dish": 10, "menu_max_options_per_group": 30,
+               "menu_max_groups_per_store": 50, "menu_option_max_extra_price": 1_000_000}
+
+
+def _menu_limits() -> dict:
+    return DAOAdminConfig().get_positive_ints(MENU_LIMITS)
+
+
+NAME_TAKEN = {"code": "option_name_taken", "message": "Two options have the same name"}
+
+
+def _not_found():
+    return HTTPException(status_code=404, detail="Not found")
+
+
+def _limit_error(code: str, message: str, most: int):
+    return HTTPException(status_code=400, detail={"code": code, "message": message, "max": most})
+
+
+def _check_options(body, limits: dict, current: list) -> list:
+    """The group's new option list as dicts, after the checks: given ids are options of this group, the
+    count and the names, and the extra price cap for a price that is new or changed (an option saved under a
+    higher cap keeps its price, TC3-67)."""
+    by_id = {o["id"]: o for o in current}
+    options = [o.model_dump() | {"id": str(o.id) if o.id else None} for o in body.options]
+    if any(o["id"] and o["id"] not in by_id for o in options):
+        raise _not_found()
+    most = limits["menu_max_options_per_group"]
+    if len(options) > most:
+        raise _limit_error("options_max", f"At most {most} options in one group", most)
+    names = [o["name"] for o in options]
+    if len(set(names)) < len(names):
+        raise HTTPException(status_code=409, detail=NAME_TAKEN)
+    cap = limits["menu_option_max_extra_price"]
+    if any(o["extra_price"] > cap and Decimal(str(by_id.get(o["id"], {}).get("extra_price", -1))) != o["extra_price"]
+           for o in options):
+        raise _limit_error("extra_price_max", f"An option can add at most {_make_price_text(cap)}", cap)
+    return options
+
+
+def _save_group(seller_id: str, group_id, body, current: list, limits: dict) -> dict:
+    options = _check_options(body, limits, current)
+    dao = DAOMenuOptionGroups()
+    try:
+        group_id = dao.save_group(seller_id, group_id, body.model_dump(exclude={"options"}), options)
+    except OptionNameTaken:
+        raise HTTPException(status_code=409, detail=NAME_TAKEN)
+    return dao.read_group(group_id, seller_id)
+
+
+@router.post("/me/menu/items/{item_id}/option-groups")
+def create_option_group(item_id: uuid.UUID, body: Schema.RequestOptionGroup, user=Depends(verify_token)):
+    """A new group, made from the dish form and put on that dish (Q4: groups are created from a dish)."""
+    return create_option_group_for(_get_seller_id(user), str(item_id), body)
+
+
+def create_option_group_for(seller_id: str, item_id: str, body):
+    dao = DAOMenuOptionGroups()
+    if not DAOFoodItems().read_owned_by_seller(item_id, seller_id):
+        raise _not_found()
+    limits = _menu_limits()
+    if dao.count_store_groups(seller_id) >= limits["menu_max_groups_per_store"]:
+        most = limits["menu_max_groups_per_store"]
+        raise _limit_error("groups_per_store_max", f"A store can have at most {most} option groups", most)
+    links = dao.read_dish_links(item_id, seller_id)
+    if len(links) >= limits["menu_max_groups_per_dish"]:
+        most = limits["menu_max_groups_per_dish"]
+        raise _limit_error("groups_per_dish_max", f"A dish can have at most {most} option groups", most)
+    group = _save_group(seller_id, None, body, [], limits)
+    dao.attach(item_id, group["id"], seller_id, len(links))
+    group["dish_ids"] = [item_id]
+    return {"success": True, "group": group}
+
+
+@router.put("/me/menu/option-groups/{group_id}")
+def update_option_group(group_id: uuid.UUID, body: Schema.RequestOptionGroup, user=Depends(verify_token)):
+    """Name, required, how many, and the options (add / edit / turn off / remove): for every dish using it."""
+    return update_option_group_for(_get_seller_id(user), str(group_id), body)
+
+
+def update_option_group_for(seller_id: str, group_id: str, body):
+    current = DAOMenuOptionGroups().read_group(group_id, seller_id)
+    if not current:
+        raise _not_found()
+    return {"success": True, "group": _save_group(seller_id, group_id, body, current["menu_options"], _menu_limits())}
+
+
+@router.delete("/me/menu/option-groups/{group_id}")
+def delete_option_group(group_id: uuid.UUID, user=Depends(verify_token)):
+    """Only a group no dish uses (ADR 0003 point 11)."""
+    return delete_option_group_for(_get_seller_id(user), str(group_id))
+
+
+def delete_option_group_for(seller_id: str, group_id: str):
+    dao = DAOMenuOptionGroups()
+    group = dao.read_group(group_id, seller_id)
+    if not group:
+        raise _not_found()
+    if group["dish_ids"]:
+        raise HTTPException(status_code=409, detail={"code": "group_in_use", "message": "Remove this group from its dishes first"})
+    dao.delete_group(group_id, seller_id)
+    return {"success": True}
+
+
+def _owned_dish_and_group(item_id: str, group_id: str, seller_id: str):
+    if not DAOFoodItems().read_owned_by_seller(item_id, seller_id) or not DAOMenuOptionGroups().read_group(group_id, seller_id):
+        raise _not_found()
+
+
+@router.post("/me/menu/items/{item_id}/option-groups/{group_id}")
+def attach_option_group(item_id: uuid.UUID, group_id: uuid.UUID, user=Depends(verify_token)):
+    return attach_option_group_for(_get_seller_id(user), str(item_id), str(group_id))
+
+
+def attach_option_group_for(seller_id: str, item_id: str, group_id: str):
+    _owned_dish_and_group(item_id, group_id, seller_id)
+    dao = DAOMenuOptionGroups()
+    links = dao.read_dish_links(item_id, seller_id)
+    if group_id not in links:
+        most = _menu_limits()["menu_max_groups_per_dish"]
+        if len(links) >= most:
+            raise _limit_error("groups_per_dish_max", f"A dish can have at most {most} option groups", most)
+        dao.attach(item_id, group_id, seller_id, len(links))
+    return {"success": True}
+
+
+@router.delete("/me/menu/items/{item_id}/option-groups/{group_id}")
+def detach_option_group(item_id: uuid.UUID, group_id: uuid.UUID, user=Depends(verify_token)):
+    """Takes the group off this dish; the group stays (ADR 0003 point 11)."""
+    return detach_option_group_for(_get_seller_id(user), str(item_id), str(group_id))
+
+
+def detach_option_group_for(seller_id: str, item_id: str, group_id: str):
+    _owned_dish_and_group(item_id, group_id, seller_id)
+    dao = DAOMenuOptionGroups()
+    dao.detach(item_id, group_id, seller_id)
+    # The rest numbered 0..n-1 again: the next attach takes position n (len of the links)
+    dao.set_dish_order(item_id, seller_id, dao.read_dish_links(item_id, seller_id))
+    return {"success": True}
+
+
+@router.put("/me/menu/items/{item_id}/option-groups")
+def order_option_groups(item_id: uuid.UUID, body: Schema.RequestDishGroupOrder, user=Depends(verify_token)):
+    """The dish's groups in a new order: the list must be exactly the groups the dish uses."""
+    return order_option_groups_for(_get_seller_id(user), str(item_id), body)
+
+
+def order_option_groups_for(seller_id: str, item_id: str, body):
+    if not DAOFoodItems().read_owned_by_seller(item_id, seller_id):
+        raise _not_found()
+    dao = DAOMenuOptionGroups()
+    group_ids = [str(g) for g in body.group_ids]
+    if sorted(group_ids) != sorted(dao.read_dish_links(item_id, seller_id)):
+        raise HTTPException(status_code=400, detail="The list must hold every group of this dish once")
+    dao.set_dish_order(item_id, seller_id, group_ids)
+    return {"success": True}
 
 
 @router.post("/me/menu/items/{item_id}/image")
@@ -679,9 +902,11 @@ def get_seller_earnings(user=Depends(verify_token)):
         weekday = config.get_int_in_range("payout_weekday", 2, 1, 7)
         hour = config.get_int_in_range("payout_generate_hour", 8, 0, 23)
         window_hours = config.get_positive_int("complaint_window_hours", 24)
-        since = datetime.now(timezone.utc) - timedelta(days=history_days)
+        max_percent = min(config.get_positive_int("payout_deduction_max_percent", 100), 100)
+        now = datetime.now(timezone.utc)
+        since = now - timedelta(days=history_days)
 
-        orders, awaiting = [], Decimal(0)
+        orders, waiting = [], Decimal(0)
         for row in DAOOrders().read_done_orders_for_earnings(seller_id, since):
             # What reaches the seller: the order's payout minus the tax withheld from it
             payout = _money(row.get("payout_amount"))
@@ -691,11 +916,9 @@ def get_seller_earnings(user=Depends(verify_token)):
                 state = "held"
             expected = None
             if state == "pending":
-                awaiting += payout - withheld
+                waiting += payout - withheld
                 done_at = datetime.fromisoformat(row["status_changed_at"])
-                expected = expected_payout_date(done_at, weeks, weekday, hour, window_hours).isoformat()
-            elif state == "processing":
-                awaiting += payout - withheld
+                expected = expected_payout_date(done_at, weeks, weekday, hour, window_hours, now).isoformat()
             orders.append({
                 "id": row["id"],
                 "done_at": row.get("status_changed_at"),
@@ -705,15 +928,30 @@ def get_seller_earnings(user=Depends(verify_token)):
                 "payout_amount": _vnd(payout),
                 "wh_vat_amount": _vnd(_money(row.get("wh_vat_amount"))),   # 0 until computed
                 "wh_pit_amount": _vnd(_money(row.get("wh_pit_amount"))),
+                "net_amount": _vnd(payout - withheld),   # T174 A7: what the seller gets for it
                 "payout_state": state,
+                # T181 A51: the complaint that holds it ("complaint KN000012"), so the store knows which one to settle
+                "hold_complaint": (row.get("payout_hold_note") or "").removeprefix("complaint ") or None if state == "held" else None,
                 "expected_payout_date": expected,
             })
 
+        # T174 A9: open deductions come off what is waiting the way the next payout takes them
+        # (admin_generate_payout_for_seller step 7): at most payout_deduction_max_percent of it, the rest waits.
+        dao_payouts = DAOAdminPayouts()
+        open_list = dao_payouts.read_open_deductions(seller_id)
+        open_deductions = sum((_money(d["amount"]) - _money(d["applied_amount"]) for d in open_list), Decimal(0))
+        taken = min(open_deductions, (waiting * max_percent / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+        # orders already in a payout (state processing) count at its net: their deductions are taken, not open
+        awaiting, deducted = waiting - taken, taken
+
         payouts, received = [], Decimal(0)
-        for row in DAOAdminPayouts().read_payouts_by_seller_id(seller_id, EARNINGS_PAYOUTS_LIMIT):
+        for row in dao_payouts.read_payouts_by_seller_id(seller_id, EARNINGS_PAYOUTS_LIMIT):
             net = _money(row.get("net_payout"))
             if row.get("status") == "completed":
                 received += net
+            elif row.get("status") in ("pending", "processing"):
+                awaiting += net
+                deducted += _money(row.get("total_deductions"))
             payouts.append({
                 **row,
                 "net_payout": _vnd(net),
@@ -725,6 +963,11 @@ def get_seller_earnings(user=Depends(verify_token)):
             "success": True,
             "history_days": history_days,
             "awaiting_total": _vnd(awaiting),
+            "deductions_total": _vnd(deducted),                    # comes off the orders awaiting payout
+            "deductions_carry": _vnd(open_deductions - taken),     # left for a later payout
+            # T181 A51: each open deduction: what kind (a refund charged to the store, or a fee), which order, what is left
+            "deductions": [{"order_id": d["order_id"], "kind": "refund" if d.get("refund_id") else "fee",
+                            "amount": _vnd(_money(d["amount"]) - _money(d["applied_amount"]))} for d in open_list],
             "received_total": _vnd(received),
             "payouts_limit": EARNINGS_PAYOUTS_LIMIT,   # received_total covers only these batches
             "orders": orders,

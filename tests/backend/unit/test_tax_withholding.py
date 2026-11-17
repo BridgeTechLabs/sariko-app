@@ -7,7 +7,7 @@ from test_seller_earnings import _order, earnings  # noqa: F401  (fixture)
 
 
 class _Client:
-    data = True   # reserve_order_portions: the portions were taken (T134)
+    data = []   # reserve_order_stock: the stock was taken, no dish went below its minimum (seller-menu đợt 2)
 
     def __init__(self, fail_compute=False):
         self.rpcs, self.fail_compute = [], fail_compute
@@ -16,6 +16,7 @@ class _Client:
         self.rpcs.append((name, params))
         if name == "compute_order_withholding" and self.fail_compute:
             raise RuntimeError("admin_tax_config missing a rate")
+        self.data = name == "update_order_payment_status" or []   # T208: the order still waits; reserve: []
         return self
 
     def execute(self):
@@ -27,6 +28,7 @@ def _dao(client, monkeypatch):
     dao._supabase_client = client
     monkeypatch.setattr(dao, "_invalidate_cache_for_order", lambda order_id: None, raising=False)
     monkeypatch.setattr(dao, "read_order_by_id_raw", lambda order_id: None, raising=False)
+    monkeypatch.setattr("dao.dao_orders.DAOAdminConfig", lambda: type("C", (), {"get_positive_int": lambda self, k, d: d})())
     return dao
 
 
@@ -55,7 +57,7 @@ def test_earnings_show_withholding(earnings):  # noqa: F811
         orders=[_order(1, wh_vat_amount="550", wh_pit_amount="275"), _order(2)],
         payouts=[{"id": "p1", "period_start": "2026-10-15", "period_end": "2026-10-15", "order_count": 1,
                   "net_payout": "48235", "withholding_amount": "825.00", "total_deductions": "0",
-                  "status": "pending", "paid_at": None}],
+                  "status": "completed", "paid_at": None}],   # a live payout would count in awaiting (T174 A9)
     )
     body = res.json()
     first, second = body["orders"]

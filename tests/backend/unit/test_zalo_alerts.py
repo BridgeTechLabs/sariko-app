@@ -9,7 +9,7 @@ import pytest
 from dao.dao_orders import DAOOrders
 from dao.dao_refunds import DAORefunds
 from services import push_service, zalo
-from test_daily_portions import ORDER_ID, _Client, make_ipn_params
+from test_dish_stock import ORDER_ID, _Client, make_ipn_params
 
 CHATS = {"ZALO_CHAT_ORDERS": "c-orders", "ZALO_CHAT_SUPPORT": "c-support", "ZALO_CHAT_OPS": "c-ops"}
 
@@ -85,8 +85,8 @@ def test_error_is_one_log_line_without_token(http, caplog):
 # ─── TC-2 / TC-3: the paid IPN ───────────────────────────────────────────────
 @pytest.fixture
 def paid(fastapi_client, vnp_secret, monkeypatch):
-    def call(reserve=True, alerts=1, appointment=None):
-        client = _Client(reserve)
+    def call(reserve=(), alerts=1, appointment=None):   # reserve_order_stock: [] taken, None a dish short
+        client = _Client(list(reserve) if reserve is not None else None)
         client.order.update(total_amount="125000", delivery_appointment=appointment,
                             seller_profiles={"store_name": "TEST Quán Adobo"})
         dao = DAOOrders.__new__(DAOOrders)
@@ -98,7 +98,8 @@ def paid(fastapi_client, vnp_secret, monkeypatch):
         monkeypatch.setattr("dao.dao_orders.push_service.notify_new_order", lambda order: None)
         monkeypatch.setattr("dao.dao_orders.push_service.notify_order_status", lambda order: None)
         monkeypatch.setattr("dao.dao_orders.DAOAdminConfig", lambda: type("C", (), {
-            "get_int_in_range": lambda self, key, default, lo, hi: alerts if key == "zalo_new_order_alerts" else default})())
+            "get_int_in_range": lambda self, key, default, lo, hi: alerts if key == "zalo_new_order_alerts" else default,
+            "get_positive_int": lambda self, key, default: default})())
         monkeypatch.setattr(DAORefunds, "__init__", lambda self: None)
         monkeypatch.setattr(DAORefunds, "create_refund", lambda self, **kw: None)
         res = fastapi_client.get("/payments/vnpay/ipn", params=make_ipn_params(vnp_secret, ORDER_ID, 125000))
@@ -122,7 +123,7 @@ def test_tc3_appointment_in_vietnam_time(http, paid):
 
 def test_tc3_switch_off_and_sold_out(http, paid):
     paid(alerts=0)
-    paid(reserve=False)
+    paid(reserve=None)
     assert http == []
 
 

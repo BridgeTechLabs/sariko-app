@@ -184,6 +184,12 @@ const routes = [
         meta: { requiresAuth: true, requiresSeller: true }
     },
     {
+        path: '/seller/me/earnings',
+        name: 'seller-earnings',
+        component: () => import('@/pages/seller/SellerEarningsPage.vue'),
+        meta: { requiresAuth: true, requiresSeller: true }
+    },
+    {
         path: '/seller/me/opening-hours',
         name: 'seller-opening-hours',
         component: () => import('@/pages/seller/SellerHoursPage.vue'),
@@ -191,6 +197,13 @@ const routes = [
     },
     {
         path: '/seller/me/profile',
+        name: 'seller-store-profile',
+        component: () => import('@/pages/seller/SellerStoreProfilePage.vue'),
+        meta: { requiresAuth: true, requiresSeller: true }
+    },
+    {
+        // ID, tax, bank, agreement: the form shows only the groups still missing
+        path: '/seller/me/profile/legal',
         name: 'seller-profile-completion',
         component: () => import('@/pages/seller/SellerProfileCompletionPage.vue'),
         meta: { requiresAuth: true, requiresSeller: true }
@@ -352,6 +365,11 @@ router.beforeEach(async (to) => {
 
     if (to.name === 'account' && isLoggedIn && authStore.user?.isSeller) {
         return { name: 'seller-me' }
+    }
+
+    // Runs after bootstrap above, so a reload on this URL never shows the buyer form first.
+    if (to.name === 'account-profile' && isLoggedIn && authStore.user?.isSeller) {
+        return { name: 'seller-store-profile' }
     }
 
     if (to.meta.requiresSeller && (!authStore.user?.isSeller)) {

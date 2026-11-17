@@ -13,7 +13,8 @@ from services import push_service, zalo
 
 logger = logging.getLogger(__name__)
 
-SOLD_OUT_REASON = "Sold out"  # the buyer UI translates this exact text (OrderStatusHeader.vue)
+PAYMENT_TIMEOUT_REASON = "payment_timeout"   # T181 A28: nobody paid in time
+SOLD_OUT_REASON = "sold_out"  # orders.cancellation_reason code, translated by each viewer's app (T178)
 
 
 def seller_orders_key(seller_id: str) -> str:
@@ -25,14 +26,28 @@ def seller_orders_key(seller_id: str) -> str:
     return f"seller_{seller_id}_orders"
 
 
+def seller_orders_list_key(seller_id: str) -> str:
+    """Cache key for a seller's raw order list, stored with the signature it was read under (GET /sellers/me/orders)."""
+    return f"seller_{seller_id}_orders_list"
+
+
 def _invalidate_seller_orders(seller_id: Optional[str]) -> None:
-    """Drop a seller's cached signature so the next probe re-reads the database.
+    """Drop a seller's cached signature and order list so the next call re-reads the database.
 
     Tolerates None so callers can pass a column straight off an updated row
     without a guard — an order with no seller_id has no cache entry anyway.
     """
     if seller_id:
         cache.invalidate(seller_orders_key(seller_id))
+        cache.invalidate(seller_orders_list_key(seller_id))
+
+
+def with_current_trip(order: dict) -> dict:
+    """T180 A26: delivery_status = the status of the order's current trip, its newest deliveries row (the DB keeps at
+    most one live row per order; a rebook rewrites its row). Lists read this, never the first embedded row (unordered)."""
+    trips = order.get("deliveries") or []
+    order["delivery_status"] = max(trips, key=lambda d: d.get("created_at") or "")["status"] if trips else None
+    return order
 
 
 def _with_preorder_days(order: dict) -> dict:
@@ -44,7 +59,7 @@ def _with_preorder_days(order: dict) -> dict:
     return order
 
 
-TRIP_ENDED = {"REJECTED", "CANCELLED", "CANCELED", "EXPIRED"}   # Lalamove statuses after which a rebook may follow
+TRIP_ENDED = {"REJECTED", "CANCELLED", "CANCELED", "EXPIRED", "LOST"}   # failed ends; a rebook may follow (not after LOST)
 
 
 class DAOOrders(DAOBase):
@@ -120,13 +135,12 @@ class DAOOrders(DAOBase):
     def read_orders_by_user_id(self, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refunds(status), review_stores(id), deliveries(status), order_items(food_items(preorder_day))") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_appointment, created_at, seller_profiles(store_name, slug, avatar_url), refund_state, review_stores(id), deliveries(status, created_at), order_items(food_items(preorder_day))") \
                 .eq("user_id", user_id) \
-                .neq("refunds.reason", "duplicate_payment") \
                 .order("created_at", desc=True) \
                 .execute()
 
-            return [_with_preorder_days(order) for order in result.data] if result and result.data else []
+            return [with_current_trip(_with_preorder_days(order)) for order in result.data] if result and result.data else []
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_orders_by_user_id: {e}")
@@ -136,10 +150,9 @@ class DAOOrders(DAOBase):
     def read_order_by_id(self, order_id: str, user_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, seller_profiles(store_name, slug, avatar_url), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity, food_items(image_url, preorder_day)), refunds(status)") \
+                .select("id, seller_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, cancellation_reason, status_changed_at, created_at, paid_at, seller_profiles(store_name, slug, avatar_url, is_open, weekly_hours, opened_at), order_items(id, food_item_id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, options_snapshot, quantity, food_items(image_url, preorder_day, stock)), refund_state, duplicate_refund") \
                 .eq("id", order_id) \
                 .eq("user_id", user_id) \
-                .neq("refunds.reason", "duplicate_payment") \
                 .maybe_single() \
                 .execute()
 
@@ -150,7 +163,7 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_order_by_id: {e}")
 
-    _SELLER_LIST_SELECT = "id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, created_at, paid_at, status_changed_at, users{join}(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), deliveries(status)"
+    _SELLER_LIST_SELECT = "id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, created_at, paid_at, status_changed_at, users{join}(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, options_snapshot, quantity), deliveries(status, created_at)"
 
     def read_orders_by_seller_id(self, seller_id: str, finished_since: datetime):
         """Running orders of any age + done / cancelled orders created since `finished_since` (UTC)."""
@@ -165,7 +178,7 @@ class DAOOrders(DAOBase):
                 .order("created_at", desc=True) \
                 .execute()
 
-            return result.data if result and result.data else []
+            return [with_current_trip(o) for o in result.data] if result and result.data else []
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_orders_by_seller_id: {e}")
@@ -173,14 +186,15 @@ class DAOOrders(DAOBase):
             raise Exception(f"error read_orders_by_seller_id: {e}")
 
     def read_done_orders_for_earnings(self, seller_id: str, done_since: datetime):
-        """Seller's paid orders that became done since `done_since`, with their money split."""
+        """Seller's paid orders that became done since `done_since`, plus those still waiting for a payout whatever
+        their age (T174 A9), with their money split."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, subtotal, commission_amount, vat_amount, payout_amount, payout_status, payout_hold, status_changed_at, wh_vat_amount, wh_pit_amount") \
+                .select("id, subtotal, commission_amount, vat_amount, payout_amount, payout_status, payout_hold, payout_hold_note, status_changed_at, wh_vat_amount, wh_pit_amount") \
                 .eq("seller_id", seller_id) \
                 .eq("payment_status", "paid") \
                 .eq("status", "done") \
-                .gte("status_changed_at", done_since.isoformat()) \
+                .or_(f"status_changed_at.gte.{done_since.isoformat()},payout_status.in.(pending,processing)") \
                 .order("status_changed_at", desc=True) \
                 .execute()
 
@@ -215,7 +229,7 @@ class DAOOrders(DAOBase):
             if name:
                 rows = query("!inner").ilike("users.name", f"*{name}*").execute().data or []
                 found.update({r["id"]: r for r in rows})
-            return sorted(found.values(), key=lambda r: r["created_at"], reverse=True)[:limit]
+            return [with_current_trip(o) for o in sorted(found.values(), key=lambda r: r["created_at"], reverse=True)[:limit]]
 
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - search_orders_for_seller: {e}")
@@ -251,7 +265,7 @@ class DAOOrders(DAOBase):
     def read_order_by_id_for_seller(self, order_id: str, seller_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, cancellation_reason, created_at, paid_at, status_changed_at, users(name, email, phone), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, quantity), payments(method, type)") \
+                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, cancellation_reason, cancellation_note, created_at, paid_at, status_changed_at, users(name, email, phone), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, options_snapshot, quantity), payments(method, type), refund_state") \
                 .eq("id", order_id) \
                 .eq("seller_id", seller_id) \
                 .maybe_single() \
@@ -304,7 +318,7 @@ class DAOOrders(DAOBase):
             raise Exception(f"error read_delivery_history: {e}")
 
     def update_order_status(self, order_id: str, status: str, cancellation_reason: Optional[str] = None,
-                            expected_status: Optional[str] = None):
+                            expected_status: Optional[str] = None, cancellation_note: Optional[str] = None):
         """expected_status makes the write conditional: if someone else changed the
         status first (seller vs the confirm-timeout job), nothing is written and
         None comes back."""
@@ -312,6 +326,8 @@ class DAOOrders(DAOBase):
             update_data = {"status": status}
             if cancellation_reason:
                 update_data["cancellation_reason"] = cancellation_reason
+            if cancellation_note:   # text a seller typed for "other" (T178); the buyer's reads never select it
+                update_data["cancellation_note"] = cancellation_note
 
             query = self._supabase_client.table(self._table_name) \
                 .update(update_data) \
@@ -359,7 +375,7 @@ class DAOOrders(DAOBase):
         """Read order by ID without user scoping (for IPN server-to-server)."""
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, seller_user_id, payment_status, status, total_amount, transaction_ref, delivery_appointment, seller_profiles(store_name)") \
+                .select("id, user_id, seller_user_id, payment_status, payout_status, status, total_amount, transaction_ref, delivery_appointment, seller_profiles(store_name)") \
                 .eq("id", order_id) \
                 .maybe_single() \
                 .execute()
@@ -389,24 +405,34 @@ class DAOOrders(DAOBase):
 
     def update_payment_status(self, order_id: str, payment_status: str, transaction_ref: Optional[str] = None):
         try:
-            # T134: the order takes its dish portions before it reaches the seller. The last portion
-            # going while the buyer paid: still marked paid (the money came in), then cancelled + refunded.
-            sold_out = payment_status == "paid" and not self._supabase_client.rpc(
-                'reserve_order_portions', {'p_order_id': order_id}).execute().data
-            self._supabase_client.rpc(
+            # Seller-menu đợt 2 (QĐ2-2): the order takes its dishes' stock before it reaches the seller. None = a dish
+            # was short (the last portion went while the buyer paid): still marked paid (the money came in), then
+            # cancelled + refunded. Else the dishes that just went below their minimum per order, mostly [] (not
+            # "falsy = short": [] is a normal payment, TC2-37).
+            crossed = []
+            if payment_status == "paid":
+                crossed = self._supabase_client.rpc('reserve_order_stock', {
+                    'p_order_id': order_id,
+                    'p_cooldown_minutes': DAOAdminConfig().get_positive_int('stock_alert_cooldown_minutes', 30),
+                }).execute().data
+            sold_out = crossed is None
+            # T208: false = the order was no longer pending (cancelled while the buyer paid): nothing written
+            marked = self._supabase_client.rpc(
                 'update_order_payment_status',
                 {
                     'p_order_id': order_id,
                     'p_status': payment_status,
                     'p_transaction_ref': transaction_ref
                 }
-            ).execute()
+            ).execute().data
 
             # The most important invalidation of the lot: pending -> paid is what
             # makes an order enter the seller's list in the first place. The RPC
-            # returns void, so seller_id costs one primary-key read — once per
-            # payment, against a cache that serves every poll tick in between.
+            # answers only "still pending", so seller_id costs one primary-key read
+            # — once per payment, against a cache that serves every poll tick in between.
             self._invalidate_cache_for_order(order_id)
+            if marked is False:   # no seller push, no withholding: the caller refunds it (late_payment)
+                return False
 
             if sold_out:
                 self._cancel_sold_out(order_id)
@@ -421,6 +447,7 @@ class DAOOrders(DAOBase):
                     self._supabase_client.rpc('compute_order_withholding', {'p_order_id': order_id}).execute()
                 except Exception as e:
                     logger.error(f"withholding not computed for order {order_id}, payout will compute it: {e}")
+                order = None
                 try:
                     order = self.read_order_by_id_raw(order_id)
                     if order:
@@ -430,6 +457,11 @@ class DAOOrders(DAOBase):
                             zalo.send("orders", zalo.new_order_text(order))
                 except Exception as e:
                     logger.warning(f"new-order push / Zalo skipped for order {order_id}: {e}")
+                try:   # QĐ2-10: one push per dish (cooldown applied in the SQL), apart from the new-order push
+                    for dish in crossed:
+                        push_service.notify_seller_stock((order or {}).get("seller_user_id"), dish)
+                except Exception as e:
+                    logger.warning(f"out-of-stock push skipped for order {order_id}: {e}")
             return True
 
         except PostgrestExceptionAPIError as e:
@@ -514,6 +546,29 @@ class DAOOrders(DAOBase):
                 .execute().data or []
         except PostgrestExceptionAPIError as e:
             raise Exception(f"Supabase error - read_unpaid_vnpay_orders: {e}")
+
+    def read_expirable_unpaid_orders(self, created_before: datetime):
+        """T181 A28: orders still waiting for payment, created before `created_before` (UTC); the expiry job
+        checks each against its last pay link."""
+        try:
+            return self._supabase_client.table(self._table_name).select("id, created_at, payment_create_date") \
+                .eq("status", "pending").in_("payment_status", ["pending", "failed"]) \
+                .lt("created_at", created_before.astimezone(timezone.utc).replace(tzinfo=None).isoformat()) \
+                .execute().data or []
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_expirable_unpaid_orders: {e}")
+
+    def expire_unpaid_order(self, order_id: str) -> bool:
+        """Cancel an order nobody paid (cancellation_reason payment_timeout, T178 code), only while it is still
+        pending and unpaid: a payment landing at the same moment wins. Unpaid, so no push, refund or portions."""
+        try:
+            result = self._supabase_client.table(self._table_name) \
+                .update({"status": "cancelled", "cancellation_reason": PAYMENT_TIMEOUT_REASON}) \
+                .eq("id", order_id).eq("status", "pending").in_("payment_status", ["pending", "failed"]) \
+                .execute()
+            return bool(result.data)
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - expire_unpaid_order: {e}")
 
     def claim_vnpay_check(self, order_id: str, now: datetime, last_before: datetime) -> bool:
         """Take this order's turn to ask VNPay: true only for the caller whose conditional update set

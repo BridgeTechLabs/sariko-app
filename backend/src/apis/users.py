@@ -86,9 +86,11 @@ def update_current_user_profile(body: Schema.RequestUpdateProfile, user=Depends(
 
         if is_seller:
             seller_fields = {}
-            for field in ("phone", "address", "lat", "lon", "store_name"):
+            for field in ("phone", "address", "lat", "lon", "store_name", "description"):
                 if field in data:
                     seller_fields[field] = data.pop(field)
+            if "description" in seller_fields:
+                seller_fields["description"] = seller_fields["description"] or None   # "" clears it
             data.pop("address_details", None)
             if seller_fields:
                 dao_seller.update_seller_profile_info(user_id, seller_fields)
@@ -105,7 +107,7 @@ def update_current_user_profile(body: Schema.RequestUpdateProfile, user=Depends(
                     receiver_name=body.name,
                     phone_number=body.phone,
                 )
-            for field in ("address", "address_details", "lat", "lon"):
+            for field in ("address", "address_details", "lat", "lon", "description"):
                 data.pop(field, None)
 
         updated_user = dao_users.update_user_profile(user_id, data)

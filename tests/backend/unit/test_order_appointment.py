@@ -14,7 +14,7 @@ NOW = datetime.now(timezone.utc)
 
 def cart(*preorder_days):
     return {"id": "cart", "seller_id": "seller", "cart_items": [
-        {"quantity": 1, "food_items": {"name": f"Dish {d}", "price": 50000, "is_available": True, "preorder_day": d},
+        {"quantity": 1, "food_items": {"name": f"Dish {d}", "seller_id": "seller", "price": 50000, "is_available": True, "preorder_day": d},
          "food_item_variants": None} for d in preorder_days]}
 
 

@@ -10,6 +10,7 @@ export const useComplaintStore = defineStore("complaintStore", {
             mine: [],
             loadingMine: false,
             detail: null,           // the complaint on the detail screen, with signed image URLs
+            _detailId: null,        // the complaint asked for: an older answer landing later is dropped (A24a)
             loadingDetail: false,
 
             // form
@@ -46,8 +47,10 @@ export const useComplaintStore = defineStore("complaintStore", {
         async loadDetail(complaintId) {
             this.loadingDetail = true
             this.detail = null
+            this._detailId = complaintId
             try {
-                this.detail = (await apiComplaints.getDetail(complaintId)).complaint
+                const complaint = (await apiComplaints.getDetail(complaintId)).complaint
+                if (this._detailId === complaintId) this.detail = complaint
             } catch (e) {
                 console.error(`complaintStore - loadDetail - ${e}`)
             } finally {

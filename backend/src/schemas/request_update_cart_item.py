@@ -1,8 +1,8 @@
-from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 
 class RequestUpdateCartItem(BaseModel):
-    food_item_id: str
+    id: UUID                              # cart_items.id
     quantity: int = Field(gt=0)
-    variant_id: Optional[str] = None

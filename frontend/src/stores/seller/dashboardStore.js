@@ -2,16 +2,22 @@ import { defineStore } from "pinia";
 import apiSellerDashboard from "@/apis/sellers/apiSellerDashboard";
 import apiDeliveries from "@/apis/deliveries/apiDeliveries";
 import { createPoller } from "@/composables/createPoller";
+import { useAuthStore } from "@/stores/auth/authStore";
+import { useProfileCompletionStore } from "@/stores/seller/profileCompletionStore";
 
 const ORDER_LIST_POLL_MS = 10_000
+const ORDER_LIST_CLOCK_MS = 60_000   // pending deadlines follow the clock and store hours, not the signature
 const ORDER_DETAIL_POLL_MS = 10_000
 const ORDER_TERMINAL = ['done', 'cancelled']
+
+const signature = (head) => head && `${head.latest}|${head.count}`
 
 export const useDashboardStore = defineStore("dashboardStore", {
     state() {
         return {
             sellerId: null,
             sellerInfo: null,
+            earnings: null,
             orders: [],
             historyDays: null,   // done / cancelled orders older than this are only found by search
             orderDetails: null,
@@ -24,8 +30,11 @@ export const useDashboardStore = defineStore("dashboardStore", {
 
             _ordersPoller: null,
             _ordersWatchers: 0,
+            _ordersHead: null,       // signature the list was loaded at
+            _ordersLoadedAt: 0,
             _orderDetailPoller: null,
             _orderDetailWatchedId: null,
+            _detailOrderId: null,   // the order the detail page shows: answers for any other are dropped (A24a)
         }
     },
 
@@ -73,6 +82,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
                 this.sellerInfo = {
                     slug: res.slug,
                     store_name: res.store_name,
+                    description: res.description,
                     address: res.address,
                     lat: res.lat,
                     lon: res.lon,
@@ -90,6 +100,22 @@ export const useDashboardStore = defineStore("dashboardStore", {
             }
         },
 
+        // GET /sellers/me/earnings: kept here so the Me preview and the Earnings page show it at once. Throws.
+        async fetchEarnings() {
+            this.earnings = await apiSellerDashboard.getEarnings()
+        },
+
+        async fetchReviews(limit, offset) {
+            return apiSellerDashboard.getReviews(limit, offset)
+        },
+
+        // One Store profile field (store_name, description, phone, name, avatar_url) through PATCH
+        // /users/me/profile. Throws. Then the header, the store page and the missing rows follow at once.
+        async saveStoreProfile(fields) {
+            await useAuthStore().updateProfile(fields)
+            await Promise.all([this.fetchSellerInfo(), useProfileCompletionStore().fetch()])
+        },
+
         async setStoreOpen(isOpen) {
             const res = await apiSellerDashboard.setStoreOpen(isOpen)
             if (this.sellerInfo) Object.assign(this.sellerInfo, { is_open: res.is_open, open_now: res.open_now })
@@ -100,13 +126,17 @@ export const useDashboardStore = defineStore("dashboardStore", {
             if (this.sellerInfo) Object.assign(this.sellerInfo, { weekly_hours: res.weekly_hours, open_now: res.open_now })
         },
 
-        async fetchOrders({ silent = false } = {}) {
+        async fetchOrders({ silent = false, head = null } = {}) {
             if (this.isLoading) return
             if (!silent) this.isLoading = true
             try {
+                // Signature BEFORE the list: a write landing in between costs one more load, never a missed one
+                head = head || await apiSellerDashboard.getOrdersHead().catch(() => null)
                 const res = await apiSellerDashboard.getOrders()
                 this.orders = res.orders || []
                 this.historyDays = res.history_days ?? null
+                this._ordersHead = signature(head)
+                this._ordersLoadedAt = Date.now()
             } catch (e) {
                 console.error('dashboardStore - fetchOrders -', e)
             } finally {
@@ -116,9 +146,11 @@ export const useDashboardStore = defineStore("dashboardStore", {
         },
 
         async loadOrderDetail(orderId) {
+            this._detailOrderId = orderId
             this.orderDetailLoading = true
             try {
                 const res = await apiSellerDashboard.getOrderDetail(orderId)
+                if (orderId !== this._detailOrderId) return
                 this.orderDetails = res.order || null
                 if (this.orderDetails?.delivery_method === 'delivery'
                     && ['ready', 'delivery_failed', 'done'].includes(this.orderDetails?.status)) {
@@ -127,14 +159,14 @@ export const useDashboardStore = defineStore("dashboardStore", {
             } catch (e) {
                 console.error('dashboardStore - loadOrderDetail -', e)
             } finally {
-                this.orderDetailLoading = false
+                if (orderId === this._detailOrderId) this.orderDetailLoading = false
             }
         },
 
         async _fetchDelivery(orderId) {
             try {
                 const res = await apiDeliveries.getSellerDeliveryStatus(orderId)
-                this.orderDelivery = res?.delivery || null
+                if (orderId === this._detailOrderId) this.orderDelivery = res?.delivery || null
             } catch (e) {
                 console.error('dashboardStore - _fetchDelivery -', e)
             }
@@ -143,7 +175,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
         async refreshOrderDetailSilent(orderId) {
             try {
                 const res = await apiSellerDashboard.getOrderDetail(orderId)
-                this.orderDetails = res.order || null
+                if (orderId === this._detailOrderId) this.orderDetails = res.order || null
             } catch (e) {
                 console.error('dashboardStore - refreshOrderDetailSilent -', e)
             }
@@ -152,7 +184,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
         async refreshDeliverySilent(orderId) {
             try {
                 const res = await apiDeliveries.getSellerDeliveryStatus(orderId)
-                this.orderDelivery = res?.delivery || null
+                if (orderId === this._detailOrderId) this.orderDelivery = res?.delivery || null
             } catch (e) {
                 console.error('dashboardStore - refreshDeliverySilent -', e)
             }
@@ -165,9 +197,17 @@ export const useDashboardStore = defineStore("dashboardStore", {
             this._ordersPoller = createPoller({
                 name: 'seller-orders',
                 intervalMs: ORDER_LIST_POLL_MS,
-                fetch: () => this.fetchOrders({ silent: true }),
+                fetch: () => this.pollOrders(),
             })
             this._ordersPoller.start()
+        },
+
+        // A tick asks only for the signature; the full list loads when it moved, or once a minute while a
+        // pending order shows its confirm deadline. An error keeps the list as it is until the next tick.
+        async pollOrders() {
+            const head = await apiSellerDashboard.getOrdersHead()
+            const clockDue = this.orders.some(o => o.status === 'pending') && Date.now() - this._ordersLoadedAt >= ORDER_LIST_CLOCK_MS
+            if (signature(head) !== this._ordersHead || clockDue) await this.fetchOrders({ silent: true, head })
         },
 
         stopWatchingOrders() {
@@ -229,15 +269,16 @@ export const useDashboardStore = defineStore("dashboardStore", {
         },
 
         clearOrderDetail() {
+            this._detailOrderId = null
             this.orderDetails = null
             this.orderDelivery = null
         },
 
-        async setOrderStatus(orderId, newStatus, reason = null) {
-            await apiSellerDashboard.updateOrderStatus(orderId, newStatus, reason)
+        async setOrderStatus(orderId, newStatus, reason = null, note = null) {
+            await apiSellerDashboard.updateOrderStatus(orderId, newStatus, reason, note)
             if (this.orderDetails?.id === orderId) {
                 this.orderDetails.status = newStatus
-                if (reason) this.orderDetails.cancellation_reason = reason
+                if (reason) Object.assign(this.orderDetails, { cancellation_reason: reason, cancellation_note: note })
             }
             this.updateOrderLocally(orderId, newStatus)
         },
@@ -245,6 +286,7 @@ export const useDashboardStore = defineStore("dashboardStore", {
         async doRebookDelivery(orderId) {
             await apiDeliveries.rebookDelivery(orderId)
             await this._fetchDelivery(orderId)
+            await this.fetchDeliveryStatus(orderId)   // T180 A37: the home list's rebooks left, not only the detail's
             this.updateOrderLocally(orderId, 'ready')
             if (this.orderDetails?.id === orderId) this.orderDetails.status = 'ready'
         },

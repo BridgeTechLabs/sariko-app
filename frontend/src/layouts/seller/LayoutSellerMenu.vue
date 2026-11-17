@@ -13,8 +13,9 @@
 .seller-menu-page {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
-    min-height: 100dvh;
+    /* one screen high: the header and the tabs stay, the content scrolls under them (Jack 13/11) */
+    height: 100vh;
+    height: 100dvh;
     background: var(--bg-main);
     font-family: $sariko-font-family-secondary;
 }
@@ -26,6 +27,7 @@
 
 .content-section {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 0 16px;
     padding-bottom: calc(var(--bottom-nav-height, 72px) + 24px);

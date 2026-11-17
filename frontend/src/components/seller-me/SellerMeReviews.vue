@@ -2,16 +2,18 @@
 import { Star, User } from 'lucide-vue-next';
 import { mapState } from 'pinia';
 import StarRating from '@/components/shared/StarRating.vue';
+import SectionTitle from '@/components/shared/SectionTitle.vue';
 import { useDashboardStore } from '@/stores/seller/dashboardStore';
-import apiSellerDashboard from '@/apis/sellers/apiSellerDashboard';
 import { formatVnTime } from '@/utils/vnTime';
+import { ratingText } from '@/utils/rating';
+import { orderCode } from '@/utils/orderCode';
 
 const PAGE_SIZE = 10
 
 export default {
     name: 'SellerMeReviews',
 
-    components: { Star, User, StarRating },
+    components: { Star, User, StarRating, SectionTitle },
 
     // preview > 0: the "Me" page shows only the newest `preview` reviews and a link to the full list
     // (/seller/me/reviews), so it does not grow with every review. 0: full list with "See more".
@@ -34,7 +36,7 @@ export default {
 
         ratingAvg() {
             const avg = this.sellerInfo?.rating_avg
-            return avg == null ? null : Number(avg).toFixed(1)
+            return avg == null ? null : ratingText(avg)
         },
 
         ratingCount() {
@@ -48,13 +50,15 @@ export default {
     },
 
     methods: {
+        ratingText,
+        orderCode,
         async load() {
             this.loading = true
             this.error = false
             try {
                 // preview: ask one more than shown, to know whether there are others
                 const limit = this.preview ? this.preview + 1 : PAGE_SIZE
-                const res = await apiSellerDashboard.getReviews(limit, 0)
+                const res = await useDashboardStore().fetchReviews(limit, 0)
                 const page = res.reviews || []
                 this.reviews = this.preview ? page.slice(0, this.preview) : page
                 this.hasMore = page.length === limit
@@ -69,7 +73,7 @@ export default {
         async loadMore() {
             this.loadingMore = true
             try {
-                const res = await apiSellerDashboard.getReviews(PAGE_SIZE, this.reviews.length)
+                const res = await useDashboardStore().fetchReviews(PAGE_SIZE, this.reviews.length)
                 const page = res.reviews || []
                 this.reviews.push(...page)
                 this.hasMore = page.length === PAGE_SIZE
@@ -94,7 +98,7 @@ export default {
 
 <template>
     <div>
-        <div v-if="preview" class="section-title">{{ $t('seller_me.section_title_reviews') }}</div>
+        <SectionTitle v-if="preview">{{ $t('seller_me.section_title_reviews') }}</SectionTitle>
         <div class="reviews-card">
 
             <template v-if="loading">
@@ -115,6 +119,7 @@ export default {
             </div>
 
             <template v-else>
+                <p class="reviews-note">{{ $t('seller_me.reviews_only_you') }}</p>
                 <div v-if="ratingAvg" class="reviews-summary">
                     <span class="reviews-avg">{{ ratingAvg }}</span>
                     <Star :size="18" class="reviews-avg-star" />
@@ -130,7 +135,7 @@ export default {
                     <div class="review-body">
                         <div class="review-head">
                             <span class="review-name">{{ displayName(review) }}</span>
-                            <span class="review-date">{{ dateText(review.created_at) }}</span>
+                            <span class="review-date">{{ orderCode(review.order_id) }} · {{ dateText(review.created_at) }}</span>
                         </div>
                         <StarRating :model-value="review.rating" :size="13" :gap="2" readonly />
                         <p v-if="review.comment" class="review-comment">{{ review.comment }}</p>
@@ -156,16 +161,6 @@ export default {
 </template>
 
 <style scoped>
-.section-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-    padding-left: 4px;
-}
-
 .reviews-card {
     background: rgb(255, 255, 255, 0.05);
     border-radius: 16px;
@@ -206,6 +201,12 @@ export default {
     align-self: center;
     color: var(--color-accent);
     font-weight: 600;
+}
+
+.reviews-note {
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .reviews-summary {

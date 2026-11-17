@@ -2,11 +2,14 @@ import { defineStore } from 'pinia'
 import { useDashboardStore } from '@/stores/seller/dashboardStore'
 import apiSellerMenu from '@/apis/sellers/apiSellerMenu'
 import { fileToBase64 } from '@/utils/fileToBase64'
+import { copyGroupForDish } from '@/utils/optionGroups'
 
 export const useMenuStore = defineStore('menuStore', {
     state() {
         return {
             categories: [],   // [{ id, name, sort_order, is_active, food_items: [...] }]
+            optionGroups: [],   // the store's option groups, each with dish_ids (the dishes using it)
+            optionLimits: {},   // admin_settings caps: menu_max_groups_per_dish, ..._options_per_group, ..._groups_per_store, menu_option_max_extra_price
             isLoading: false,
             loadError: false,   // last fetch failed: an error, not an empty menu
             sellerId: null,
@@ -16,6 +19,10 @@ export const useMenuStore = defineStore('menuStore', {
     getters: {
         allItems(state) {
             return state.categories.flatMap(c => c.food_items || [])
+        },
+        // [names] of the dishes with these ids, in that order
+        dishNames() {
+            return ids => ids.map(id => this.allItems.find(i => i.id === id)?.name).filter(Boolean)
         },
     },
 
@@ -27,15 +34,21 @@ export const useMenuStore = defineStore('menuStore', {
                 const dashStore = useDashboardStore()
                 if (!dashStore.sellerId) await dashStore.fetchSellerInfo()
                 this.sellerId = dashStore.sellerId
-
-                const res = await apiSellerMenu.getMenu()
-                this.categories = res.menu || []
+                await this.reload()
             } catch (e) {
                 console.error('menuStore - fetchMenu -', e)
                 this.loadError = true
             } finally {
                 this.isLoading = false
             }
+        },
+
+        // Reads the menu again without the loading state (the open forms stay mounted)
+        async reload() {
+            const res = await apiSellerMenu.getMenu()
+            this.categories = res.menu || []
+            this.optionGroups = res.option_groups || []
+            this.optionLimits = res.option_limits || {}
         },
 
         // ── Categories ──────────────────────────────────────────────────────
@@ -97,12 +110,13 @@ export const useMenuStore = defineStore('menuStore', {
                 const idx = (cat.food_items || []).findIndex(i => i.id === itemId)
                 if (idx !== -1) {
                     // Handle category change
+                    // The PATCH answer has no option_groups / options_sold_out: the old object moves, updated
                     if (updated.category_id !== cat.id) {
-                        cat.food_items.splice(idx, 1)
+                        const [moved] = cat.food_items.splice(idx, 1)
                         const newCat = this.categories.find(c => c.id === updated.category_id)
                         if (newCat) {
                             if (!newCat.food_items) newCat.food_items = []
-                            newCat.food_items.push(updated)
+                            newCat.food_items.push(Object.assign(moved, updated))
                         }
                     } else {
                         Object.assign(cat.food_items[idx], updated)
@@ -119,6 +133,7 @@ export const useMenuStore = defineStore('menuStore', {
                 const idx = (cat.food_items || []).findIndex(i => i.id === itemId)
                 if (idx !== -1) { cat.food_items.splice(idx, 1); break }
             }
+            for (const g of this.optionGroups) g.dish_ids = g.dish_ids.filter(id => id !== itemId)
         },
 
         async toggleAvailable(itemId, isAvailable) {
@@ -154,6 +169,40 @@ export const useMenuStore = defineStore('menuStore', {
 
             if (item) item.food_item_variants = saved
             return saved
+        },
+
+        // ── Option groups (seller-menu đợt 3) ───────────────────────────────
+        // A group shows on every dish using it, so each change reads the menu again (also after a failure).
+
+        async saveOptionGroup(groupId, body, dishId) {
+            try {
+                if (groupId) await apiSellerMenu.updateOptionGroup(groupId, body)
+                else await apiSellerMenu.createOptionGroup(dishId, body)
+            } finally { await this.reload() }
+        },
+
+        // QĐ3-11: this dish gets its own copy of a shared group, in the same place
+        async copyOptionGroup(dishId, groupId, body) {
+            const dish = this.allItems.find(i => i.id === dishId)
+            try {
+                await copyGroupForDish(apiSellerMenu, dishId, (dish?.option_groups || []).map(g => g.id), groupId, body)
+            } finally { await this.reload() }
+        },
+
+        // A group still on dishes is taken off them first: the API deletes only an unused group
+        async deleteOptionGroup(groupId, dishIds = []) {
+            try {
+                for (const dishId of dishIds) await apiSellerMenu.detachOptionGroup(dishId, groupId)
+                await apiSellerMenu.deleteOptionGroup(groupId)
+            } finally { await this.reload() }
+        },
+
+        async attachOptionGroup(dishId, groupId) {
+            try { await apiSellerMenu.attachOptionGroup(dishId, groupId) } finally { await this.reload() }
+        },
+
+        async detachOptionGroup(dishId, groupId) {
+            try { await apiSellerMenu.detachOptionGroup(dishId, groupId) } finally { await this.reload() }
         },
 
         // ── Image upload (via backend, service role) ─────────────────────────

@@ -1,15 +1,15 @@
 <script>
 import { mapState, mapActions } from 'pinia';
-import { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt, MessageCircle, ExternalLink, UserCheck, MessageSquareWarning } from 'lucide-vue-next';
+import { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt, MessageCircle, ExternalLink, MessageSquareWarning } from 'lucide-vue-next';
 import { useAccountV2Store } from '@/stores/v2/account/accountStore';
-import { useProfileCompletionStore } from '@/stores/seller/profileCompletionStore';
 import BaseSwitch from '@/components/v2/shared/BaseSwitch.vue';
+import SectionTitle from '@/components/shared/SectionTitle.vue';
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/utils/support';
 
 export default {
     name: 'SellerMeSettings',
 
-    components: { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt, MessageCircle, ExternalLink, UserCheck, MessageSquareWarning, BaseSwitch },
+    components: { MapPin, Globe, FileText, Shield, Lock, Bell, ChevronRight, Receipt, MessageCircle, ExternalLink, MessageSquareWarning, BaseSwitch, SectionTitle },
 
     data() {
         return { supportEmail: SUPPORT_EMAIL, supportMailto: SUPPORT_MAILTO }
@@ -17,24 +17,21 @@ export default {
 
     computed: {
         ...mapState(useAccountV2Store, ['notifications']),
-        ...mapState(useProfileCompletionStore, { profileMissing: 'missing' }),
     },
 
     methods: {
         ...mapActions(useAccountV2Store, ['togglePush', 'syncPushState']),
-        ...mapActions(useProfileCompletionStore, { fetchProfileCompletion: 'fetch' }),
     },
 
     mounted() {
         this.syncPushState()
-        this.fetchProfileCompletion()
     },
 }
 </script>
 
 <template>
     <div>
-        <div class="section-title">{{ $t('seller_me.section_title_settings') }}</div>
+        <SectionTitle>{{ $t('seller_me.section_title_settings') }}</SectionTitle>
         <div class="menu-group">
 
             <div class="menu-item" @click="togglePush">
@@ -43,13 +40,6 @@ export default {
                 <!-- No v-model: the click bubbles up to the row, which toggles -->
                 <BaseSwitch :model-value="notifications.orderUpdates" :label="$t('seller_me.menu_label_new_order_alerts')" />
             </div>
-
-            <router-link to="/seller/me/profile" class="menu-item">
-                <div class="menu-icon"><UserCheck size="18" /></div>
-                <span class="menu-label">{{ $t('seller_profile.menu_label') }}</span>
-                <span v-if="profileMissing.length" class="missing-dot" :aria-label="$t('seller_profile.menu_missing', { n: profileMissing.length })">{{ profileMissing.length }}</span>
-                <ChevronRight size="16" class="menu-arrow" />
-            </router-link>
 
             <router-link to="/account/address" class="menu-item">
                 <div class="menu-icon"><MapPin size="18" /></div>
@@ -104,16 +94,6 @@ export default {
 </template>
 
 <style scoped>
-.section-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-    padding-left: 4px;
-}
-
 .menu-group {
     background: rgb(255, 255, 255, 0.08);
     border-radius: 12px;
@@ -162,20 +142,6 @@ export default {
     flex: 1;
     font-size: 14px;
     font-weight: 500;
-}
-
-.missing-dot {
-    min-width: 20px;
-    height: 20px;
-    padding: 0 6px;
-    border-radius: 10px;
-    background: var(--color-error);
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .menu-arrow {

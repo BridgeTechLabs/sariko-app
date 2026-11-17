@@ -39,8 +39,9 @@ export default {
 }
 </script>
 
+<!-- Mounted once in App.vue: the store page, the dish page and the home page all add to the cart -->
 <template>
-
+  <q-dialog v-model="isShowModalCartConflict">
     <div class="modal-container">
 
         <div class="header-icon">
@@ -81,7 +82,7 @@ export default {
         </div>
 
     </div>
-
+  </q-dialog>
 </template>
 
 <style lang="scss" scoped>

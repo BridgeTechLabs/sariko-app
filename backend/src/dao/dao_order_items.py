@@ -3,7 +3,7 @@ import logging
 from postgrest.exceptions import APIError as PostgrestExceptionAPIError
 
 from dao.dao_base import DAOBase
-from utils.pricing import cart_item_unit_price
+from utils.pricing import cart_item_unit_price, options_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ class DAOOrderItems(DAOBase):
                     "price_snapshot": str(cart_item_unit_price(item)),
                     "unit_label_snapshot": food.get("unit_label"),
                     "variant_name_snapshot": variant["name"] if variant else None,
+                    "options_snapshot": options_snapshot(item),
                     "quantity": item.get("quantity"),
                 })
 

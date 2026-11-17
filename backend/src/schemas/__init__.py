@@ -49,6 +49,7 @@ from schemas.request_update_food_item import RequestUpdateFoodItem
 # Seller Menu — Price variants
 from schemas.request_create_variant import RequestCreateVariant
 from schemas.request_update_variant import RequestUpdateVariant
+from schemas.request_option_group import RequestDishGroupOrder, RequestOptionGroup
 
 # Deliveries
 from schemas.request_quotation import RequestQuotation
@@ -95,6 +96,8 @@ class Schema:
 
     RequestCreateVariant = RequestCreateVariant
     RequestUpdateVariant = RequestUpdateVariant
+    RequestOptionGroup = RequestOptionGroup
+    RequestDishGroupOrder = RequestDishGroupOrder
 
     RequestQuotation = RequestQuotation
 

@@ -5,6 +5,7 @@ import { mapState } from 'pinia';
 import { useSellerStore } from '@/stores/seller/sellerStore';
 import { useCartStore } from '@/stores/cart/cartStore';
 import { useAuthStore } from '@/stores/auth/authStore';
+import { ratingText } from '@/utils/rating';
 
 export default {
     props: {
@@ -49,10 +50,15 @@ export default {
             type: Number,
             default: 0
         },
-        // Portions left today (utils/portions.js); null = not shown. 0 = sold out today, not tappable
-        portionsLeft: {
+        // Stock left (utils/portions.js stockLeft); null = no limit, nothing shown
+        stockLeft: {
             type: Number,
             default: null
+        },
+        // The dish's stock is under its minimum per order: shown as sold out, not tappable
+        soldOut: {
+            type: Boolean,
+            default: false
         }
     },
 
@@ -78,11 +84,12 @@ export default {
             return this.ratingCount > 0 && this.ratingAvg != null
         },
         canOrder() {
-            return this.isAvailable && this.portionsLeft !== 0
+            return this.isAvailable && !this.soldOut
         }
     },
 
     methods: {
+        ratingText,
         goToDetail() {
             if (!this.canOrder) return
             if (this.seller?.slug) {
@@ -93,7 +100,7 @@ export default {
         async handleAddToCart(e) {
             e.stopPropagation()
             if (!this.canOrder) return
-            // No single price to add — the level is picked on the detail page.
+            // No single price to add — the level / options are picked on the detail page.
             if (this.hasVariants) return this.goToDetail()
             const authStore = useAuthStore()
             if (!authStore.user) {
@@ -129,7 +136,7 @@ export default {
             class="food-thumb"
             @error="$event.target.src = '/images/default-food-image.webp'"
             />
-            <div v-if="!canOrder" class="sold-out-label">{{ isAvailable ? $t('seller_page.section_food_cards.label_sold_out_today') : $t('seller_page.section_food_cards.label_sold_out') }}</div>
+            <div v-if="!canOrder" class="sold-out-label">{{ $t('seller_page.section_food_cards.label_sold_out') }}</div>
         </div>
 
         <div class="food-info">
@@ -137,7 +144,7 @@ export default {
                 <div class="food-name__label">{{ name }}</div>
                 <div v-if="hasRating" class="food-name__review">
                     <Star size="12px" fill="gold" color="gold" style="margin-right: 4px;"/>
-                    <div class="text-yellow">{{ ratingAvg }}</div>
+                    <div class="text-yellow">{{ ratingText(ratingAvg) }}</div>
                     <div class="review-count">({{ ratingCount }})</div>
                 </div>
             </div>
@@ -149,8 +156,8 @@ export default {
                 <q-badge v-else class="preorder-badge" color="positive">
                     {{ $t('seller_page.section_food_cards.label_item_instant') }}
                 </q-badge>
-                <q-badge v-if="portionsLeft > 0" class="preorder-badge" color="grey-8">
-                    {{ $t('seller_page.section_food_cards.label_portions_left', { n: portionsLeft }) }}
+                <q-badge v-if="stockLeft > 0 && !soldOut" class="preorder-badge" color="grey-8">
+                    {{ $t('seller_page.section_food_cards.label_portions_left', { n: stockLeft }) }}
                 </q-badge>
             </div>
 
