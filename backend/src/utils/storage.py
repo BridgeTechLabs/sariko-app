@@ -32,13 +32,10 @@ def compress_to_jpeg(content: bytes) -> bytes:
     return buf.getvalue()
 
 
-def upload_private(bucket: str, path: str, content: bytes, content_type: str, upsert: bool = False) -> None:
+def upload_private(bucket: str, path: str, content: bytes, content_type: str) -> None:
     """Upload to a private bucket under the service role. No public URL: readers get
-    a signed URL from the backend (admin app). upsert=True overwrites an existing object."""
-    options = {"content-type": content_type}
-    if upsert:
-        options["upsert"] = "true"
-    get_supabase_client().storage.from_(bucket).upload(path, content, options)
+    a signed URL from the backend (admin app)."""
+    get_supabase_client().storage.from_(bucket).upload(path, content, {"content-type": content_type})
 
 
 def remove_private(bucket: str, path: str) -> None:

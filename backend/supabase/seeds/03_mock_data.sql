@@ -53,10 +53,18 @@ on conflict (id) do update set
   role = excluded.role, is_seller = excluded.is_seller,
   preferred_language = excluded.preferred_language;
 
-insert into public.user_addresses (user_id, label, address, lat, lon, is_default) values
-  ('11111111-1111-1111-1111-111111111111', 'Home',   '12 Nguyễn Huệ, Quận 1, TP.HCM',   10.7743, 106.7038, true),
-  ('11111111-1111-1111-1111-111111111111', 'Office', '45 Lê Lợi, Quận 1, TP.HCM',       10.7729, 106.6984, false),
-  ('22222222-2222-2222-2222-222222222222', 'Home',   '88 Phan Xích Long, Phú Nhuận',    10.7995, 106.6889, true);
+-- receiver_name / phone_number are NOT NULL (migration 20261003015158): each address
+-- carries its own receiver. The Office one goes to someone other than the account
+-- holder, so the "deliver to another person" path has data too.
+insert into public.user_addresses (
+  user_id, label, address, lat, lon, is_default, receiver_name, phone_number, street_name, note
+) values
+  ('11111111-1111-1111-1111-111111111111', 'Home',   '12 Nguyễn Huệ, Quận 1, TP.HCM', 10.7743, 106.7038, true,
+   'Mai Buyer', '+84900000001', 'Căn 12A', null),
+  ('11111111-1111-1111-1111-111111111111', 'Office', '45 Lê Lợi, Quận 1, TP.HCM',     10.7729, 106.6984, false,
+   'Linh Đồng Nghiệp', '+84900000011', 'Tầng 5', 'Gửi lễ tân'),
+  ('22222222-2222-2222-2222-222222222222', 'Home',   '88 Phan Xích Long, Phú Nhuận',  10.7995, 106.6889, true,
+   'Nam Buyer', '+84900000002', null, null);
 
 -- ── Sellers ─────────────────────────────────────────────────────────────────
 -- One active + listed (the only kind a buyer can order from) and one coming_soon,
@@ -123,26 +131,32 @@ on conflict (id) do nothing;
 -- in every state the status machine can be in mid-flow.
 -- Money follows the real formula: vat is charged on the commission, and the
 -- payout excludes the delivery fee.
+-- receiver_* / delivery_note are copied from the chosen address, as apis/orders.py
+-- does for every delivery order (delivery_note = street_name · note).
 insert into public.orders (
   id, user_id, seller_id, seller_user_id, status, payment_status, delivery_method,
   delivery_address, delivery_lat, delivery_lon, subtotal, delivery_fee, total_amount,
-  commission_rate, commission_amount, vat_rate, vat_amount, payout_amount, note
+  commission_rate, commission_amount, vat_rate, vat_amount, payout_amount, note,
+  receiver_name, receiver_phone, delivery_note
 ) values
   -- paid, delivered, one line with a variant
   ('eeeeeeee-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
    'aaaaaaaa-0000-0000-0000-000000000001', '33333333-3333-3333-3333-333333333333',
    'done', 'paid', 'delivery', '12 Nguyễn Huệ, Quận 1, TP.HCM', 10.7743, 106.7038,
-   150000, 25000, 175000, 0.10, 15000, 0.10, 1500, 133500, null),
+   150000, 25000, 175000, 0.10, 15000, 0.10, 1500, 133500, null,
+   'Mai Buyer', '+84900000001', 'Căn 12A'),
   -- awaiting payment: the Pay Now retry path
   ('eeeeeeee-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111',
    'aaaaaaaa-0000-0000-0000-000000000001', '33333333-3333-3333-3333-333333333333',
    'pending', 'pending', 'delivery', '45 Lê Lợi, Quận 1, TP.HCM', 10.7729, 106.6984,
-   75000, 20000, 95000, 0.10, 7500, 0.10, 750, 66750, 'Ít ớt giúp em'),
+   75000, 20000, 95000, 0.10, 7500, 0.10, 750, 66750, 'Ít ớt giúp em',
+   'Linh Đồng Nghiệp', '+84900000011', 'Tầng 5 · Gửi lễ tân'),
   -- paid and waiting on the seller: Accept/Reject on the dashboard
   ('eeeeeeee-0000-0000-0000-000000000003', '22222222-2222-2222-2222-222222222222',
    'aaaaaaaa-0000-0000-0000-000000000001', '33333333-3333-3333-3333-333333333333',
    'confirmed', 'paid', 'delivery', '88 Phan Xích Long, Phú Nhuận', 10.7995, 106.6889,
-   60000, 22000, 82000, 0.10, 6000, 0.10, 600, 53400, null)
+   60000, 22000, 82000, 0.10, 6000, 0.10, 600, 53400, null,
+   'Nam Buyer', '+84900000002', null)
 on conflict (id) do nothing;
 
 -- price_snapshot is the FINAL unit price: for a variant line it is the variant's
@@ -158,13 +172,18 @@ insert into public.payments (order_id, amount, status, method) values
   ('eeeeeeee-0000-0000-0000-000000000003', 82000,  'succeeded', 'vnpay');
 
 -- ── Reviews ─────────────────────────────────────────────────────────────────
--- One overall row (food_item_id null) + one per-dish row, the exact shape
--- apis/reviews.py writes. The on_review_change trigger recomputes rating_avg on
--- both seller_profiles and food_items, so those are never set by hand here.
-insert into public.reviews (order_id, seller_id, user_id, food_item_id, rating, comment) values
+-- public.reviews was split in migration 20261021030000: the store rating goes to
+-- review_stores (one per order), dish ratings to review_items (name_snapshot is
+-- NOT NULL so a review outlives its dish). Row triggers recompute rating_* on
+-- seller_profiles and food_items, so those are never set by hand here.
+insert into public.review_stores (order_id, seller_id, user_id, rating, comment) values
   ('eeeeeeee-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001',
-   '11111111-1111-1111-1111-111111111111', null, 5, null),
+   '11111111-1111-1111-1111-111111111111', 5, null)
+on conflict (order_id) do nothing;
+
+insert into public.review_items (order_id, seller_id, user_id, food_item_id, name_snapshot, rating, comment) values
   ('eeeeeeee-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001',
-   '11111111-1111-1111-1111-111111111111', 'cccccccc-0000-0000-0000-000000000001', 5, 'Ngon, đúng vị nhà làm.');
+   '11111111-1111-1111-1111-111111111111', 'cccccccc-0000-0000-0000-000000000001',
+   'Chicken Adobo', 5, 'Ngon, đúng vị nhà làm.');
 
 commit;

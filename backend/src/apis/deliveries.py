@@ -6,7 +6,7 @@ import os
 import time
 import uuid
 from decimal import Decimal
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request
 
 from core.auth import verify_token
 from core.phone import to_e164_vn
@@ -15,7 +15,6 @@ from dao.dao_deliveries import DAODeliveries
 from dao.dao_orders import DAOOrders, TRIP_ENDED
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
-from services.invoice_service import create_invoice_for_done_order
 from services import allingo_service, push_service
 from services.allingo_service import AllingoError, address, trip_fields
 from services.lalamove_service import get_lalamove_service
@@ -114,7 +113,7 @@ def cancel_trip(trip: dict, lalamove) -> bool:
     return lalamove().cancel_order(trip["lalamove_order_id"])
 
 
-def order_follows_trip(dao_orders, order_id: str, trip_status: str, background_tasks: BackgroundTasks):
+def order_follows_trip(dao_orders, order_id: str, trip_status: str):
     """A webhook's effect on the ORDER, decided by the order's own status, not by whether the trip row just
     changed: a retried event finishes what a failed run began. The push goes with the order change, so once."""
     if trip_status == "COMPLETED":
@@ -124,7 +123,6 @@ def order_follows_trip(dao_orders, order_id: str, trip_status: str, background_t
             updated = dao_orders.update_order_status(order_id, "done", expected_status=order["status"])
             if updated:
                 push_service.notify_seller_delivered(updated)
-                background_tasks.add_task(create_invoice_for_done_order, updated)
     elif trip_status in TRIP_ENDED:
         order = dao_orders.read_order_by_id_raw(order_id)
         if order and order["status"] == "ready":
@@ -216,7 +214,7 @@ def get_delivery_status(order_id: str, user=Depends(verify_token)):
 # POST /deliveries/webhook — Lalamove status callback (public, v3)
 # --------------------------------------------------------------------------
 @router.post("/webhook")
-async def delivery_webhook(request: Request, background_tasks: BackgroundTasks):
+async def delivery_webhook(request: Request):
     try:
         # Read raw bytes first — needed for exact HMAC verification
         raw_body = await request.body()
@@ -331,7 +329,7 @@ async def delivery_webhook(request: Request, background_tasks: BackgroundTasks):
             if order:
                 push_service.notify_seller_driver_assigned(order)
 
-        order_follows_trip(dao_orders, delivery["order_id"], new_status, background_tasks)
+        order_follows_trip(dao_orders, delivery["order_id"], new_status)
 
         return {"success": True}
 
@@ -380,7 +378,7 @@ def booking_in_flight(dao_orders, dao_deliveries, order_id) -> bool:
 # Errors answer 5xx on purpose (unlike Lalamove's 200): AllinGo resends up to 8 times over 44 hours.
 # --------------------------------------------------------------------------
 @router.post("/webhook/allingo")
-async def allingo_webhook(request: Request, background_tasks: BackgroundTasks):
+async def allingo_webhook(request: Request):
     raw_body = await request.body()
     secret = os.getenv("ALLINGO_WEBHOOK_SECRET", "")
     if not secret:
@@ -430,7 +428,7 @@ async def allingo_webhook(request: Request, background_tasks: BackgroundTasks):
             order = dao_orders.read_order_by_id_raw(delivery["order_id"])
             if order:
                 push_service.notify_seller_driver_assigned(order)
-        order_follows_trip(dao_orders, delivery["order_id"], status, background_tasks)
+        order_follows_trip(dao_orders, delivery["order_id"], status)
         return {"success": True}
 
     except HTTPException:
