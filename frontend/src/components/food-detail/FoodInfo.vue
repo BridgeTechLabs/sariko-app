@@ -62,7 +62,7 @@ export default {
             </div>
             <div class="item-badge">
                 <q-badge v-if="food.preorder_day > 0" color="amber-8" class="preorder-badge">
-                    {{ $t('seller_page.section_food_cards.lable_item_pre_order') }}: {{ food.preorder_day }} {{ $t('seller_page.section_food_cards.lable_item_pre_order_unit_day') }}
+                    {{ $t('seller_page.section_food_cards.lable_item_pre_order') }}: {{ food.preorder_day }} {{ $t('seller_page.section_food_cards.lable_item_pre_order_unit_day', food.preorder_day) }}
                 </q-badge>
                 <q-badge v-else class="preorder-badge" color="positive">
                     {{ $t('seller_page.section_food_cards.label_item_instant') }}

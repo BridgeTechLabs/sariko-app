@@ -258,7 +258,7 @@
             "label_portions_left": "{n} left",
             "label_item_instant": "Same-day",
             "lable_item_pre_order": "Pre-order",
-            "lable_item_pre_order_unit_day": "days"
+            "lable_item_pre_order_unit_day": "day | days"
         },
         "section_coming_soon": {
             "title": "Coming soon",

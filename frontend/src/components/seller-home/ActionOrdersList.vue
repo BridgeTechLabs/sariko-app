@@ -117,11 +117,6 @@ export default {
             }))
         },
 
-        rejectReasonText() {
-            if (this.selectedReason === 'other') return this.customReason
-            return this.rejectReasonOptions.find(o => o.key === this.selectedReason)?.label || ''
-        },
-
         canConfirmReject() {
             if (!this.selectedReason) return false
             if (this.selectedReason === 'other' && !this.customReason.trim()) return false
@@ -265,8 +260,9 @@ export default {
             if (!this.canConfirmReject || !this.rejectingOrder) return
             this.rejecting = true
             try {
-                await apiSellerDashboard.updateOrderStatus(this.rejectingOrder.id, 'cancelled', this.rejectReasonText)
-                useDashboardStore().updateOrderLocally(this.rejectingOrder.id, 'cancelled')
+                // a code; "other" carries the seller's own words as a note, as on the order page (T178)
+                await useDashboardStore().setOrderStatus(this.rejectingOrder.id, 'cancelled', `seller_reject_${this.selectedReason}`,
+                    this.selectedReason === 'other' ? this.customReason.trim() : null)
                 this.showRejectDialog = false
                 this.$q.notify({
                     classes: 'quasar-notify-positive',
