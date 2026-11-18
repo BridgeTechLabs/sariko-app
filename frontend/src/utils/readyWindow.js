@@ -38,7 +38,7 @@ export function deadlineHint(vm, order, now = Date.now()) {
 export function confirmEarlyReady(vm, order) {
     if (!minutesUntilReady(order)) return Promise.resolve(true)
     const appointment = new Date(order.delivery_appointment)
-    const time = appointment.toLocaleString(vm.$i18n.locale === 'vi' ? 'vi-VN' : 'en-PH', {
+    const time = appointment.toLocaleString(vm.$i18n.locale === 'vi' ? 'vi-VN' : 'en-GB', {
         weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
         timeZone: 'Asia/Ho_Chi_Minh', hour12: false,
     })

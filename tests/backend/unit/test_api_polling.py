@@ -68,6 +68,35 @@ def test_every_delivery_write_moves_the_order_signature():  # TC-12
     assert {"delivery_webhook", "allingo_webhook", "rebook_delivery", "update_seller_order_status"} <= set(writers)
 
 
+def test_no_route_handler_is_async_def():  # T212
+    # An async def route runs on the event loop, so its sync DB / push calls hold up every other request.
+    for f in (SRC / "apis").glob("*.py"):
+        found = re.findall(r"@router\.\w+\([^\n]*\)\n(?:@[^\n]*\n)*async def (\w+)", f.read_text())
+        assert not found, f"{f.name}: {found}"
+
+
+def test_webhooks_run_one_at_a_time():  # T212 QA-1: two events of one trip must not interleave read-then-write
+    import threading
+    from types import SimpleNamespace
+
+    def call(hook, done):
+        try:
+            hook(request=SimpleNamespace(headers={}), raw_body=b"{}")
+        except Exception:
+            pass   # 401 / 503 without keys: only whether it waited matters here
+        done.append(True)
+
+    for hook in (deliveries.delivery_webhook, deliveries.allingo_webhook):
+        done = []
+        with deliveries._webhook_lock:   # as if another webhook were running
+            t = threading.Thread(target=call, args=(hook, done))
+            t.start()
+            t.join(0.2)
+            assert not done, f"{hook.__name__} did not wait for the running webhook"
+        t.join(2)
+        assert done, f"{hook.__name__} never ran"
+
+
 # ── TC-8 / TC-19..21: JWKS cached 1 hour, unknown kid refetches ───────────────────────────────────
 
 def _key(kid):
