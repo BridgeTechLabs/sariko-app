@@ -13,7 +13,7 @@ export function parseDbTime(value) {
 export function formatVnTime(value, options) {
     const d = value instanceof Date ? value : parseDbTime(value)
     if (!d) return ''
-    return d.toLocaleString(i18n.global.locale === 'vi' ? 'vi-VN' : 'en-PH', { timeZone: TZ, hour12: false, ...options })
+    return d.toLocaleString(i18n.global.locale === 'vi' ? 'vi-VN' : 'en-GB', { timeZone: TZ, hour12: false, ...options })
 }
 
 // "2026-10-19": the Vietnam calendar day of a moment, for Today / Yesterday grouping.
@@ -33,5 +33,5 @@ export function vnWeekdayKey() {
 // "Thứ Hai" / "Monday" for a weekday key, in the current UI language. 2026-10-12 was a Monday.
 export function weekdayName(key) {
     return new Date(Date.UTC(2026, 9, 11 + Number(key))).toLocaleDateString(
-        i18n.global.locale === 'vi' ? 'vi-VN' : 'en-PH', { weekday: 'long', timeZone: 'UTC' })
+        i18n.global.locale === 'vi' ? 'vi-VN' : 'en-GB', { weekday: 'long', timeZone: 'UTC' })
 }
