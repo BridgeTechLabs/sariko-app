@@ -20,7 +20,8 @@ export function foodPriceDisplay(food) {
     const prices = levels.map(v => Number(v.price))
     const min = Math.min(...prices)
     const max = Math.max(...prices)
-    return min === max ? formatVnd(min) : `${formatVnd(min)} – ${formatVnd(max)}`
+    const keep = v => formatVnd(v).replace(' ₫', '\u00a0₫')   // a range may wrap at the dash, never between a number and ₫
+    return min === max ? formatVnd(min) : `${keep(min)} – ${keep(max)}`
 }
 
 export function hasVariants(food) {
