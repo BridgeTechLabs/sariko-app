@@ -62,7 +62,7 @@ export default {
         },
 
         dateLocale() {
-            return this.$i18n.locale === 'vi' ? 'vi-VN' : 'en-PH'
+            return this.$i18n.locale === 'vi' ? 'vi-VN' : 'en-GB'
         },
 
         dateText() {
