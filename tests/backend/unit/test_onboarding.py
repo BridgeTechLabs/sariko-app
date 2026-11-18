@@ -123,7 +123,7 @@ def _body(**over):
     body = {
         "full_name": "Maria Santos", "date_of_birth": adult.isoformat(),
         "nationality": "Philippines", "id_type": "passport", "id_number": "P1234567",
-        "id_expiry_date": "2035-01-01", "tax_resident": True,
+        "id_expiry_date": "2035-01-01", "tax_resident": True, "tax_code": "0316970660",
         "email": "maria@example.com", "phone": "0901234567",
         "residential_address": "12 Nguyen Hue, District 1",
         "store_name": "Maria's Kitchen", "pickup_address": "12 Nguyen Hue, District 1",
@@ -418,6 +418,12 @@ def test_tc34_passport_seller_still_needs_the_photo(env):
     ({"id_expiry_date": (date.today() + timedelta(days=60)).isoformat()}, "id_expiring"),
     ({**CCCD, "id_number": "12345"}, "invalid_id_number"),
     ({"tax_resident": None}, "missing_field"),
+    ({"tax_code": None}, "missing_field"),
+    ({"tax_code": "   "}, "missing_field"),
+    ({"tax_code": "031697066"}, "invalid_tax_code"),        # 9 digits
+    ({"tax_code": "0316970660-01"}, "invalid_tax_code"),    # branch suffix must be 3 digits
+    ({"tax_code": "03169706601"}, "invalid_tax_code"),      # 11 digits
+    ({"tax_code": "MST0316970660"}, "invalid_tax_code"),
     ({"personal_data_consent": False}, "consent_required"),
     ({"bank_account_number": "12345"}, "invalid_bank_account"),
     ({"bank_account_holder": "JUAN CRUZ"}, "bank_holder_mismatch"),
@@ -426,6 +432,12 @@ def test_tc35_identity_rules(env, over, code):
     res = env["client"].post("/onboarding/applications", json=_body(**over))
     assert res.status_code == 400 and _code(res) == code
     assert FakeDAO.apps == {}
+
+
+@pytest.mark.parametrize("tax_code", ["0316970660", "0316970660-001", "0316970660001", " 0316970660 "])
+def test_valid_tax_code_is_stored_squashed(env, tax_code):
+    app_id, _ = _create(env, tax_code=tax_code)
+    assert FakeDAO.apps[app_id]["tax_code"] == tax_code.strip()
 
 
 def test_tc35_stores_expiry_and_consent(env):

@@ -56,3 +56,4 @@ graphify-out
 
 .config
 docs/
+backend/supabase/snippets/
