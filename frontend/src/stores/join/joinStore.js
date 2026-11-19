@@ -213,6 +213,9 @@ export const useJoinStore = defineStore('joinStore', {
                     else if (f.email.trim().toLowerCase() === state.takenEmail) e.email = 'join_page.error_email_taken'
                     if (!isVnPhone(f.phone)) e.phone = 'join_page.error_phone'
                     if (!f.tax_resident) e.tax_resident = 'join_page.error_required'
+                    // Same rule as core/seller_kyc.py valid_tax_code: the MST goes on Sariko's e-invoice
+                    need('tax_code')
+                    if (squash(f.tax_code) && !/^\d{10}(-?\d{3})?$/.test(squash(f.tax_code))) e.tax_code = 'join_page.error_tax_code'
                     // Same rules as core/seller_kyc.py id_error (NĐ 248/2026 Đ18.1.b)
                     if (f.id_type === 'cccd' && !/^\d{12}$/.test(squash(f.id_number))) e.id_number = 'join_page.error_cccd'
                     const today = new Date()

@@ -16,6 +16,7 @@ class FakeSettings:
 @pytest.fixture(autouse=True)
 def fakes(monkeypatch):
     monkeypatch.setattr(sellers, "confirm_window", lambda: timedelta(minutes=30))
+    monkeypatch.setattr(sellers, "preorder_window", lambda: timedelta(hours=12))
     monkeypatch.setattr(orders, "DAOAdminConfig", FakeSettings)
     monkeypatch.setattr(sellers, "DAOAdminConfig", FakeSettings)   # the list reads settings through its own reader
 
@@ -66,3 +67,15 @@ def test_delivery_failed_counts_to_buyer_cancel():   # T177 TC-A30a
 def test_other_statuses_show_nothing():
     for status in ("ready", "done", "cancelled"):
         assert deadline({"status": status, "status_changed_at": iso(NOW), "paid_at": iso(NOW)}) is None
+
+
+@pytest.mark.parametrize("appointment", [NOW + timedelta(days=3), None])   # None: TC-10, no 500
+def test_tc5_preorder_seller_and_buyer_see_the_same_deadline_while_closed(monkeypatch, appointment):
+    monkeypatch.setattr(orders, "confirm_window", lambda: timedelta(minutes=30))
+    monkeypatch.setattr(orders, "preorder_window", lambda: timedelta(hours=12))
+    paid = NOW - timedelta(hours=2)
+    order = {"status": "pending", "paid_at": iso(paid), "delivery_appointment": appointment and iso(appointment),
+             "order_items": [{"food_items": {"preorder_day": 3}}]}
+    closed = {**OPEN, "is_open": False}
+    buyer = orders.confirm_by({**order, "seller_id": "s1", "payment_status": "paid", "seller_profiles": dict(closed)})
+    assert deadline(order, closed) == buyer == paid + timedelta(hours=12)

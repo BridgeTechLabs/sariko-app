@@ -154,7 +154,7 @@ def body(**override):
         "identity": {"full_name": "Nguyễn Văn An", "date_of_birth": "1990-01-01",
                      "nationality": "Việt Nam", "id_type": "cccd", "id_number": "079090001234",
                      "id_expiry_date": "2035-01-01", "residential_address": "2 Hai Ba Trung"},
-        "tax": {"tax_resident": True},
+        "tax": {"tax_resident": True, "tax_code": "0316970660"},
         "bank": {"bank_name": "VCB", "bank_account_number": "0123456789", "bank_account_holder": "NGUYEN VAN AN"},
         "phone": "0901234567",
         "pickup_address": {"address": "1 Le Loi, Q1", "lat": 10.77, "lon": 106.70},
@@ -338,6 +338,9 @@ def test_tc15_holder_without_accents_matches(holder):
 
 def test_tc16_tax_and_consent():
     _refused(body(tax={"tax_resident": None}), 400, "missing_field")
+    _refused(body(tax={"tax_code": None}), 400, "missing_field")
+    _refused(body(tax={"tax_code": "031697066"}), 400, "invalid_tax_code")
+    _refused(body(tax={"tax_code": "0316970660-01"}), 400, "invalid_tax_code")
     _refused(body(agreement={"personal_data_consent": False}), 400, "consent_required")
 
 
@@ -506,10 +509,11 @@ def test_tc30_cart_refuses_coming_soon(monkeypatch):
 
 def test_tax_resident_also_on_seller_profile():   # tax-withholding TC-14: the withholding rate reads it there
     make_complete(tax_resident=None)
-    r = client().post(P, json={"tax": {"tax_resident": False}})
+    r = client().post(P, json={"tax": {"tax_resident": False, "tax_code": "0316970660-001"}})
     assert r.status_code == 200, r.text
     assert DB.sellers[SELLER_A]["tax_resident"] is False
     assert DB.apps[f"app-{SELLER_A}"]["tax_resident"] is False
+    assert DB.apps[f"app-{SELLER_A}"]["tax_code"] == "0316970660-001"
 
 
 # G. One full name box (docs/dev/seller-full-name N1-N6, TC ids in the names)

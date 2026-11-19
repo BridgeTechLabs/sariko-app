@@ -258,7 +258,7 @@
             "label_portions_left": "{n} left",
             "label_item_instant": "Same-day",
             "lable_item_pre_order": "Pre-order",
-            "lable_item_pre_order_unit_day": "days"
+            "lable_item_pre_order_unit_day": "day | days"
         },
         "section_coming_soon": {
             "title": "Coming soon",
@@ -513,7 +513,7 @@
         "status_title_delivery_failed": "Delivery failed - the seller is handling it",
         "status_subtext_awaiting_payment": "Complete your payment to send this order to the seller.",
         "status_subtext_pending": "Your order has been sent. The seller will confirm shortly.",
-        "status_subtext_pending_by": "The seller will confirm by {time}. If not, the order is cancelled and refunded.",
+        "status_subtext_pending_by": "The seller will confirm by {time}.\nIf not, the order is cancelled and refunded.",
         "status_subtext_pending_closed": "The store is closed now. The seller's time to confirm starts when it opens.",
         "status_subtext_confirmed": "The seller is preparing your order.",
         "status_subtext_scheduled": "The seller will start preparing on {date}.",
@@ -1215,6 +1215,7 @@
         "section_tax": "Tax",
         "label_tax_code": "Tax code (MST)",
         "hint_optional": "Optional",
+        "hint_tax_code": "10 digits, or 13 for a branch (0123456789-001)",
         "label_tax_resident": "Do you stay in Vietnam 183 days or more a year?",
         "hint_tax_resident": "This sets the tax rate SariKo withholds.",
         "resident_yes": "Yes",
@@ -1317,6 +1318,7 @@
         "error_too_many_files": "Up to {maxFiles} files here",
         "error_id_document": "Upload your passport photo page",
         "error_account_number": "Digits only, 6 to 20",
+        "error_tax_code": "10 digits, or 13 for a branch (0123456789-001)",
         "error_agree": "Tick all four boxes",
         "error_signature": "Type your full name exactly as above",
         "error_captcha_load": "The security check could not load. Check your connection and reload the page.",
@@ -1363,7 +1365,8 @@
         "group_pickup_address": "pickup address",
         "group_agreement": "Seller Agreement",
         "group_contact": "Contact and pickup address",
-        "form_hint": "Fill in what is still missing. SariKo keeps your ID and bank details private.",
+        "form_hint": "Fill in every section below, then tap Save: nothing is saved until all of them are filled. SariKo keeps your ID and bank details private.",
+        "check_red": "Not saved yet. Check the field in red.",
         "all_done": "Your seller profile is complete.",
         "label_id_expiry": "ID valid until",
         "hint_passport_validity": "Your passport must be valid for at least {months} more months.",

@@ -65,7 +65,7 @@ export default {
 
         <div class="join-section-title">{{ $t('join_page.section_tax') }}</div>
         <div class="join-grid">
-            <q-input v-model="form.tax_code" dark outlined dense color="amber" :label="$t('join_page.label_tax_code')" :hint="$t('join_page.hint_optional')" maxlength="300" />
+            <q-input v-model="form.tax_code" dark outlined dense color="amber" :label="$t('join_page.label_tax_code')" :hint="$t('join_page.hint_tax_code')" :error="!!err('tax_code')" :error-message="err('tax_code')" maxlength="14" />
         </div>
         <div>
             <div class="join-label">{{ $t('join_page.label_tax_resident') }}</div>

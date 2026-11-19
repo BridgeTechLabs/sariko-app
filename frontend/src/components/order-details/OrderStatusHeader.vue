@@ -6,7 +6,7 @@ import { cookingDay, isScheduled } from '@/utils/orderStage';
 import { cancelReasonText } from '@/utils/cancelReason';
 import { refundChip } from '@/utils/refundChip';
 import { formatVnd } from '@/utils/priceDisplay';
-import { formatVnTime } from '@/utils/vnTime';
+import { formatVnTime, vnDay } from '@/utils/vnTime';
 import { readySubtextKey } from '@/utils/deliveryBadge';
 
 
@@ -67,7 +67,9 @@ export default {
             if (this.isTripLost) return this.$t('delivery_tracker.status_LOST')
             if (this.isPending) {   // paid and waiting for the seller (A29)
                 if (this.order.confirm_by) {
-                    const time = formatVnTime(this.order.confirm_by, { hour: '2-digit', minute: '2-digit' })
+                    const day = vnDay(this.order.confirm_by) !== vnDay(new Date())   // a pre-order: hours away, maybe tomorrow
+                        ? { weekday: 'short', day: '2-digit', month: '2-digit' } : {}
+                    const time = formatVnTime(this.order.confirm_by, { ...day, hour: '2-digit', minute: '2-digit' })
                     return this.$t('order_detail.status_subtext_pending_by', { time })
                 }
                 return this.$t('order_detail.status_subtext_pending_closed')
@@ -160,6 +162,7 @@ export default {
     color: rgba(255, 255, 255, 0.5);
     text-align: center;
     line-height: 1.5;
+    white-space: pre-line;
 }
 
 .refund-chip {

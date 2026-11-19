@@ -24,7 +24,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 
 from core.client_ip import client_ip
 from core.phone import to_e164_vn
-from core.seller_kyc import age, bank_holder_matches, clean_full_name, id_error, name_matches, valid_bank_account
+from core.seller_kyc import age, bank_holder_matches, clean_full_name, id_error, name_matches, valid_bank_account, valid_tax_code
 from core.store_hours import VN_TZ
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_onboarding import DAOOnboarding
@@ -292,6 +292,10 @@ def create_application(body: Schema.RequestCreateOnboardingApplication, request:
             raise _error(400, "missing_field", "Required field is empty", field=field)
     if body.tax_resident is None:
         raise _error(400, "missing_field", "Required field is empty", field="tax_resident")
+    if not _squash(body.tax_code or ""):
+        raise _error(400, "missing_field", "Required field is empty", field="tax_code")
+    if not valid_tax_code(body.tax_code):
+        raise _error(400, "invalid_tax_code", "Tax code must be 10 or 13 digits")
     code = id_error(body.id_type, body.id_number, body.id_expiry_date, date.today(),
                     settings["onboarding_min_id_validity_months"])
     if code:

@@ -81,12 +81,12 @@ def test_tc11_missing_key_in_positive_ints_is_cached_as_default(dao):
     assert ints(dao, "zzz") == {"zzz": 1} and len(dao._supabase_client.queries) == 1
 
 
-def test_tc6_order_expiry_reads_its_two_keys_in_one_query(dao, monkeypatch):  # T200 TC-6
+def test_tc6_order_expiry_reads_its_three_keys_in_one_query(dao, monkeypatch):  # T200 TC-6
     from services import order_expiry
     monkeypatch.setattr(order_expiry, "DAOAdminConfig", lambda: dao)
     monkeypatch.setattr(order_expiry, "DAOOrders", lambda: type("O", (), {"read_unconfirmed_paid_orders": lambda s, paid_before: []})())
     order_expiry.expire_unconfirmed_orders()
-    assert dao._supabase_client.queries == [["order_confirm_minutes", "order_confirm_reminder_minutes"]]
+    assert dao._supabase_client.queries == [["order_confirm_minutes", "preorder_confirm_minutes", "order_confirm_reminder_minutes"]]
 
 
 def test_tc6_payment_reconcile_reads_its_three_keys_in_one_query(dao, monkeypatch):  # T200 TC-6

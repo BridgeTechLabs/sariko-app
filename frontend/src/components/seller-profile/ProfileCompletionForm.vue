@@ -14,6 +14,7 @@ const ERRORS = {
     id_expiring: ['id_expiry_date', 'seller_profile.error_id_expiring'],
     invalid_email: ['email', 'join_page.error_email'],
     invalid_bank_account: ['bank_account_number', 'join_page.error_account_number'],
+    invalid_tax_code: ['tax_code', 'join_page.error_tax_code'],
     bank_holder_mismatch: ['bank_account_holder', 'seller_profile.error_bank_holder'],
     invalid_phone: ['phone', 'join_page.error_phone'],
     agreement_required: ['agreed', 'seller_profile.error_agree'],
@@ -151,6 +152,14 @@ export default {
                 items: (d?.groups || []).map(g => this.$t(`seller_profile.group_${g}`)).join(', '),
             }
             this.errors = { [d?.code === 'missing_field' ? d.field : field]: this.$t(d?.code === 'missing_field' ? 'join_page.error_required' : key, params) }
+            this.revealError()
+        },
+
+        // Save sits at the bottom, the field in error is often far above it: scroll there and say so (BUGS #43).
+        async revealError() {
+            await this.$nextTick()
+            this.$el.querySelector('.q-field--error, .field-error, .form-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            this.$q.notify({ classes: 'quasar-notify-negative', message: this.$t('seller_profile.check_red'), position: 'bottom', timeout: 2500 })
         },
 
         async onSave() {
@@ -166,6 +175,7 @@ export default {
                 if (this.missing.includes('id_document')) {   // passport saved without its photo
                     if (!this.shown.includes('id_document')) this.shown.push('id_document')
                     this.errors = { id_document: this.$t('join_page.error_id_document') }
+                    this.revealError()
                     return
                 }
                 this.$q.notify({
@@ -233,7 +243,7 @@ export default {
                 <div class="field-label">{{ $t('join_page.label_tax_resident') }}</div>
                 <q-option-group v-model="form.tax_resident" :options="residentOptions" type="radio" inline dark color="amber" />
                 <div v-if="err('tax_resident')" class="field-error">{{ err('tax_resident') }}</div>
-                <q-input v-model="form.tax_code" dark outlined dense color="amber" :label="$t('join_page.label_tax_code')" :hint="$t('join_page.hint_optional')" maxlength="300" />
+                <q-input v-model="form.tax_code" dark outlined dense color="amber" :label="$t('join_page.label_tax_code')" :hint="$t('join_page.hint_tax_code')" :error="!!err('tax_code')" :error-message="err('tax_code')" maxlength="14" />
             </div>
 
             <!-- Bank -->

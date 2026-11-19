@@ -14,7 +14,7 @@ from apis.complaints import complaints_for_order
 from apis.deliveries import quote_trip
 from core.auth import verify_token
 from core.phone import to_e164_vn
-from core.store_hours import VN_TZ, confirm_deadline, is_open_now
+from core.store_hours import VN_TZ
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_carts import DAOCarts
 from dao.dao_cart_items import DAOCartItems
@@ -23,7 +23,7 @@ from dao.dao_order_items import DAOOrderItems
 from dao.dao_seller_profiles import DAOSellerProfiles
 from schemas import Schema
 from services import push_service
-from services.order_expiry import confirm_window
+from services.order_expiry import confirm_window, order_deadline, preorder_window
 from services.lalamove_service import get_lalamove_service
 from utils.pricing import chosen_options, dish_groups, options_sold_out, order_amounts
 from utils.stock import min_qty, stock_error, stock_sold_out
@@ -367,17 +367,13 @@ def cancel_before(order: dict):
 
 def confirm_by(order: dict):
     """A paid order the seller has not accepted: when it auto-cancels, as the seller sees it (_with_deadlines).
-    None while the store is closed, that clock is paused. The store's hours are read here and not sent on."""
-    seller = order.get("seller_profiles") or {}
-    hours, opened_at = seller.pop("weekly_hours", None), seller.pop("opened_at", None)
-    switch = seller.pop("is_open", None)
+    None for a same-day order while the store is closed. The store's hours are read here and not sent on."""
+    profile = order.get("seller_profiles") or {}
+    seller = {k: profile.pop(k, None) for k in ("is_open", "weekly_hours", "opened_at")}
     if order["status"] != "pending" or order.get("payment_status") != "paid" or not order.get("paid_at"):
         return None
-    now = datetime.now(timezone.utc)
-    if not is_open_now(switch, hours, now, order["seller_id"]):
-        return None
-    return confirm_deadline(_ts(order["paid_at"]), hours, _ts(opened_at) if opened_at else None, now, confirm_window(),
-                            order["seller_id"])
+    return order_deadline(order, seller | {"id": order["seller_id"]}, datetime.now(timezone.utc),
+                          confirm_window(), preorder_window())
 
 
 @router.get("/{order_id}")
