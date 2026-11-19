@@ -40,7 +40,7 @@ class FakeOrders:
         self.orders, self.seller_acted_first, self.cancelled = orders, set(seller_acted_first), []
 
     def read_unconfirmed_paid_orders(self, paid_before):
-        return [o for o in self.orders if datetime.fromisoformat(o["paid_at"]) <= paid_before]
+        return [o for o in self.orders if datetime.fromisoformat(o["paid_at"]) <= paid_before and o["id"] not in self.cancelled]
 
     def update_order_status(self, order_id, status, reason=None, expected_status=None):
         assert (status, expected_status) == ("cancelled", "pending")
@@ -53,13 +53,15 @@ class FakeOrders:
 class FakeConfig(DAOAdminConfig):
     """Only the DB read is faked; the real get_minutes validation runs."""
     value = 30
+    preorder = 720
     reminder = 10
 
     def __init__(self):
         pass  # no Supabase client
 
     def get_setting(self, key):
-        return {"order_confirm_minutes": self.value, "order_confirm_reminder_minutes": self.reminder}[key]
+        return {"order_confirm_minutes": self.value, "preorder_confirm_minutes": self.preorder,
+                "order_confirm_reminder_minutes": self.reminder}[key]
 
     def get_positive_ints(self, defaults):
         return {k: self._positive_int(k, self.get_setting(k), d) for k, d in defaults.items()}
@@ -158,3 +160,91 @@ def test_reminds_seller_once_before_auto_cancel(monkeypatch, config, refunds, se
     assert reminders == soon                                   # "early" reminds at 12:25 - 10 min
     order_expiry.expire_unconfirmed_orders(now=at("12:15"))
     assert reminders == soon + ["early", ("admin_order_expiring", "/orders?open=early", "early", 10)]
+
+
+# ── Pre-orders (docs/dev/20261119-preorder-confirm): preorder_confirm_minutes from payment, open or closed ──
+
+H12 = timedelta(hours=12)
+
+
+def _preorder(oid, paid, days=3, appointment="auto", is_open=False, hours=None, opened_at=None, items=None):
+    order = _order(oid, paid, is_open, hours)
+    order["seller_profiles"]["opened_at"] = opened_at.isoformat() if opened_at else None
+    order["total_amount"] = 150000
+    order["delivery_appointment"] = (paid + timedelta(days=days)).isoformat() if appointment == "auto" else appointment
+    order["order_items"] = items if items is not None else [{"food_items": {"preorder_day": days}}]
+    return order
+
+
+def test_tc1_closed_store_preorder_cancels_12h_after_payment(monkeypatch, config, refunds, seller_pushes, reminders):
+    fake = FakeOrders([_preorder("pre", at("10:00"))])          # switch off
+    monkeypatch.setattr(order_expiry, "DAOOrders", lambda: fake)
+    assert order_expiry.expire_unconfirmed_orders(now=at("21:59")) == 0
+    assert order_expiry.expire_unconfirmed_orders(now=at("22:01")) == 1
+    assert fake.cancelled == ["pre"] and refunds == [("pre", "seller_timeout")]
+
+
+def test_tc2_switch_on_does_not_restart_the_preorder_clock():
+    order = _preorder("pre", at("10:00"), is_open=True, opened_at=at("16:00"))
+    assert order_expiry.order_deadline(order, order["seller_profiles"], at("17:00"), WINDOW, H12) == at("22:00")
+
+
+def test_tc4_window_longer_than_the_delivery_time_stops_at_delivery():
+    order = _preorder("pre", at("10:00"), days=3)
+    assert order_expiry.order_deadline(order, {}, at("11:00"), WINDOW, timedelta(minutes=5000)) == at("10:00", 15)
+
+
+def test_tc10_preorder_without_delivery_time_does_not_break_the_run(monkeypatch, config, refunds, seller_pushes, reminders):
+    fake = FakeOrders([_preorder("pre", at("10:00", 11), days=2, appointment=None), _order("late", at("21:00", 11))])
+    monkeypatch.setattr(order_expiry, "DAOOrders", lambda: fake)
+    assert order_expiry.expire_unconfirmed_orders(now=at("21:59", 11)) == 1     # same-day one still cancels
+    assert fake.cancelled == ["late"]
+    assert order_expiry.expire_unconfirmed_orders(now=at("22:01", 11)) == 1
+    assert fake.cancelled == ["late", "pre"]
+
+
+def test_tc11_preorder_window_shorter_than_same_day(monkeypatch, config, refunds, seller_pushes, reminders):
+    config.preorder = 15
+    now = at("12:00")
+    fake = FakeOrders([_preorder("remind", now - timedelta(minutes=6)), _preorder("cancel", now - timedelta(minutes=16))])
+    monkeypatch.setattr(order_expiry, "DAOOrders", lambda: fake)
+    assert order_expiry.expire_unconfirmed_orders(now=now) == 1
+    assert fake.cancelled == ["cancel"] and refunds == [("cancel", "seller_timeout")]
+    assert reminders == ["remind", ("admin_order_expiring", "/orders?open=remind", "remind", 9)]
+
+
+def test_tc12_closed_store_preorder_reminds_once(monkeypatch, config, refunds, seller_pushes, reminders):
+    fake = FakeOrders([_preorder("pre", at("10:00"))])
+    monkeypatch.setattr(order_expiry, "DAOOrders", lambda: fake)
+    order_expiry.expire_unconfirmed_orders(now=at("21:50"))
+    order_expiry.expire_unconfirmed_orders(now=at("21:51"))
+    assert reminders == ["pre", ("admin_order_expiring", "/orders?open=pre", "pre", 10)]
+
+
+def test_tc13_preorder_cancels_and_refunds_once(monkeypatch, config, refunds, seller_pushes, reminders):
+    fake = FakeOrders([_preorder("pre", at("10:00")), _preorder("raced", at("10:00"))], seller_acted_first={"raced"})
+    amounts = []
+    monkeypatch.setattr(order_expiry.DAORefunds, "create_refund_for_order",
+                        lambda self, order, reason: amounts.append((order["id"], order["total_amount"])))
+    monkeypatch.setattr(order_expiry, "DAOOrders", lambda: fake)
+    order_expiry.expire_unconfirmed_orders(now=at("22:01"))
+    order_expiry.expire_unconfirmed_orders(now=at("22:02"))
+    assert fake.cancelled == ["pre"] and amounts == [("pre", 150000)]
+
+
+def test_tc14_mixed_cart_is_a_preorder_deleted_dish_is_not():
+    mixed = _preorder("mixed", at("10:00"), items=[{"food_items": {"preorder_day": 0}}, {"food_items": {"preorder_day": 1}}])
+    assert order_expiry.order_deadline(mixed, {}, at("11:00"), WINDOW, H12) == at("22:00")
+    deleted = _preorder("deleted", at("10:00"), items=[{"food_items": None}])
+    assert order_expiry.order_deadline(deleted, deleted["seller_profiles"], at("11:00"), WINDOW, H12) is None  # closed: paused
+    deleted["seller_profiles"]["is_open"] = True
+    assert order_expiry.order_deadline(deleted, deleted["seller_profiles"], at("10:10"), WINDOW, H12) == at("10:30")
+
+
+def test_tc15_missing_preorder_setting_defaults_to_12_hours(monkeypatch, config, refunds, seller_pushes, reminders):
+    config.preorder = None
+    assert order_expiry.preorder_window() == H12
+    fake = FakeOrders([_preorder("pre", at("10:00"))])
+    monkeypatch.setattr(order_expiry, "DAOOrders", lambda: fake)
+    assert order_expiry.expire_unconfirmed_orders(now=at("21:59")) == 0
+    assert order_expiry.expire_unconfirmed_orders(now=at("22:01")) == 1
