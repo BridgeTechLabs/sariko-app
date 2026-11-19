@@ -13,6 +13,7 @@ def order(**kw):
 
 def test_a29a_open_store_gives_the_seller_deadline(monkeypatch):
     monkeypatch.setattr(orders, "confirm_window", lambda: timedelta(minutes=10))
+    monkeypatch.setattr(orders, "preorder_window", lambda: timedelta(hours=12))
     o = order()
     due = orders.confirm_by(o)
     assert abs((due - datetime.fromisoformat(o["paid_at"])).total_seconds() - 600) < 1
@@ -21,6 +22,7 @@ def test_a29a_open_store_gives_the_seller_deadline(monkeypatch):
 
 def test_a29a_closed_store_unpaid_or_moved_on_order_has_no_deadline(monkeypatch):
     monkeypatch.setattr(orders, "confirm_window", lambda: timedelta(minutes=10))
+    monkeypatch.setattr(orders, "preorder_window", lambda: timedelta(hours=12))
     closed = order()
     closed["seller_profiles"]["is_open"] = False
     assert orders.confirm_by(closed) is None

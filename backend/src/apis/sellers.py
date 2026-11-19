@@ -9,8 +9,8 @@ from decimal import ROUND_HALF_UP, Decimal
 from apis.complaints import complaints_for_order
 from apis.deliveries import book_allingo, cancel_trip, check_trip_addresses, keep_taken_trip, lalamove_recipient, seller_phone
 from apis.orders import cancel_after
-from core.store_hours import confirm_deadline, is_open_now
-from services.order_expiry import confirm_window
+from core.store_hours import is_open_now
+from services.order_expiry import confirm_window, order_deadline, preorder_window
 
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_admin_payouts import DAOAdminPayouts
@@ -102,21 +102,17 @@ def _get_seller_id(user):
 
 def _with_deadlines(orders: list, seller: dict) -> list:
     """`deadline` shown under the seller's Accept / Ready buttons.
-    pending (paid): when it auto-cancels; None while the store is closed, that clock is paused.
+    pending (paid): when it auto-cancels (order_deadline); None for a same-day order while the store is closed.
     confirmed / delivery_failed: when the buyer may cancel it for a full refund (R4, R6)."""
     now = datetime.now(timezone.utc)
-    hours = seller.get("weekly_hours")
-    window = None
+    windows = None
     get_minutes = functools.cache(DAOAdminConfig().get_minutes)   # each setting read once for the whole list
     for order in orders:
         order["deadline"] = None
-        if (order["status"] == "pending" and order.get("payment_status") == "paid" and order.get("paid_at")
-                and is_open_now(seller.get("is_open"), hours, now, seller.get("id"))):
-            window = window or confirm_window()
-            opened_at = seller.get("opened_at")
-            order["deadline"] = confirm_deadline(datetime.fromisoformat(order["paid_at"]), hours,
-                                                 datetime.fromisoformat(opened_at) if opened_at else None,
-                                                 now, window, seller.get("id")).isoformat()
+        if order["status"] == "pending" and order.get("payment_status") == "paid" and order.get("paid_at"):
+            windows = windows or (confirm_window(), preorder_window())
+            deadline = order_deadline(order, seller, now, *windows)
+            order["deadline"] = deadline.isoformat() if deadline else None
         elif order["status"] in ("confirmed", "delivery_failed") and order.get("status_changed_at"):
             order["deadline"] = cancel_after(order, get_minutes).isoformat()
     return orders
