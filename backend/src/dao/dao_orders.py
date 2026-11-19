@@ -50,12 +50,16 @@ def with_current_trip(order: dict) -> dict:
     return order
 
 
-def _with_preorder_days(order: dict) -> dict:
-    """Pre-order days of a buyer's order (the buyer UI shows "Scheduled" until the cooking day):
-    the largest preorder_day of its dishes, read live from food_items since orders don't store it.
+def preorder_days(order: dict) -> int:
+    """The largest preorder_day of the order's dishes, read live from food_items since orders don't store it.
     A deleted dish (food_items null) doesn't count; 0 = same-day."""
-    order["preorder_days"] = max(((item.get("food_items") or {}).get("preorder_day") or 0
-                                  for item in order.get("order_items") or []), default=0)
+    return max(((item.get("food_items") or {}).get("preorder_day") or 0
+                for item in order.get("order_items") or []), default=0)
+
+
+def _with_preorder_days(order: dict) -> dict:
+    """Pre-order days of a buyer's order (the buyer UI shows "Scheduled" until the cooking day)."""
+    order["preorder_days"] = preorder_days(order)
     return order
 
 
@@ -163,7 +167,7 @@ class DAOOrders(DAOBase):
         except Exception as e:
             raise Exception(f"error read_order_by_id: {e}")
 
-    _SELLER_LIST_SELECT = "id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, created_at, paid_at, status_changed_at, users{join}(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, options_snapshot, quantity), deliveries(status, created_at)"
+    _SELLER_LIST_SELECT = "id, user_id, status, total_amount, delivery_fee, payment_status, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, created_at, paid_at, status_changed_at, users{join}(name, phone, email), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, options_snapshot, quantity, food_items(preorder_day)), deliveries(status, created_at)"
 
     def read_orders_by_seller_id(self, seller_id: str, finished_since: datetime):
         """Running orders of any age + done / cancelled orders created since `finished_since` (UTC)."""
@@ -265,7 +269,7 @@ class DAOOrders(DAOBase):
     def read_order_by_id_for_seller(self, order_id: str, seller_id: str):
         try:
             result = self._supabase_client.table(self._table_name) \
-                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, cancellation_reason, cancellation_note, created_at, paid_at, status_changed_at, users(name, email, phone), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, options_snapshot, quantity), payments(method, type), refund_state") \
+                .select("id, user_id, status, total_amount, delivery_fee, payment_status, transaction_ref, ipn_data, payment_create_date, delivery_method, delivery_address, delivery_appointment, note, receiver_name, receiver_phone, cancellation_reason, cancellation_note, created_at, paid_at, status_changed_at, users(name, email, phone), order_items(id, name_snapshot, price_snapshot, unit_label_snapshot, variant_name_snapshot, options_snapshot, quantity, food_items(preorder_day)), payments(method, type), refund_state") \
                 .eq("id", order_id) \
                 .eq("seller_id", seller_id) \
                 .maybe_single() \
@@ -353,12 +357,12 @@ class DAOOrders(DAOBase):
             raise Exception(f"error update_order_status: {e}")
 
     def read_unconfirmed_paid_orders(self, paid_before: datetime):
-        """Paid orders still waiting for the seller, paid before `paid_before`, with the
-        store hours needed to decide whether they timed out (or are about to)."""
+        """Paid orders still waiting for the seller, paid before `paid_before`, with the store hours
+        and pre-order days needed to decide whether they timed out (or are about to)."""
         try:
             result = self._supabase_client.table(self._table_name) \
                 .select("id, seller_user_id, total_amount, payment_status, transaction_ref, ipn_data, payment_create_date, paid_at, "
-                        "seller_profiles(id, is_open, weekly_hours, opened_at)") \
+                        "delivery_appointment, seller_profiles(id, is_open, weekly_hours, opened_at), order_items(food_items(preorder_day))") \
                 .eq("status", "pending") \
                 .eq("payment_status", "paid") \
                 .lte("paid_at", paid_before.isoformat()) \

@@ -513,7 +513,7 @@
         "status_title_delivery_failed": "Delivery failed - the seller is handling it",
         "status_subtext_awaiting_payment": "Complete your payment to send this order to the seller.",
         "status_subtext_pending": "Your order has been sent. The seller will confirm shortly.",
-        "status_subtext_pending_by": "The seller will confirm by {time}. If not, the order is cancelled and refunded.",
+        "status_subtext_pending_by": "The seller will confirm by {time}.\nIf not, the order is cancelled and refunded.",
         "status_subtext_pending_closed": "The store is closed now. The seller's time to confirm starts when it opens.",
         "status_subtext_confirmed": "The seller is preparing your order.",
         "status_subtext_scheduled": "The seller will start preparing on {date}.",
