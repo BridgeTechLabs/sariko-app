@@ -152,6 +152,14 @@ export default {
                 items: (d?.groups || []).map(g => this.$t(`seller_profile.group_${g}`)).join(', '),
             }
             this.errors = { [d?.code === 'missing_field' ? d.field : field]: this.$t(d?.code === 'missing_field' ? 'join_page.error_required' : key, params) }
+            this.revealError()
+        },
+
+        // Save sits at the bottom, the field in error is often far above it: scroll there and say so (BUGS #43).
+        async revealError() {
+            await this.$nextTick()
+            this.$el.querySelector('.q-field--error, .field-error, .form-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            this.$q.notify({ classes: 'quasar-notify-negative', message: this.$t('seller_profile.check_red'), position: 'bottom', timeout: 2500 })
         },
 
         async onSave() {
@@ -167,6 +175,7 @@ export default {
                 if (this.missing.includes('id_document')) {   // passport saved without its photo
                     if (!this.shown.includes('id_document')) this.shown.push('id_document')
                     this.errors = { id_document: this.$t('join_page.error_id_document') }
+                    this.revealError()
                     return
                 }
                 this.$q.notify({
