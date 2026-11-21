@@ -10,8 +10,6 @@ import ZenPromoFloating from '@/components/home-page/ZenPromoFloating.vue'
 import HomeFooter from '@/components/home-page/HomeFooter.vue'
 import BuyerMissingBanner from '@/components/home-page/BuyerMissingBanner.vue'
 
-const ZEN_AD_VARIANT = import.meta.env.VITE_ZEN_AD_VARIANT || 'banner'
-
 export default {
     name: 'HomePage',
     components: {
@@ -27,11 +25,8 @@ export default {
         BuyerMissingBanner
     },
     computed: {
-        showZenBanner() {
-            return ZEN_AD_VARIANT === 'banner'
-        },
         showZenFloating() {
-            return ZEN_AD_VARIANT === 'floating'
+            return import.meta.env.VITE_ZEN_AD_VARIANT === 'floating'
         }
     }
 }
@@ -48,7 +43,7 @@ export default {
         </template>
 
         <template #ZenPromo>
-            <PromoCarousel :show-zen="showZenBanner" />
+            <PromoCarousel />
         </template>
 
         <template #SearchBar>

@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { categories } from "@/stores/data.js";
 import { apiSellers } from "@/apis/sellers/apiSellers.js";
+import { apiPromoBanners } from "@/apis/promo/apiPromoBanners.js";
 import { foodPriceDisplay, picksOnDetail } from '@/utils/priceDisplay'
 
 export const useHomeStore = defineStore('homeStore', {
@@ -10,6 +11,7 @@ export const useHomeStore = defineStore('homeStore', {
             categories: categories,
             selectedCategory: null,
             featuredDishes: [],
+            promoBanners: null,   // null = loading; [] = none or failed (no carousel)
         }
     },
 
@@ -32,6 +34,14 @@ export const useHomeStore = defineStore('homeStore', {
                 }
             } catch (e) {
                 console.error(`homeStore - fetchFeaturedDishes - ${e}`)
+            }
+        },
+
+        async fetchPromoBanners() {
+            try {
+                this.promoBanners = (await apiPromoBanners.list()).banners || []
+            } catch (e) {
+                this.promoBanners = []
             }
         }
     }

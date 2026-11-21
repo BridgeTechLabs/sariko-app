@@ -1,75 +1,108 @@
 <script>
+import { mapState, mapActions } from 'pinia'
 import { X } from 'lucide-vue-next'
-import ZenPromoBanner from '@/components/home-page/ZenPromoBanner.vue'
+import { useHomeStore } from '@/stores/homeStore'
 
+// Holds the ids of the banners shown when the buyer pressed X: a new list of banners shows the carousel again.
 const DISMISS_KEY = 'sariko.zen_promo_dismissed_version'
-// Bump VITE_ZEN_BANNER_VERSION (and rebuild) to re-show the promos to users who dismissed them.
-const BANNER_VERSION = import.meta.env.VITE_ZEN_BANNER_VERSION || '3'
 
 export default {
     name: 'PromoCarousel',
-    components: { X, ZenPromoBanner },
-    props: {
-        showZen: { type: Boolean, default: false }
-    },
+    components: { X },
     data() {
         return {
-            slide: 'tambayan',
-            dismissed: false
+            slide: null,
+            broken: [],                                     // ids whose image failed to load
+            dismissedIds: localStorage.getItem(DISMISS_KEY)  // null = never dismissed
         }
     },
-    mounted() {
-        this.dismissed = localStorage.getItem(DISMISS_KEY) === BANNER_VERSION
+    computed: {
+        ...mapState(useHomeStore, ['promoBanners']),
+        ids() {
+            return (this.promoBanners || []).map(b => b.id).join(',')
+        },
+        shown() {
+            return (this.promoBanners || []).filter(b => !this.broken.includes(b.id))
+        },
+        // A buyer who dismissed it once gets no placeholder: it would flash and vanish on every visit.
+        loading() {
+            return this.promoBanners === null && this.dismissedIds === null
+        },
+        visible() {
+            return this.shown.length > 0 && this.dismissedIds !== this.ids
+        }
+    },
+    watch: {
+        // immediate: back on the home page the store already holds the list from the last visit
+        promoBanners: {
+            handler(banners) {
+                // Load every image now so a dead one leaves before its turn (and the dots count only the live ones).
+                for (const b of banners || []) {
+                    const img = new Image()
+                    img.onerror = () => this.broken.push(b.id)
+                    img.src = b.image_url
+                }
+            },
+            immediate: true
+        },
+        shown: {
+            handler(list) {
+                if (!list.some(b => b.id === this.slide)) this.slide = list[0]?.id ?? null
+            },
+            immediate: true
+        }
+    },
+    created() {
+        this.fetchPromoBanners()
     },
     methods: {
-        openTambayan() {
-            window.open(import.meta.env.VITE_TAMBAYAN_URL || 'https://tambayan.sariko.store', '_blank', 'noopener,noreferrer')
+        ...mapActions(useHomeStore, ['fetchPromoBanners']),
+        open(banner) {
+            window.open(banner.link_url, '_blank', 'noopener,noreferrer')
         },
         dismiss() {
-            this.dismissed = true
-            localStorage.setItem(DISMISS_KEY, BANNER_VERSION)
+            this.dismissedIds = this.ids
+            localStorage.setItem(DISMISS_KEY, this.ids)
         }
     }
 }
 </script>
 
 <template>
-    <div v-if="!dismissed" class="promo-carousel">
+    <q-skeleton v-if="loading" animation="pulse" class="promo-skeleton" />
+
+    <div v-else-if="visible" class="promo-carousel">
         <q-carousel
             v-model="slide"
             swipeable
             animated
             infinite
-            :autoplay="showZen && 5000"
+            :autoplay="shown.length > 1 && 5000"
             class="carousel"
         >
-            <q-carousel-slide name="tambayan" class="slide">
+            <q-carousel-slide v-for="b in shown" :key="b.id" :name="b.id" class="slide">
                 <img
-                    src="/logo/tambayan/tambayan-banner.webp"
-                    alt="SariKo Tambayan"
+                    :src="b.image_url"
+                    :alt="b.alt"
                     draggable="false"
-                    class="tambayan-banner"
+                    class="promo-banner"
                     role="button"
                     tabindex="0"
-                    @click="openTambayan"
-                    @keydown.enter="openTambayan"
+                    @click="open(b)"
+                    @keydown.enter="open(b)"
                 />
-            </q-carousel-slide>
-
-            <q-carousel-slide v-if="showZen" name="zen" class="slide">
-                <ZenPromoBanner />
             </q-carousel-slide>
         </q-carousel>
 
-        <div v-if="showZen" class="promo-dots">
+        <div v-if="shown.length > 1" class="promo-dots">
             <button
-                v-for="name in ['tambayan', 'zen']"
-                :key="name"
+                v-for="(b, i) in shown"
+                :key="b.id"
                 type="button"
                 class="promo-dot"
-                :class="{ active: slide === name }"
-                :aria-label="name === 'zen' ? 'Zen' : 'SariKo Tambayan'"
-                @click="slide = name"
+                :class="{ active: slide === b.id }"
+                :aria-label="b.alt || String(i + 1)"
+                @click="slide = b.id"
             />
         </div>
 
@@ -89,7 +122,7 @@ export default {
     position: relative;
 }
 
-/* Height follows the Tambayan image (1200 x 236) so its baked-in text is never cropped. */
+/* Every banner is 1200 x 236 (the admin app refuses other shapes), so its baked-in text is never cropped. */
 .carousel {
     height: auto;
     aspect-ratio: 1200 / 236;
@@ -97,11 +130,18 @@ export default {
     background: transparent;
 }
 
+.promo-skeleton {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1200 / 236;
+    border-radius: 16px;
+}
+
 .slide {
     padding: 0;
 }
 
-.tambayan-banner {
+.promo-banner {
     display: block;
     width: 100%;
     height: 100%;
