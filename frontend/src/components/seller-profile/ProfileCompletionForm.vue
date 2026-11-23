@@ -3,6 +3,7 @@ import { mapState, mapActions } from 'pinia'
 import { useProfileCompletionStore } from '@/stores/seller/profileCompletionStore'
 import { BANKS, NATIONALITIES } from '@/stores/join/joinStore'
 import AddressForm from '@/components/account/AddressForm.vue'
+import SectionTitle from '@/components/shared/SectionTitle.vue'
 
 // Backend error code -> [field, i18n key]. Field '' = message above the Save button.
 const ERRORS = {
@@ -31,7 +32,7 @@ const ERRORS = {
 export default {
     name: 'ProfileCompletionForm',
 
-    components: { AddressForm },
+    components: { AddressForm, SectionTitle },
 
     data() {
         return {
@@ -78,6 +79,19 @@ export default {
             // Only the passport photo missing and none picked: Save still runs and says so under the photo field.
             return !this.saving && !this.waitingForAddress
         },
+        // Cards on the page, in order: each is numbered "n/total" when there are several.
+        steps() {
+            const shows = {
+                identity: this.has('identity') || this.has('id_document'), tax: this.has('tax'), bank: this.has('bank'),
+                contact: this.has('phone') || this.has('pickup_address'), agreement: this.has('agreement'),
+            }
+            return Object.keys(shows).filter(k => shows[k])
+        },
+        // YYYYMMDD -> DD/MM/YYYY
+        agreementDate() {
+            const v = String(this.data?.agreement_version_current || '')
+            return `${v.slice(6, 8)}/${v.slice(4, 6)}/${v.slice(0, 4)}`
+        },
         payloadGroups() {
             return this.shown.filter(g => !['pickup_address', 'id_document'].includes(g))
         },
@@ -88,6 +102,20 @@ export default {
 
         has(group) {
             return this.shown.includes(group)
+        },
+
+        stepTitle(key) {
+            const title = this.$t(`seller_profile.group_${key}`)
+            return this.steps.length > 1 ? this.$t('seller_profile.step_title', { n: this.steps.indexOf(key) + 1, total: this.steps.length, title }) : title
+        },
+
+        // Store profile links here with ?section=<group>: open on that card.
+        async scrollToSection() {
+            const q = this.$route.query.section
+            const key = q === 'id_document' ? 'identity' : q
+            if (!this.steps.includes(key)) return
+            await this.$nextTick()
+            this.$el.querySelector(`#step-${key}`)?.scrollIntoView({ behavior: 'instant', block: 'start' })
         },
 
         err(field) {
@@ -197,6 +225,7 @@ export default {
         this.shown = [...this.missing]
         this.nameFix = !this.has('identity') && this.has('bank') && !!this.data?.name_mismatch
         this.initForm()
+        this.scrollToSection()
     },
 }
 </script>
@@ -212,71 +241,81 @@ export default {
             <div v-else class="form-hint">{{ $t('seller_profile.form_hint') }}</div>
 
             <!-- Identity + ID document -->
-            <div v-if="has('identity') || has('id_document')" class="card">
-                <div class="card-title">{{ $t('seller_profile.group_identity') }}</div>
+            <div v-if="steps.includes('identity')" id="step-identity">
+                <SectionTitle>{{ stepTitle('identity') }}</SectionTitle>
+                <div class="card">
                 <template v-if="has('identity')">
                     <div class="card-hint">{{ $t('join_page.about_hint') }}</div>
-                    <q-input v-model="form.full_name" dark outlined dense color="amber" :label="$t('join_page.label_full_name')" :hint="$t('join_page.hint_full_name')" :error="!!err('full_name')" :error-message="err('full_name')" maxlength="300" />
-                    <q-input v-model="form.date_of_birth" dark outlined dense color="amber" stack-label type="date" :label="$t('join_page.label_date_of_birth')" :error="!!err('date_of_birth')" :error-message="err('date_of_birth')" />
-                    <q-select v-model="form.nationality" dark outlined dense color="amber" :options="nationalities" :label="$t('join_page.label_nationality')" :error="!!err('nationality')" :error-message="err('nationality')" />
-                    <q-input v-if="form.nationality === 'Other'" v-model="form.nationality_other" dark outlined dense color="amber" :label="$t('join_page.label_nationality_other')" maxlength="300" />
+                    <q-input v-model="form.full_name" dark outlined dense hide-bottom-space color="amber" :label="$t('join_page.label_full_name')" :hint="$t('join_page.hint_full_name')" :error="!!err('full_name')" :error-message="err('full_name')" maxlength="300" />
+                    <q-input v-model="form.date_of_birth" dark outlined dense hide-bottom-space color="amber" stack-label type="date" :label="$t('join_page.label_date_of_birth')" :error="!!err('date_of_birth')" :error-message="err('date_of_birth')" />
+                    <q-select v-model="form.nationality" dark outlined dense hide-bottom-space color="amber" :options="nationalities" :label="$t('join_page.label_nationality')" :error="!!err('nationality')" :error-message="err('nationality')" />
+                    <q-input v-if="form.nationality === 'Other'" v-model="form.nationality_other" dark outlined dense hide-bottom-space color="amber" :label="$t('join_page.label_nationality_other')" maxlength="300" />
                     <div class="field-label">{{ $t('join_page.label_id_type') }}</div>
                     <q-option-group v-model="form.id_type" :options="idTypes" type="radio" inline dark color="amber" />
-                    <q-input v-model="form.id_number" dark outlined dense color="amber" :label="$t('join_page.label_id_number')" :hint="prefill.id_number_masked ? $t('seller_profile.hint_keep_number', { masked: prefill.id_number_masked }) : ''" :error="!!err('id_number')" :error-message="err('id_number')" maxlength="300" />
-                    <q-input v-model="form.id_expiry_date" dark outlined dense color="amber" stack-label type="date" :label="$t('seller_profile.label_id_expiry')" :hint="form.id_type === 'passport' ? $t('seller_profile.hint_passport_validity', { months: limits.min_id_validity_months }) : ''" :error="!!err('id_expiry_date')" :error-message="err('id_expiry_date')" />
-                    <q-input v-model="form.residential_address" dark outlined dense color="amber" :label="$t('join_page.label_residential_address')" :hint="$t('join_page.hint_residential_address')" :error="!!err('residential_address')" :error-message="err('residential_address')" maxlength="300" />
-                    <q-input v-model="form.email" dark outlined dense color="amber" type="email" :label="$t('join_page.label_email')" :hint="$t('join_page.hint_optional')" :error="!!err('email')" :error-message="err('email')" maxlength="300" />
+                    <q-input v-model="form.id_number" dark outlined dense hide-bottom-space color="amber" :label="$t('join_page.label_id_number')" :hint="prefill.id_number_masked ? $t('seller_profile.hint_keep_number', { masked: prefill.id_number_masked }) : undefined" :error="!!err('id_number')" :error-message="err('id_number')" maxlength="300" />
+                    <q-input v-model="form.id_expiry_date" dark outlined dense hide-bottom-space color="amber" stack-label type="date" :label="$t('seller_profile.label_id_expiry')" :hint="form.id_type === 'passport' ? $t('seller_profile.hint_passport_validity', { months: limits.min_id_validity_months }) : undefined" :error="!!err('id_expiry_date')" :error-message="err('id_expiry_date')" />
+                    <q-input v-model="form.residential_address" dark outlined dense hide-bottom-space color="amber" :label="$t('join_page.label_residential_address')" :hint="$t('join_page.hint_residential_address')" :error="!!err('residential_address')" :error-message="err('residential_address')" maxlength="300" />
+                    <q-input v-model="form.email" dark outlined dense hide-bottom-space color="amber" type="email" :label="$t('join_page.label_email')" :hint="$t('join_page.hint_optional')" :error="!!err('email')" :error-message="err('email')" maxlength="300" />
                     <div v-if="form.id_type === 'cccd'" class="card-hint">{{ $t('seller_profile.hint_no_cccd_photo') }}</div>
                 </template>
                 <template v-if="needsPassportPhoto">
                     <div class="field-label">{{ $t('seller_profile.label_passport_photo') }}</div>
                     <!-- Not a q-file hint: Quasar positions hints absolutely, a 3-line one spills out of the card -->
                     <div class="card-hint">{{ $t('join_page.documents_hint', { mb: limits.max_file_mb }) }}</div>
-                    <q-file v-model="idFile" dark outlined dense color="amber" accept="image/jpeg,image/png,application/pdf" :label="$t('join_page.documents_add')" :error="!!err('id_document')" :error-message="err('id_document')" />
+                    <q-file v-model="idFile" dark outlined dense hide-bottom-space color="amber" accept="image/jpeg,image/png,application/pdf" :label="$t('join_page.documents_add')" :error="!!err('id_document')" :error-message="err('id_document')" />
                 </template>
+                </div>
             </div>
 
             <!-- Tax -->
-            <div v-if="has('tax')" class="card">
-                <div class="card-title">{{ $t('seller_profile.group_tax') }}</div>
+            <div v-if="steps.includes('tax')" id="step-tax">
+                <SectionTitle>{{ stepTitle('tax') }}</SectionTitle>
+                <div class="card">
                 <div class="field-label">{{ $t('join_page.label_tax_resident') }}</div>
                 <q-option-group v-model="form.tax_resident" :options="residentOptions" type="radio" inline dark color="amber" />
                 <div v-if="err('tax_resident')" class="field-error">{{ err('tax_resident') }}</div>
-                <q-input v-model="form.tax_code" dark outlined dense color="amber" :label="$t('join_page.label_tax_code')" :hint="$t('join_page.hint_optional')" maxlength="300" />
+                <q-input v-model="form.tax_code" dark outlined dense hide-bottom-space color="amber" :label="$t('join_page.label_tax_code')" :hint="$t('join_page.hint_optional')" maxlength="300" />
+                </div>
             </div>
 
             <!-- Bank -->
-            <div v-if="has('bank')" class="card">
-                <div class="card-title">{{ $t('seller_profile.group_bank') }}</div>
+            <div v-if="steps.includes('bank')" id="step-bank">
+                <SectionTitle>{{ stepTitle('bank') }}</SectionTitle>
+                <div class="card">
                 <div class="card-hint">{{ $t('join_page.payout_hint') }}</div>
-                <q-input v-if="nameFix" v-model="form.full_name" dark outlined dense color="amber" :label="$t('join_page.label_full_name')" :hint="$t('join_page.hint_full_name')" :error="!!err('full_name')" :error-message="err('full_name')" maxlength="300" />
-                <q-select v-model="form.bank_name" dark outlined dense color="amber" :options="banks" :label="$t('join_page.label_bank_name')" :error="!!err('bank_name')" :error-message="err('bank_name')" />
-                <q-input v-if="form.bank_name === 'Other'" v-model="form.bank_name_other" dark outlined dense color="amber" :label="$t('join_page.label_bank_name_other')" maxlength="300" />
-                <q-input v-model="form.bank_account_number" dark outlined dense color="amber" inputmode="numeric" :label="$t('join_page.label_bank_account_number')" :hint="prefill.bank_account_number_masked ? $t('seller_profile.hint_keep_number', { masked: prefill.bank_account_number_masked }) : ''" :error="!!err('bank_account_number')" :error-message="err('bank_account_number')" maxlength="30" />
-                <q-input v-model="form.bank_account_holder" dark outlined dense color="amber" :label="$t('join_page.label_bank_account_holder')" :hint="$t('join_page.hint_bank_account_holder')" :error="!!err('bank_account_holder')" :error-message="err('bank_account_holder')" maxlength="300" />
+                <q-input v-if="nameFix" v-model="form.full_name" dark outlined dense hide-bottom-space color="amber" :label="$t('join_page.label_full_name')" :hint="$t('join_page.hint_full_name')" :error="!!err('full_name')" :error-message="err('full_name')" maxlength="300" />
+                <q-select v-model="form.bank_name" dark outlined dense hide-bottom-space color="amber" :options="banks" :label="$t('join_page.label_bank_name')" :error="!!err('bank_name')" :error-message="err('bank_name')" />
+                <q-input v-if="form.bank_name === 'Other'" v-model="form.bank_name_other" dark outlined dense hide-bottom-space color="amber" :label="$t('join_page.label_bank_name_other')" maxlength="300" />
+                <q-input v-model="form.bank_account_number" dark outlined dense hide-bottom-space color="amber" inputmode="numeric" :label="$t('join_page.label_bank_account_number')" :hint="prefill.bank_account_number_masked ? $t('seller_profile.hint_keep_number', { masked: prefill.bank_account_number_masked }) : undefined" :error="!!err('bank_account_number')" :error-message="err('bank_account_number')" maxlength="30" />
+                <q-input v-model="form.bank_account_holder" dark outlined dense hide-bottom-space color="amber" :label="$t('join_page.label_bank_account_holder')" :hint="$t('join_page.hint_bank_account_holder')" :error="!!err('bank_account_holder')" :error-message="err('bank_account_holder')" maxlength="300" />
+                </div>
             </div>
 
             <!-- Contact + pickup address -->
-            <div v-if="has('phone') || has('pickup_address')" class="card">
-                <div class="card-title">{{ $t('seller_profile.group_contact') }}</div>
-                <q-input v-if="has('phone')" v-model="form.phone" dark outlined dense color="amber" type="tel" :label="$t('join_page.label_phone')" :hint="$t('join_page.hint_phone')" :error="!!err('phone')" :error-message="err('phone')" maxlength="30" />
+            <div v-if="steps.includes('contact')" id="step-contact">
+                <SectionTitle>{{ stepTitle('contact') }}</SectionTitle>
+                <div class="card">
+                <q-input v-if="has('phone')" v-model="form.phone" dark outlined dense hide-bottom-space color="amber" type="tel" :label="$t('join_page.label_phone')" :hint="$t('join_page.hint_phone')" :error="!!err('phone')" :error-message="err('phone')" maxlength="30" />
                 <template v-if="has('pickup_address')">
                     <div class="field-label">{{ $t('join_page.label_pickup_address') }}</div>
                     <div class="card-hint">{{ $t('join_page.hint_pickup_address') }}</div>
                     <div v-if="!waitingForAddress" class="saved-note">✔️ {{ $t('seller_profile.address_saved') }}</div>
                     <AddressForm embedded @saved="fetch" />
                 </template>
+                </div>
             </div>
 
             <!-- Agreement -->
-            <div v-if="has('agreement')" class="card">
-                <div class="card-title">{{ $t('seller_profile.group_agreement') }}</div>
+            <div v-if="steps.includes('agreement')" id="step-agreement">
+                <SectionTitle>{{ stepTitle('agreement') }}</SectionTitle>
+                <div class="card">
                 <a href="/docs/sariko_seller_agreement.html" target="_blank" class="doc-link">{{ $t('join_page.agreement_open') }}</a>
-                <q-checkbox v-model="form.agree_accurate" dark color="amber" :label="$t('join_page.agree_accurate')" />
-                <q-checkbox v-model="form.agree_data" dark color="amber" :label="$t('join_page.agree_data')" />
-                <q-checkbox v-model="form.agree_agreement" dark color="amber" :label="$t('join_page.agree_agreement', { version: data.agreement_version_current })" />
+                <q-checkbox v-model="form.agree_accurate" class="agree" dark color="amber" :label="$t('join_page.agree_accurate')" />
+                <q-checkbox v-model="form.agree_data" class="agree" dark color="amber" :label="$t('join_page.agree_data')" />
+                <q-checkbox v-model="form.agree_agreement" class="agree" dark color="amber" :label="$t('join_page.agree_agreement', { version: agreementDate })" />
                 <div v-if="err('agreed')" class="field-error">{{ err('agreed') }}</div>
-                <q-input v-model="form.signature_name" dark outlined dense color="amber" :label="$t('join_page.label_signature')" :hint="fullName ? $t('join_page.hint_signature', { name: fullName }) : ''" :error="!!err('signature_name')" :error-message="err('signature_name')" maxlength="300" />
+                <q-input v-model="form.signature_name" dark outlined dense hide-bottom-space color="amber" :label="$t('join_page.label_signature')" :hint="fullName ? $t('join_page.hint_signature', { name: fullName }) : undefined" :error="!!err('signature_name')" :error-message="err('signature_name')" maxlength="300" />
+                </div>
             </div>
 
             <template v-if="shown.length">
@@ -308,17 +347,20 @@ export default {
     padding: 14px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 12px;
 }
 
-.card-title::first-letter {
-    text-transform: uppercase;
+[id^="step-"] {
+    scroll-margin-top: 12px;
 }
 
-.card-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text-primary);
+.agree {
+    min-height: 44px;
+}
+
+.agree :deep(.q-checkbox__label) {
+    font-size: 14px;
+    line-height: 1.4;
 }
 
 .card-hint {

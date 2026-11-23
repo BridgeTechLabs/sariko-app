@@ -1348,6 +1348,7 @@
         "banner_missing": "Still missing: {items}",
         "banner_action": "Complete now",
         "banner_toggle": "Show or hide",
+        "step_title": "{n}/{total} · {title}",
         "group_identity": "ID details",
         "group_id_document": "passport photo",
         "group_tax": "Tax",

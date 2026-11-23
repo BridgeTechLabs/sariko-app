@@ -1351,6 +1351,7 @@
         "banner_missing": "Còn thiếu: {items}",
         "banner_action": "Hoàn thiện ngay",
         "banner_toggle": "Hiện hoặc ẩn",
+        "step_title": "{n}/{total} · {title}",
         "group_identity": "thông tin giấy tờ",
         "group_id_document": "ảnh hộ chiếu",
         "group_tax": "thuế",
