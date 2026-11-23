@@ -158,6 +158,22 @@ def appointment_error(cart_items: list, appointment, now: datetime):
     return None
 
 
+# How far ahead of the server clock a buyer's phone may be when it notes the tap on a post link: clock drift, not a business rule
+REF_CLOCK_SKEW_MS = 5 * 60 * 1000
+
+
+def order_ref(request, seller_info: dict, now: datetime) -> dict:
+    """{ref_code, ref_source} when the buyer opened an AI Studio post of this store within attribution_window_days,
+    else {} (docs/dev/20261123-studio-integration QĐ-1). Never an error: a ref that does not fit is dropped."""
+    if not request.ref_code or request.ref_at is None or request.ref_slug != seller_info["slug"]:
+        return {}
+    age_ms = now.timestamp() * 1000 - request.ref_at
+    days = DAOAdminConfig().get_positive_int("attribution_window_days", 7)
+    if not -REF_CLOCK_SKEW_MS <= age_ms <= days * 86_400_000:
+        return {}
+    return {"ref_code": request.ref_code, "ref_source": request.ref_source}
+
+
 @router.post("")
 def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token)):
 
@@ -299,6 +315,7 @@ def create_order(request: Schema.RequestCreateOrder, user=Depends(verify_token))
         quotation_id=quotation_id,
         delivery_appointment=appointment,
         **receiver,
+        **order_ref(request, seller_info, datetime.now(timezone.utc)),
     )
 
     if not order:
