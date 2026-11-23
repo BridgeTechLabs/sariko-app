@@ -79,11 +79,17 @@ def test_users_info_me_db_error_is_500(api, monkeypatch):
 @pytest.mark.parametrize("profile,prefix", [(SELLER, "avatar-sellers/s1/"), (None, "avatar-buyers/u1/")])
 def test_users_avatar_path_by_role(api, monkeypatch, profiles, profile, prefix):
     profiles.profile = profile
-    seen = []
+    seen, now = [], [1700000000.5]
+    monkeypatch.setattr(users.time, "time", lambda: now[0])
     monkeypatch.setattr(users, "upload_image_base64", lambda path, data: seen.append(path) or f"https://cdn/{path}")
-    r = api(users.router).post("/users/me/avatar", json={"image_base64": "aGk="})
-    assert r.status_code == 200 and seen == [prefix + "avatar.jpg"]
-    assert set(r.json()) == {"success", "avatar_url"} and r.json()["avatar_url"].startswith(f"https://cdn/{prefix}avatar.jpg?v=")
+    c = api(users.router)
+    r = c.post("/users/me/avatar", json={"image_base64": "aGk="})
+    assert r.status_code == 200 and seen == [prefix + "avatar-1700000000.jpg"]
+    # Versioned path, no ?v: the file is cached for a year
+    assert r.json() == {"success": True, "avatar_url": f"https://cdn/{prefix}avatar-1700000000.jpg"}
+    now[0] += 1
+    c.post("/users/me/avatar", json={"image_base64": "aGk="})
+    assert seen[1] == prefix + "avatar-1700000001.jpg"
 
 
 def test_users_avatar_without_image_is_422(api):
