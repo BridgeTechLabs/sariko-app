@@ -11,7 +11,8 @@ export const useHomeStore = defineStore('homeStore', {
             categories: categories,
             selectedCategory: null,
             featuredDishes: [],
-            promoBanners: null,   // null = loading; [] = none or failed (no carousel)
+            promoBanners: null,   // top of the page; null = loading; [] = none or failed (no carousel)
+            footerBanners: null,  // just above the footer, same rules
         }
     },
 
@@ -39,9 +40,12 @@ export const useHomeStore = defineStore('homeStore', {
 
         async fetchPromoBanners() {
             try {
-                this.promoBanners = (await apiPromoBanners.list()).banners || []
+                const res = await apiPromoBanners.list()
+                this.promoBanners = res.banners || []
+                this.footerBanners = res.footer_banners || []
             } catch (e) {
                 this.promoBanners = []
+                this.footerBanners = []
             }
         }
     }

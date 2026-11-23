@@ -3,30 +3,36 @@ import { mapState, mapActions } from 'pinia'
 import { X } from 'lucide-vue-next'
 import { useHomeStore } from '@/stores/homeStore'
 
-// Holds the ids of the banners shown when the buyer pressed X: a new list of banners shows the carousel again.
-const DISMISS_KEY = 'sariko.zen_promo_dismissed_version'
+// Per placement, the ids of the banners shown when the buyer pressed X: a new list shows the carousel again.
+const DISMISS_KEYS = { top: 'sariko.zen_promo_dismissed_version', footer: 'sariko.footer_promo_dismissed_version' }
 
 export default {
     name: 'PromoCarousel',
     components: { X },
+    props: {
+        placement: { type: String, default: 'top' }   // 'top' | 'footer' (just above the home footer)
+    },
     data() {
         return {
             slide: null,
-            broken: [],                                     // ids whose image failed to load
-            dismissedIds: localStorage.getItem(DISMISS_KEY)  // null = never dismissed
+            broken: [],                                                      // ids whose image failed to load
+            dismissedIds: localStorage.getItem(DISMISS_KEYS[this.placement])  // null = never dismissed
         }
     },
     computed: {
-        ...mapState(useHomeStore, ['promoBanners']),
+        ...mapState(useHomeStore, ['promoBanners', 'footerBanners']),
+        banners() {
+            return this.placement === 'footer' ? this.footerBanners : this.promoBanners
+        },
         ids() {
-            return (this.promoBanners || []).map(b => b.id).join(',')
+            return (this.banners || []).map(b => b.id).join(',')
         },
         shown() {
-            return (this.promoBanners || []).filter(b => !this.broken.includes(b.id))
+            return (this.banners || []).filter(b => !this.broken.includes(b.id))
         },
         // A buyer who dismissed it once gets no placeholder: it would flash and vanish on every visit.
         loading() {
-            return this.promoBanners === null && this.dismissedIds === null
+            return this.banners === null && this.dismissedIds === null
         },
         visible() {
             return this.shown.length > 0 && this.dismissedIds !== this.ids
@@ -34,7 +40,7 @@ export default {
     },
     watch: {
         // immediate: back on the home page the store already holds the list from the last visit
-        promoBanners: {
+        banners: {
             handler(banners) {
                 // Load every image now so a dead one leaves before its turn (and the dots count only the live ones).
                 for (const b of banners || []) {
@@ -53,7 +59,7 @@ export default {
         }
     },
     created() {
-        this.fetchPromoBanners()
+        if (this.placement === 'top') this.fetchPromoBanners()   // one request fills both placements
     },
     methods: {
         ...mapActions(useHomeStore, ['fetchPromoBanners']),
@@ -62,16 +68,16 @@ export default {
         },
         dismiss() {
             this.dismissedIds = this.ids
-            localStorage.setItem(DISMISS_KEY, this.ids)
+            localStorage.setItem(DISMISS_KEYS[this.placement], this.ids)
         }
     }
 }
 </script>
 
 <template>
-    <q-skeleton v-if="loading" animation="pulse" class="promo-skeleton" />
+    <q-skeleton v-if="loading" animation="pulse" class="promo-skeleton" :class="placement" />
 
-    <div v-else-if="visible" class="promo-carousel">
+    <div v-else-if="visible" class="promo-carousel" :class="placement">
         <q-carousel
             v-model="slide"
             swipeable
@@ -120,6 +126,10 @@ export default {
 <style lang="scss" scoped>
 .promo-carousel {
     position: relative;
+}
+
+.footer {
+    margin-bottom: 16px;
 }
 
 /* Every banner is 1200 x 236 (the admin app refuses other shapes), so its baked-in text is never cropped. */
