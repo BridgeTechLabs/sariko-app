@@ -8,6 +8,7 @@ from clients.supabase import get_supabase_client
 BUCKET = "sariko-public"
 MAX_SIDE = 1600
 JPEG_QUALITY = 70
+ONE_YEAR = "31536000"  # cache-control seconds, only for paths that are never overwritten
 
 
 def compress_to_jpeg(content: bytes) -> bytes:
@@ -62,7 +63,8 @@ def upload_image_base64(path: str, image_base64: str) -> str:
 
     content = compress_to_jpeg(base64.b64decode(image_base64))
     client = get_supabase_client()
+    # Callers pass a new path per upload (timestamped), so browsers / CDN may keep it a year.
     client.storage.from_(BUCKET).upload(
-        path, content, {"content-type": "image/jpeg", "upsert": "true"}
+        path, content, {"content-type": "image/jpeg", "upsert": "true", "cache-control": ONE_YEAR}
     )
     return client.storage.from_(BUCKET).get_public_url(path).rstrip("?")
