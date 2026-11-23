@@ -1,75 +1,114 @@
 <script>
+import { mapState, mapActions } from 'pinia'
 import { X } from 'lucide-vue-next'
-import ZenPromoBanner from '@/components/home-page/ZenPromoBanner.vue'
+import { useHomeStore } from '@/stores/homeStore'
 
-const DISMISS_KEY = 'sariko.zen_promo_dismissed_version'
-// Bump VITE_ZEN_BANNER_VERSION (and rebuild) to re-show the promos to users who dismissed them.
-const BANNER_VERSION = import.meta.env.VITE_ZEN_BANNER_VERSION || '2'
+// Per placement, the ids of the banners shown when the buyer pressed X: a new list shows the carousel again.
+const DISMISS_KEYS = { top: 'sariko.zen_promo_dismissed_version', footer: 'sariko.footer_promo_dismissed_version' }
 
 export default {
     name: 'PromoCarousel',
-    components: { X, ZenPromoBanner },
+    components: { X },
     props: {
-        showZen: { type: Boolean, default: false }
+        placement: { type: String, default: 'top' }   // 'top' | 'footer' (just above the home footer)
     },
     data() {
         return {
-            slide: this.showZen ? 'zen' : 'pangea',
-            dismissed: false
+            slide: null,
+            broken: [],                                                      // ids whose image failed to load
+            dismissedIds: localStorage.getItem(DISMISS_KEYS[this.placement])  // null = never dismissed
         }
     },
-    mounted() {
-        this.dismissed = localStorage.getItem(DISMISS_KEY) === BANNER_VERSION
+    computed: {
+        ...mapState(useHomeStore, ['promoBanners', 'footerBanners']),
+        banners() {
+            return this.placement === 'footer' ? this.footerBanners : this.promoBanners
+        },
+        ids() {
+            return (this.banners || []).map(b => b.id).join(',')
+        },
+        shown() {
+            return (this.banners || []).filter(b => !this.broken.includes(b.id))
+        },
+        // A buyer who dismissed it once gets no placeholder: it would flash and vanish on every visit.
+        loading() {
+            return this.banners === null && this.dismissedIds === null
+        },
+        visible() {
+            return this.shown.length > 0 && this.dismissedIds !== this.ids
+        }
+    },
+    watch: {
+        // immediate: back on the home page the store already holds the list from the last visit
+        banners: {
+            handler(banners) {
+                // Load every image now so a dead one leaves before its turn (and the dots count only the live ones).
+                for (const b of banners || []) {
+                    const img = new Image()
+                    img.onerror = () => this.broken.push(b.id)
+                    img.src = b.image_url
+                }
+            },
+            immediate: true
+        },
+        shown: {
+            handler(list) {
+                if (!list.some(b => b.id === this.slide)) this.slide = list[0]?.id ?? null
+            },
+            immediate: true
+        }
+    },
+    created() {
+        if (this.placement === 'top') this.fetchPromoBanners()   // one request fills both placements
     },
     methods: {
-        openPangea() {
-            window.open(import.meta.env.VITE_PANGEA_URL || 'https://game.pangea.town', '_blank', 'noopener,noreferrer')
+        ...mapActions(useHomeStore, ['fetchPromoBanners']),
+        open(banner) {
+            window.open(banner.link_url, '_blank', 'noopener,noreferrer')
         },
         dismiss() {
-            this.dismissed = true
-            localStorage.setItem(DISMISS_KEY, BANNER_VERSION)
+            this.dismissedIds = this.ids
+            localStorage.setItem(DISMISS_KEYS[this.placement], this.ids)
         }
     }
 }
 </script>
 
 <template>
-    <div v-if="!dismissed" class="promo-carousel">
+    <q-skeleton v-if="loading" animation="pulse" class="promo-skeleton" :class="placement" />
+
+    <div v-else-if="visible" class="promo-carousel" :class="placement">
         <q-carousel
             v-model="slide"
             swipeable
             animated
             infinite
-            :autoplay="showZen && 5000"
+            :autoplay="shown.length > 1 && 5000"
             class="carousel"
         >
-            <q-carousel-slide v-if="showZen" name="zen" class="slide">
-                <ZenPromoBanner />
-            </q-carousel-slide>
-
-            <q-carousel-slide name="pangea" class="slide">
+            <q-carousel-slide v-for="b in shown" :key="b.id" :name="b.id" class="slide">
                 <img
-                    src="/logo/pangea/pangea-town-banner.webp"
-                    alt="PangeaTown"
+                    :src="b.image_url"
+                    :alt="b.alt"
                     draggable="false"
-                    class="pangea-banner"
+                    class="promo-banner"
                     role="button"
                     tabindex="0"
-                    @click="openPangea"
-                    @keydown.enter="openPangea"
+                    @click="open(b)"
+                    @keydown.enter="open(b)"
                 />
             </q-carousel-slide>
         </q-carousel>
 
-        <div v-if="showZen" class="promo-dots">
+        <div v-if="shown.length > 1" class="promo-dots">
             <button
-                v-for="name in ['zen', 'pangea']"
-                :key="name"
+                v-for="(b, i) in shown"
+                :key="b.id"
                 type="button"
                 class="promo-dot"
-                :class="{ active: slide === name }"
-                :aria-label="name === 'zen' ? 'Zen' : 'PangeaTown'"
-                @click="slide = name"
+                :class="{ active: slide === b.id }"
+                :aria-label="b.alt || String(i + 1)"
+                @click="slide = b.id"
             />
         </div>
 
@@ -89,19 +128,30 @@ export default {
     position: relative;
 }
 
-/* Height follows the PangeaTown image (2904 x 570) so its baked-in text is never cropped. */
+.footer {
+    margin-bottom: 16px;
+}
+
+/* Every banner is 1200 x 236 (the admin app refuses other shapes), so its baked-in text is never cropped. */
 .carousel {
     height: auto;
-    aspect-ratio: 2904 / 570;
+    aspect-ratio: 1200 / 236;
     border-radius: 16px;
     background: transparent;
+}
+
+.promo-skeleton {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1200 / 236;
+    border-radius: 16px;
 }
 
 .slide {
     padding: 0;
 }
 
-.pangea-banner {
+.promo-banner {
     display: block;
     width: 100%;
     height: 100%;
