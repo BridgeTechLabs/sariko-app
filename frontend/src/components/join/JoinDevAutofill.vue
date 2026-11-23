@@ -70,7 +70,7 @@ export default {
                     id_expiry_date: `${now.getFullYear() + 5}-01-01`,
                     email: `test+${now.getTime()}@example.com`, phone: '0901234567',
                     residential_address: '12 Nguyen Hue, Ben Nghe, District 1, Ho Chi Minh City',
-                    tax_code: '', tax_resident: 'yes',
+                    tax_code: '0316970660', tax_resident: 'yes',
                     tier: s.tiers.some(t => t.id === 'tindahan') ? 'tindahan' : s.tiers[0].id,
                     founding_invited: false,
                     store_name: `TEST autofill ${hhmm}`,

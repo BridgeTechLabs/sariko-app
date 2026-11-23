@@ -127,13 +127,10 @@ def upload_avatar(body: Schema.RequestUploadImage, user=Depends(verify_token)):
     try:
         user_id = user["id"]
         seller_profile = DAOSellerProfiles().read_seller_profile_by_user_id(user_id)
-        if seller_profile:
-            path = f"avatar-sellers/{seller_profile['id']}/avatar.jpg"
-        else:
-            path = f"avatar-buyers/{user_id}/avatar.jpg"
-        url = upload_image_base64(path, body.image_base64)
-        # Fixed filename → cache-buster so the new avatar isn't served stale
-        return {"success": True, "avatar_url": f"{url}?v={int(time.time())}"}
+        # New path per upload: it is cached for a year, so a fixed name + ?v could keep showing the old photo
+        folder = f"avatar-sellers/{seller_profile['id']}" if seller_profile else f"avatar-buyers/{user_id}"
+        url = upload_image_base64(f"{folder}/avatar-{int(time.time())}.jpg", body.image_base64)
+        return {"success": True, "avatar_url": url}
     except Exception as e:
         logger.exception(f"Exception in POST /users/me/avatar: {repr(e)}")
         raise HTTPException(

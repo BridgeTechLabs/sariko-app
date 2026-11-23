@@ -14,6 +14,7 @@ const ERRORS = {
     id_expiring: ['id_expiry_date', 'seller_profile.error_id_expiring'],
     invalid_email: ['email', 'join_page.error_email'],
     invalid_bank_account: ['bank_account_number', 'join_page.error_account_number'],
+    invalid_tax_code: ['tax_code', 'join_page.error_tax_code'],
     bank_holder_mismatch: ['bank_account_holder', 'seller_profile.error_bank_holder'],
     invalid_phone: ['phone', 'join_page.error_phone'],
     agreement_required: ['agreed', 'seller_profile.error_agree'],
@@ -242,7 +243,7 @@ export default {
                 <div class="field-label">{{ $t('join_page.label_tax_resident') }}</div>
                 <q-option-group v-model="form.tax_resident" :options="residentOptions" type="radio" inline dark color="amber" />
                 <div v-if="err('tax_resident')" class="field-error">{{ err('tax_resident') }}</div>
-                <q-input v-model="form.tax_code" dark outlined dense color="amber" :label="$t('join_page.label_tax_code')" :hint="$t('join_page.hint_optional')" maxlength="300" />
+                <q-input v-model="form.tax_code" dark outlined dense color="amber" :label="$t('join_page.label_tax_code')" :hint="$t('join_page.hint_tax_code')" :error="!!err('tax_code')" :error-message="err('tax_code')" maxlength="14" />
             </div>
 
             <!-- Bank -->
