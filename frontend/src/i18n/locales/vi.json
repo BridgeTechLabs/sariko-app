@@ -220,13 +220,6 @@
             "title": "Món nổi bật",
             "button_label_view_store": "Xem cửa hàng"
         },
-        "section_zen_promo": {
-            "title": "Massage tận nơi",
-            "subtitle": "Chuyên viên đã chứng nhận — phục vụ tại nhà, văn phòng, khách sạn",
-            "pill_title": "Massage tại nhà",
-            "pill_cta": "Đặt ngay →",
-            "dismiss_aria": "Đóng quảng cáo Zen"
-        },
         "section_promo": {
             "dismiss_aria": "Đóng quảng cáo"
         },

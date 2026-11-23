@@ -220,13 +220,6 @@
             "title": "Featured Dishes",
             "button_label_view_store": "View store"
         },
-        "section_zen_promo": {
-            "title": "Massage at your doorstep",
-            "subtitle": "Certified therapists, delivered to home, office or hotel",
-            "pill_title": "Massage at home",
-            "pill_cta": "Book now →",
-            "dismiss_aria": "Dismiss Zen promotion"
-        },
         "section_promo": {
             "dismiss_aria": "Dismiss promotions"
         },
