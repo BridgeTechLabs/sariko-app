@@ -73,6 +73,8 @@ backend only through the Admin Gateway endpoints (`X-Api-Key`).
   first; PROD has objects made by hand that DEV lacks.
 - i18n (`frontend/src/i18n/locales/{en-PH,vi}.json`): a raw `@`, `{`, `}` or `|` breaks vue-i18n at
   runtime; write `{'@'}`, `{'{'}`, `{'}'}`, `{'|'}`. `npm run check:i18n` compiles every message.
+  Titles / columns / labels are short noun phrases (G16): their key names end in `title` / `heading` / `label` or start
+  with `col_`, so `scripts/check-titles.mjs` (in `npm run build`) sees them; old offenders sit in `title-check-allow.json`.
 - V2 frontend belongs to another developer. Don't edit `frontend/src/**/v2/**`, `utils/theme.js`,
   `stores/theme/`, `plugins/theme.js`, `assets/main.css`, `assets/tokens.css`. Fix V1 in V1 files;
   V1 colours are in `assets/v1-legacy.css`.
