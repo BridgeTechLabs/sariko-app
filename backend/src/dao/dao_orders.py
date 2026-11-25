@@ -81,7 +81,8 @@ class DAOOrders(DAOBase):
         delivery_lat: Optional[float] = None, delivery_lon: Optional[float] = None,
         delivery_fee: Optional[int] = None, quotation_id: Optional[str] = None,
         delivery_appointment=None, receiver_name: Optional[str] = None,
-        receiver_phone: Optional[str] = None, delivery_note: Optional[str] = None
+        receiver_phone: Optional[str] = None, delivery_note: Optional[str] = None,
+        ref_code: Optional[str] = None, ref_source: Optional[str] = None
     ):
         try:
             data = {
@@ -115,6 +116,9 @@ class DAOOrders(DAOBase):
                 data["quotation_id"] = quotation_id
             if delivery_appointment is not None:
                 data["delivery_appointment"] = delivery_appointment.isoformat() if hasattr(delivery_appointment, "isoformat") else delivery_appointment
+            if ref_code is not None:   # only then: an order without a ref inserts exactly as before the columns existed (KT #2)
+                data["ref_code"] = ref_code
+                data["ref_source"] = ref_source
 
             result = self._supabase_client.table(self._table_name) \
                 .insert(data) \
@@ -208,6 +212,25 @@ class DAOOrders(DAOBase):
             raise Exception(f"Supabase error - read_done_orders_for_earnings: {e}")
         except Exception as e:
             raise Exception(f"error read_done_orders_for_earnings: {e}")
+
+    def read_ref_orders(self, seller_id: str, created_since: datetime):
+        """ref_code, ref_source, subtotal of the store's orders from an AI Studio post that count for it: paid and not
+        cancelled (a refund leaves payment_status 'paid'), created since `created_since` (studio-integration QĐ-2)."""
+        # ponytail: no paging, PostgREST caps at 1,000 rows; page when a store passes that in `days`
+        try:
+            result = self._supabase_client.table(self._table_name) \
+                .select("ref_code, ref_source, subtotal") \
+                .eq("seller_id", seller_id) \
+                .not_.is_("ref_code", "null") \
+                .eq("payment_status", "paid") \
+                .neq("status", "cancelled") \
+                .gte("created_at", created_since.isoformat()) \
+                .execute()
+            return result.data or []
+        except PostgrestExceptionAPIError as e:
+            raise Exception(f"Supabase error - read_ref_orders: {e}")
+        except Exception as e:
+            raise Exception(f"error read_ref_orders: {e}")
 
     def search_orders_for_seller(self, seller_id: str, code: Optional[str], name: Optional[str], limit: int):
         """Seller order search, any age. `code`: lowercase hex prefix of the order id;

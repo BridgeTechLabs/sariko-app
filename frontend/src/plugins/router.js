@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth/authStore'
 import { apiLaunch } from '@/apis/launch/apiLaunch'
+import { saveStudioRef } from '@/utils/studioRef'
 
 let _bootstrapped = false
 
@@ -343,6 +344,8 @@ export const router = createRouter({
 
 router.beforeEach(async (to) => {
     const authStore = useAuthStore()
+
+    if (to.name === 'seller') saveStudioRef(to.params.slugName, to.query)
 
     if (!_bootstrapped) {
         await authStore.bootstrap()

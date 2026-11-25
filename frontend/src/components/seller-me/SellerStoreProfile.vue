@@ -226,7 +226,7 @@ export default {
                     <SectionTitle class="gap">{{ $t(s.title) }}</SectionTitle>
                     <div class="card">
                         <template v-for="r in s.rows" :key="r.group">
-                            <router-link v-if="r.missing" to="/seller/me/profile/legal" class="row row--tap">
+                            <router-link v-if="r.missing" :to="{ path: '/seller/me/profile/legal', query: { section: r.group } }" class="row row--tap">
                                 <span class="main label">{{ r.label }}</span>
                                 <span class="missing"><i />{{ $t('seller_profile.missing') }}</span>
                                 <ChevronRight :size="16" class="chev" />

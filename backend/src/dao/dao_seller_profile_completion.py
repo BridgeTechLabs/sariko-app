@@ -2,11 +2,12 @@ from typing import Optional
 
 from dao.dao_base import DAOBase
 
-SELLER_FIELDS = "id, user_id, store_name, tier, phone, address, lat, lon, bank_name, bank_account_number, bank_account_holder"
+SELLER_FIELDS = ("id, user_id, store_name, tier, phone, address, lat, lon, bank_name, bank_account_number, "
+                 "bank_account_holder, tax_resident")
 APP_FIELDS = (
     "id, status, source, created_at, full_name, date_of_birth, nationality, id_type, id_number, "
     "id_expiry_date, email, residential_address, tax_code, tax_resident, agreement_version, "
-    "personal_data_consent_at, signature_name"
+    "personal_data_consent_at, signature_name, agreed_at"
 )
 
 
@@ -14,10 +15,10 @@ class DAOSellerProfileCompletion(DAOBase):
     """Existing seller's profile (spec docs/dev/seller-profile-completion): operational fields
     in seller_profiles, identity / tax / agreement in onboarding_applications."""
 
-    def read_seller(self, user_id: str) -> Optional[dict]:
+    def read_seller(self, value: str, column: str = "user_id") -> Optional[dict]:
         result = (
             self._supabase_client.table("seller_profiles")
-            .select(SELLER_FIELDS).eq("user_id", user_id).maybe_single().execute()
+            .select(SELLER_FIELDS).eq(column, value).maybe_single().execute()
         )
         return result.data if result and result.data else None
 
@@ -34,12 +35,15 @@ class DAOSellerProfileCompletion(DAOBase):
         ).data or []
         return next((r for r in rows if r["source"] == "existing_seller"), rows[0] if rows else None)
 
-    def count_id_documents(self, application_id: str) -> int:
-        rows = (
+    def list_id_documents(self, application_id: str) -> list:
+        return (
             self._supabase_client.table("onboarding_files")
-            .select("id").eq("application_id", application_id).eq("kind", "id_document").execute()
+            .select("id, storage_path, content_type").eq("application_id", application_id).eq("kind", "id_document")
+            .order("created_at").execute()
         ).data or []
-        return len(rows)
+
+    def count_id_documents(self, application_id: str) -> int:
+        return len(self.list_id_documents(application_id))
 
     def create_application(self, data: dict) -> dict:
         return self._supabase_client.table("onboarding_applications").insert(data).execute().data[0]
@@ -52,3 +56,6 @@ class DAOSellerProfileCompletion(DAOBase):
 
     def create_file(self, data: dict) -> dict:
         return self._supabase_client.table("onboarding_files").insert(data).execute().data[0]
+
+    def delete_file(self, file_id: str) -> None:
+        self._supabase_client.table("onboarding_files").delete().eq("id", file_id).execute()
