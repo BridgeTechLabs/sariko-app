@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # Every group optional: the form sends only what the seller still has to fill in.
 # Fields are loose on purpose; the API checks them and answers 400 with a code (same codes as /join).
@@ -52,3 +52,12 @@ class RequestSellerProfileCompletion(BaseModel):
     full_name: Optional[str] = Field(default=None, max_length=300)  # name fix when only the bank holder mismatches
     pickup_address: Optional[ProfilePickupAddress] = None
     agreement: Optional[ProfileAgreement] = None
+
+
+class RequestAdminSellerKyc(BaseModel):
+    """Admin gateway: an operator fills in a seller's ID / tax / bank (docs/dev/20261124-seller-kyc-admin QĐ-2).
+    Anything else (agreement, phone, pickup address) is refused: only the seller signs."""
+    model_config = ConfigDict(extra="forbid")
+    identity: Optional[ProfileIdentity] = None
+    tax: Optional[ProfileTax] = None
+    bank: Optional[ProfileBank] = None

@@ -18,7 +18,7 @@ from fastapi.exceptions import RequestValidationError
 from apis import (
     users, sellers, cart, orders, payments, deliveries,
     address, moit, search, chat, reviews,
-    user_addresses, onboarding, seller_profile_completion, complaints, launch, promo_banners, admin_gateway
+    user_addresses, onboarding, seller_profile_completion, complaints, launch, promo_banners, admin_gateway, studio
 )
 from services import api_metrics
 
@@ -92,6 +92,7 @@ app.include_router(complaints.router, prefix="/rest/v1", tags=["v1"])
 app.include_router(launch.router, prefix="/rest/v1", tags=["v1"])
 app.include_router(promo_banners.router, prefix="/rest/v1", tags=["v1"])
 app.include_router(admin_gateway.router, prefix="/rest/v1")   # X-Api-Key from the admin backend, not in /docs
+app.include_router(studio.router, prefix="/rest/v1")   # AI Studio server (X-Studio-Key), not in /docs
 if os.environ.get("ENV", "local") in ("local", "dev"):
     from apis import dev
     app.include_router(dev.router, prefix="/rest/v1", tags=["dev"])

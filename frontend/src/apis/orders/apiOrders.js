@@ -15,6 +15,7 @@ export const apiOrders = {
             if (deliveryOpts.quotation_id) payload.quotation_id = deliveryOpts.quotation_id
             for (const key of ['receiver_name', 'receiver_phone', 'delivery_note']) if (deliveryOpts[key]) payload[key] = deliveryOpts[key]
             if (deliveryAppointment) payload.delivery_appointment = deliveryAppointment
+            Object.assign(payload, deliveryOpts.ref)   // AI Studio post fields, if any (utils/studioRef.js)
             const response = await apiClient.post('/v1/orders', payload)
             return response
         } catch (error) {

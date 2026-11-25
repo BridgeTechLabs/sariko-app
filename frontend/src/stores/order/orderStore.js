@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import apiOrders from "@/apis/orders/apiOrders";
 import apiPayments from "@/apis/payments/apiPayments";
 import { createPoller } from "@/composables/createPoller";
+import { studioRefFields } from "@/utils/studioRef";
 
 const ORDER_LIST_POLL_MS = 15_000
 const ORDER_DETAIL_POLL_MS = 10_000
@@ -47,7 +48,7 @@ export const useOrderStore = defineStore("orderStore", {
         async placeOrder(deliveryMethod, deliveryAddress, note, deliveryOpts = {}, deliveryAppointment = null) {
             try {
                 this.loading = true
-                const res = await apiOrders.createOrder(deliveryMethod, deliveryAddress, note, deliveryOpts, deliveryAppointment)
+                const res = await apiOrders.createOrder(deliveryMethod, deliveryAddress, note, { ...deliveryOpts, ref: studioRefFields() }, deliveryAppointment)
                 if (res?.data?.success) {
                     this.currentOrder = res.data.order
                     return res.data.order

@@ -79,6 +79,15 @@ def _load(user):
     return dao, seller, app, id_documents
 
 
+def limits(settings) -> dict:
+    return {
+        "min_age": settings["onboarding_min_age"],
+        "min_id_validity_months": settings["onboarding_min_id_validity_months"],
+        "max_file_mb": settings["onboarding_max_file_mb"],
+        "max_files_per_kind": settings["onboarding_max_files_per_kind"],
+    }
+
+
 def _state(dao, user, seller, app, id_documents, settings) -> dict:
     app = app or {}
     missing = missing_groups(seller, app, id_documents, settings["seller_agreement_version"])
@@ -89,12 +98,7 @@ def _state(dao, user, seller, app, id_documents, settings) -> dict:
         "agreement_version_current": settings["seller_agreement_version"],
         # The form then shows the full name next to the bank account, so a missing middle name can be fixed.
         "name_mismatch": holder_mismatch(seller, app),
-        "limits": {
-            "min_age": settings["onboarding_min_age"],
-            "min_id_validity_months": settings["onboarding_min_id_validity_months"],
-            "max_file_mb": settings["onboarding_max_file_mb"],
-            "max_files_per_kind": settings["onboarding_max_files_per_kind"],
-        },
+        "limits": limits(settings),
         "id_document_files": id_documents,
         # Owner-only. ID and account numbers come back masked; an empty field on save keeps them.
         "prefill": {
@@ -137,22 +141,9 @@ def _required(value, field):
     return squash(value)
 
 
-@router.post("")
-def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request: Request, user=Depends(verify_token)):
-    settings = _settings()
-    dao, seller, app, id_documents = _load(user)
-    version = settings["seller_agreement_version"]
-
-    # The form sends every missing group at once (id_document is a separate upload), so an
-    # application row is never created half-filled.
-    sent = {g for g in GROUPS if getattr(body, g, None) is not None}
-    lacking = [g for g in missing_groups(seller, app, id_documents, version) if g != "id_document" and g not in sent]
-    if lacking:
-        raise _error(400, "missing_group", "Fill in every missing section", groups=lacking)
-    if not sent and body.full_name is None:
-        raise _error(400, "nothing_to_save", "Nothing to save")
-
-    # 1. Check everything before writing anything.
+def check_kyc(body, app, seller, settings) -> tuple:
+    """Checks the identity / tax / bank groups of body and returns (application fields, seller_profiles fields) to
+    write. Shared by the seller's form and the admin gateway (docs/dev/20261124-seller-kyc-admin QĐ-1)."""
     app_data, seller_data = {}, {}
     today = date.today()
     if body.identity:
@@ -178,7 +169,7 @@ def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request
         app_data.update(date_of_birth=i.date_of_birth.isoformat(), id_expiry_date=i.id_expiry_date.isoformat())
         if email:
             app_data["email"] = email
-    if body.full_name is not None:
+    if getattr(body, "full_name", None) is not None:   # the seller form's name fix (not in the admin body)
         app_data["full_name"] = join.full_name(body.full_name)
     if body.tax:
         if body.tax.tax_resident is None:
@@ -198,6 +189,26 @@ def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request
             bank_account_number=number,
             bank_account_holder=_required(body.bank.bank_account_holder, "bank_account_holder"),
         )
+    return app_data, seller_data
+
+
+@router.post("")
+def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request: Request, user=Depends(verify_token)):
+    settings = _settings()
+    dao, seller, app, id_documents = _load(user)
+    version = settings["seller_agreement_version"]
+
+    # The form sends every missing group at once (id_document is a separate upload), so an
+    # application row is never created half-filled.
+    sent = {g for g in GROUPS if getattr(body, g, None) is not None}
+    lacking = [g for g in missing_groups(seller, app, id_documents, version) if g != "id_document" and g not in sent]
+    if lacking:
+        raise _error(400, "missing_group", "Fill in every missing section", groups=lacking)
+    if not sent and body.full_name is None:
+        raise _error(400, "nothing_to_save", "Nothing to save")
+
+    # 1. Check everything before writing anything.
+    app_data, seller_data = check_kyc(body, app, seller, settings)
     if body.phone is not None:
         try:
             seller_data["phone"] = to_e164_vn(body.phone)
@@ -262,11 +273,9 @@ def save_profile_completion(body: Schema.RequestSellerProfileCompletion, request
     return _state(dao, user, seller, app, id_documents, settings)
 
 
-@router.post("/files")
-def upload_id_document(body: Schema.RequestUploadOnboardingFile, user=Depends(verify_token)):
-    """Passport photo of a foreign seller. Vietnamese sellers give the ID number only (Q6)."""
-    settings = _settings()
-    dao, seller, app, id_documents = _load(user)
+def store_id_document(dao, app, id_documents: int, body, settings) -> dict:
+    """Checks and stores one passport photo of the application; returns the onboarding_files row. Shared by the
+    seller's form and the admin gateway."""
     if body.kind != "id_document":
         raise _error(400, "invalid_file_kind", "Invalid document type")
     if not app:
@@ -293,7 +302,15 @@ def upload_id_document(body: Schema.RequestUploadOnboardingFile, user=Depends(ve
 
     path = f"{app['id']}/id_document-{uuid.uuid4()}.{ext}"
     upload_private(join.BUCKET, path, content, content_type)
-    dao.create_file({"application_id": app["id"], "kind": "id_document", "item_key": None,
-                     "storage_path": path, "content_type": content_type, "size_bytes": len(content)})
+    return dao.create_file({"application_id": app["id"], "kind": "id_document", "item_key": None,
+                            "storage_path": path, "content_type": content_type, "size_bytes": len(content)})
+
+
+@router.post("/files")
+def upload_id_document(body: Schema.RequestUploadOnboardingFile, user=Depends(verify_token)):
+    """Passport photo of a foreign seller. Vietnamese sellers give the ID number only (Q6)."""
+    settings = _settings()
+    dao, seller, app, id_documents = _load(user)
+    store_id_document(dao, app, id_documents, body, settings)
     dao, seller, app, id_documents = _load(user)
     return _state(dao, user, seller, app, id_documents, settings)

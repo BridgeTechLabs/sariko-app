@@ -183,7 +183,7 @@ class DAOSellerProfiles(DAOBase):
             result = (
                 self._supabase_client
                 .table(self._table_name)
-                .select("user_id, is_open, weekly_hours, store_name, phone, address, lat, lon, commission_rate_override, admin_tier_config(commission_rate)")
+                .select("user_id, slug, is_open, weekly_hours, store_name, phone, address, lat, lon, commission_rate_override, admin_tier_config(commission_rate)")
                 .eq("id", seller_id)
                 .maybe_single()
                 .execute()
@@ -195,6 +195,7 @@ class DAOSellerProfiles(DAOBase):
             effective_rate = row["commission_rate_override"] if row["commission_rate_override"] is not None else tier_rate
             return {
                 "user_id": row["user_id"],
+                "slug": row["slug"],
                 "is_open": is_open_now(row["is_open"], row["weekly_hours"], seller_id=seller_id),
                 "commission_rate": Decimal(str(effective_rate)),
                 "address": row["address"],
