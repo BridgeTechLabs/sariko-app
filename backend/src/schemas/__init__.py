@@ -36,7 +36,7 @@ from schemas.request_create_review import RequestCreateReview
 from schemas.request_update_order_status import RequestUpdateOrderStatus
 from schemas.request_set_store_open import RequestSetStoreOpen
 from schemas.request_set_store_hours import RequestSetStoreHours
-from schemas.request_seller_profile_completion import RequestSellerProfileCompletion
+from schemas.request_seller_profile_completion import RequestAdminSellerKyc, RequestSellerProfileCompletion
 
 # Seller Menu — Categories
 from schemas.request_create_category import RequestCreateCategory
@@ -87,6 +87,7 @@ class Schema:
     RequestSetStoreOpen = RequestSetStoreOpen
     RequestSetStoreHours = RequestSetStoreHours
     RequestSellerProfileCompletion = RequestSellerProfileCompletion
+    RequestAdminSellerKyc = RequestAdminSellerKyc
 
     RequestCreateCategory = RequestCreateCategory
     RequestUpdateCategory = RequestUpdateCategory

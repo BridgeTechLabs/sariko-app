@@ -1,0 +1,23 @@
+[
+    "en-PH:home_page.missing_banner.title",
+    "en-PH:cart_page.empty_title",
+    "en-PH:order_review.dialog_unrated_title",
+    "en-PH:payment.waitingTitle",
+    "en-PH:seller_menu.empty_title",
+    "en-PH:seller_menu.og_sold_out_title",
+    "en-PH:coming_soon_page.seller_title",
+    "en-PH:join_page.tip_title",
+    "en-PH:join_page.welcome_prepare_title",
+    "en-PH:join_page.done_title",
+    "en-PH:seller_profile.banner_title",
+    "en-PH:complaints.sent_title",
+    "vi:home_page.missing_banner.title",
+    "vi:cart_page.empty_title",
+    "vi:payment.waitingTitle",
+    "vi:seller_menu.og_sold_out_title",
+    "vi:account_v2.addresses_title",
+    "vi:coming_soon_page.seller_title",
+    "vi:join_page.tip_title",
+    "vi:join_page.done_title",
+    "vi:complaints.sent_title"
+]

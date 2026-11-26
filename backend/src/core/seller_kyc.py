@@ -6,6 +6,7 @@ from datetime import date
 
 CCCD_RE = re.compile(r"^\d{12}$")            # số định danh cá nhân
 BANK_ACCOUNT_RE = re.compile(r"^\d{6,20}$")
+TAX_CODE_RE = re.compile(r"^\d{10}(-?\d{3})?$")   # MST: 10 digits, or 13 for a branch (0123456789-001)
 PUNCT = str.maketrans("’ʼ‘–—", "'''--")   # phone keyboards type curly quotes / long dashes
 
 
@@ -73,6 +74,11 @@ def id_error(id_type: str, id_number: str, expiry: date, today: date, min_validi
 
 def valid_bank_account(number: str) -> bool:
     return bool(BANK_ACCOUNT_RE.match(squash(number).replace(" ", "")))
+
+
+def valid_tax_code(code: str) -> bool:
+    """The seller's MST, required on Sariko's commission e-invoice (VNPAY buyerTaxCode, max 14 characters)."""
+    return bool(TAX_CODE_RE.match(squash(code)))
 
 
 def mask(value) -> str:
