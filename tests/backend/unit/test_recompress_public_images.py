@@ -33,6 +33,7 @@ SMALL = b"\xff\xd8" + b"x" * 200 * 1024
 class Bucket:
     def __init__(self, files):
         self.files, self.uploads, self.broken, self.on_upload = dict(files), [], set(), None
+        self.meta = {}  # path -> extra list() metadata (cacheControl, mimetype)
 
     def list(self, prefix, opts):
         base = f"{prefix}/" if prefix else ""
@@ -40,7 +41,7 @@ class Bucket:
         for path, data in self.files.items():
             if path.startswith(base):
                 head, _, rest = path[len(base):].partition("/")
-                items[head] = {"name": head, "id": None} if rest else {"name": head, "id": "x", "metadata": {"size": len(data)}}
+                items[head] = {"name": head, "id": None} if rest else {"name": head, "id": "x", "metadata": {"size": len(data), **self.meta.get(path, {})}}
         page = sorted(items.values(), key=lambda i: i["name"])
         return page[opts["offset"]:opts["offset"] + opts["limit"]]
 
@@ -204,3 +205,36 @@ def test_tc15_cache_control_by_path(run, tmp_path):
     run(s, "--apply", "--backup-dir", str(tmp_path / "bk"))
     cache = {p: o["cache-control"] for p, o in s.buckets["sariko-public"].uploads}
     assert cache == {admin: "3600", app: "31536000"}
+
+
+def test_cache_fix_reuploads_same_bytes_with_target_cache(run):
+    old_dish, app_dish, done = "food-items/s/item.jpg", f"food-items/s/{UUID}-1700000000", "food-items/s/ok.jpg"
+    avatar, new_avatar = "avatar-sellers/p/avatar.jpg", "avatar-sellers/p/avatar-1700000000.jpg"
+    s = Storage(**{"sariko-public": {old_dish: b"d1", app_dish: b"d2", done: b"d3", avatar: b"a1", new_avatar: b"a2"},
+                   "blog-images": {"x.png": b"b"}})
+    b = s.buckets["sariko-public"]
+    b.meta = {old_dish: {"cacheControl": "no-cache", "mimetype": "image/png"},
+              app_dish: {"cacheControl": "no-cache", "mimetype": "image/jpeg"},
+              done: {"cacheControl": "max-age=3600", "mimetype": "image/jpeg"},
+              avatar: {"cacheControl": "no-cache", "mimetype": "image/jpeg"},
+              new_avatar: {"cacheControl": "no-cache", "mimetype": "image/jpeg"}}  # not avatar.jpg: out of scope
+
+    code, cap = run(s, "--cache-only")
+    assert code == 0 and b.uploads == [] and s.buckets["blog-images"].uploads == []
+    assert "TOTAL sariko-public/food-items: 2 to change, 1 skipped" in cap.out
+
+    code, cap = run(s, "--cache-only", "--apply")
+    assert code == 0 and s.buckets["blog-images"].uploads == []
+    assert sorted(b.uploads) == sorted([
+        (old_dish, {"content-type": "image/png", "upsert": "true", "cache-control": "3600"}),
+        (app_dish, {"content-type": "image/jpeg", "upsert": "true", "cache-control": "31536000"}),
+        (avatar, {"content-type": "image/jpeg", "upsert": "true", "cache-control": "3600"})])
+    assert (b.files[old_dish], b.files[app_dish], b.files[avatar]) == (b"d1", b"d2", b"a1")  # bytes unchanged
+
+
+def test_cache_fix_failed_file_exits_1(run):
+    s = Storage(**{"sariko-public": {"food-items/s/a.jpg": b"1", "food-items/s/b.jpg": b"2"}})
+    b = s.buckets["sariko-public"]
+    b.broken.add("food-items/s/a.jpg")
+    code, cap = run(s, "--cache-only", "--apply")
+    assert code == 1 and [p for p, _ in b.uploads] == ["food-items/s/b.jpg"] and "1 error(s)" in cap.out

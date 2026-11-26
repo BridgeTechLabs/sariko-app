@@ -12,6 +12,11 @@ cache-control on overwrite: one year for blog-images and for app dish photos
 food-items/<seller>/<item uuid>-<unix seconds> (never overwritten); 3600 for other food-items
 paths (the admin app overwrites fixed <item>.jpg names, a year-long cache would show the old dish).
 
+--cache-only: no compression. Re-uploads the SAME bytes (same path, same content type) of
+sariko-public/food-items/ and avatar-sellers/*/avatar.jpg whose stored cache-control is not the
+target above (one year for app dish photos, 3600 for the rest): Python uploads that set no
+cache-control were stored as "no-cache", so browsers fetched them on every view.
+
 Reads the SERVICE ROLE key from envs/.env.$ENV like the backend (PROD is ENV=prd, DEV is ENV=dev).
 Dry run by default. --apply saves each original under --backup-dir/<bucket>/<path> before
 overwriting it; --restore uploads those originals back.
@@ -20,6 +25,7 @@ Usage (from backend/src):
     ENV=prd python -m scripts.recompress_public_images
     ENV=prd python -m scripts.recompress_public_images --apply --backup-dir ~/sariko-image-backup-20261123
     ENV=prd python -m scripts.recompress_public_images --restore ~/sariko-image-backup-20261123
+    ENV=prd python -m scripts.recompress_public_images --cache-only [--apply]
 """
 
 import argparse
@@ -45,7 +51,7 @@ APP_DISH = re.compile(r"food-items/[^/]+/[0-9a-f-]{36}-\d+")  # sellers.py uploa
 
 
 def walk(bucket, prefix):
-    """Yield (path, size) for every file under prefix: list() is one folder level, 100 per page."""
+    """Yield (path, metadata) for every file under prefix: list() is one folder level, 100 per page."""
     offset = 0
     while True:
         page = bucket.list(prefix, {"limit": PAGE, "offset": offset})
@@ -54,7 +60,7 @@ def walk(bucket, prefix):
             if item.get("id") is None:  # folder
                 yield from walk(bucket, path)
             else:
-                yield path, (item.get("metadata") or {}).get("size", 0)
+                yield path, item.get("metadata") or {}
         if len(page) < PAGE:
             return
         offset += PAGE
@@ -84,7 +90,8 @@ def recompress(storage, apply, backup_dir):
             continue
         bucket = storage.from_(bucket_id)
         files = changed = before = saved = 0
-        for path, size in walk(bucket, prefix):
+        for path, meta in walk(bucket, prefix):
+            size = meta.get("size", 0)
             files += 1
             before += size
             if size <= MIN_BYTES:
@@ -118,6 +125,30 @@ def recompress(storage, apply, backup_dir):
     return errors
 
 
+def fix_cache(storage, apply):
+    errors = 0
+    bucket = storage.from_("sariko-public")
+    for prefix in ("food-items", "avatar-sellers"):
+        changed = skipped = 0
+        for path, meta in walk(bucket, prefix):
+            cache = ONE_YEAR if APP_DISH.fullmatch(path) else "3600"
+            if meta.get("cacheControl") == f"max-age={cache}" or (prefix == "avatar-sellers" and not path.endswith("/avatar.jpg")):
+                skipped += 1
+                continue
+            print(f"sariko-public/{path}  {meta.get('cacheControl')} -> max-age={cache}")
+            if apply:
+                try:  # same bytes and type, only the cache header changes
+                    bucket.upload(path, bucket.download(path), {
+                        "content-type": meta.get("mimetype") or "image/jpeg", "upsert": "true", "cache-control": cache})
+                except Exception as e:
+                    errors += 1
+                    print(f"sariko-public/{path}  ERROR {e!r}")
+                    continue
+            changed += 1
+        print(f"TOTAL sariko-public/{prefix}: {changed} {'changed' if apply else 'to change'}, {skipped} skipped")
+    return errors
+
+
 def restore(storage, backup_dir):
     errors = 0
     for root, _, names in os.walk(backup_dir):
@@ -141,8 +172,9 @@ def main(argv=None):
     parser.add_argument("--apply", action="store_true", help="overwrite the files (default: dry run)")
     parser.add_argument("--backup-dir", help="where originals are saved before overwrite (required with --apply)")
     parser.add_argument("--restore", metavar="BACKUP_DIR", help="upload the originals in BACKUP_DIR back")
+    parser.add_argument("--cache-only", action="store_true", help="only fix the cache-control of existing files")
     args = parser.parse_args(argv)
-    if args.apply and not args.backup_dir:
+    if args.apply and not args.backup_dir and not args.cache_only:
         parser.error("--apply needs --backup-dir")
 
     env_file = os.path.join(ENVS_DIR, f".env.{os.environ.get('ENV', 'local')}")
@@ -151,7 +183,7 @@ def main(argv=None):
     load_dotenv(env_file, override=True)  # the file wins over stray shell variables
     print(f"Supabase host: {urlparse(os.environ.get('SUPABASE_URL', '')).hostname}")
 
-    if args.apply:
+    if args.apply and not args.cache_only:
         os.makedirs(args.backup_dir, exist_ok=True)
         if not os.access(args.backup_dir, os.W_OK):
             sys.exit(f"Backup dir not writable: {args.backup_dir}")
@@ -159,6 +191,8 @@ def main(argv=None):
     storage = get_supabase_client().storage
     if args.restore:
         errors = restore(storage, args.restore)
+    elif args.cache_only:
+        errors = fix_cache(storage, args.apply)
     else:
         errors = recompress(storage, args.apply, args.backup_dir)
     print(f"Done, {errors} error(s).")
