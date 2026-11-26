@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from apis import admin_gateway as gw, seller_profile_completion as spc
+from core.seller_kyc import valid_tax_code
 from dao.dao_admin_config import DAOAdminConfig
 
 KEY = "gw_test_key_0123456789"
@@ -285,9 +286,9 @@ def test_tc22_case_or_spacing_of_the_same_name_is_no_change():
 
 def test_tc08_tax_both_places():
     with_app()
-    r = api.put(P, json={"tax": {"tax_resident": False, "tax_code": " 0312  345 678 "}})
+    r = api.put(P, json={"tax": {"tax_resident": False, "tax_code": " 0312345678 "}})
     assert r.status_code == 200 and r.json()["changed"] == ["tax_code", "tax_resident"]
-    assert DB.apps[f"app-{SID}"]["tax_resident"] is False and DB.apps[f"app-{SID}"]["tax_code"] == "0312 345 678"
+    assert DB.apps[f"app-{SID}"]["tax_resident"] is False and DB.apps[f"app-{SID}"]["tax_code"] == "0312345678"
     assert DB.sellers[SID]["tax_resident"] is False and r.json()["tax"]["tax_resident"] is False
     r = api.put(P, json={"tax": {"tax_resident": None}})
     assert r.status_code == 400 and code(r) == "missing_field"
@@ -387,6 +388,19 @@ def test_tc28_tc38_bank_without_application(body):
     r = api.put(P, json=body)
     assert r.status_code == 409 and code(r) == "identity_required"
     assert DB.writes == [] and DB.apps == {}
+
+
+@pytest.mark.parametrize("value,ok", [("0312345678", True), ("0312345678-001", True), ("0312345678001", True), (" 0312345678 ", True),
+                                      ("123", False), ("031234567", False), ("abc1234567", False), ("0312345678-01", False)])
+def test_tc40_tax_code_format(value, ok):
+    assert valid_tax_code(value) is ok
+
+
+def test_tc41_admin_tax_code_format_checked_but_optional():
+    with_app()
+    r = api.put(P, json={"tax": {"tax_resident": True, "tax_code": "123"}})
+    assert r.status_code == 400 and code(r) == "invalid_tax_code" and DB.writes == []
+    assert api.put(P, json={"tax": {"tax_resident": True, "tax_code": ""}}).status_code == 200
 
 
 def test_join_row_keeps_its_values_when_seller_lacks_them():

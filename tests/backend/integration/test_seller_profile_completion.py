@@ -336,6 +336,11 @@ def test_tc15_holder_without_accents_matches(holder):
     assert client().post(P, json=body(bank={"bank_account_holder": holder})).status_code == 200
 
 
+def test_tc41_tax_code_format_checked_but_optional():
+    _refused(body(tax={"tax_resident": True, "tax_code": "123"}), 400, "invalid_tax_code")
+    assert client().post(P, json=body(tax={"tax_resident": True, "tax_code": " "})).status_code == 200
+
+
 def test_tc16_tax_and_consent():
     _refused(body(tax={"tax_resident": None}), 400, "missing_field")
     _refused(body(agreement={"personal_data_consent": False}), 400, "consent_required")

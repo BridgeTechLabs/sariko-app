@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from apis import onboarding as join
 from core.auth import verify_token
 from core.phone import to_e164_vn
-from core.seller_kyc import age, bank_holder_matches, id_error, mask, name_matches, squash, valid_bank_account
+from core.seller_kyc import age, bank_holder_matches, id_error, mask, name_matches, squash, valid_bank_account, valid_tax_code
 from dao.dao_admin_config import DAOAdminConfig
 from dao.dao_seller_profile_completion import DAOSellerProfileCompletion
 from schemas import Schema
@@ -174,6 +174,8 @@ def check_kyc(body, app, seller, settings) -> tuple:
     if body.tax:
         if body.tax.tax_resident is None:
             raise _error(400, "missing_field", "Required field is empty", field="tax_resident")
+        if squash(body.tax.tax_code or "") and not valid_tax_code(body.tax.tax_code):   # optional until invoicing (develop) needs it
+            raise _error(400, "invalid_tax_code", "Tax code must be 10 or 13 digits")
         app_data.update(tax_resident=body.tax.tax_resident, tax_code=squash(body.tax.tax_code or "") or None)
         seller_data["tax_resident"] = body.tax.tax_resident  # the withholding rate reads it here
     if body.bank:

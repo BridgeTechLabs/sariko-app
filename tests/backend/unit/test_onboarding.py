@@ -421,11 +421,17 @@ def test_tc34_passport_seller_still_needs_the_photo(env):
     ({"personal_data_consent": False}, "consent_required"),
     ({"bank_account_number": "12345"}, "invalid_bank_account"),
     ({"bank_account_holder": "JUAN CRUZ"}, "bank_holder_mismatch"),
+    ({"tax_code": "123"}, "invalid_tax_code"),   # TC-41
 ])
 def test_tc35_identity_rules(env, over, code):
     res = env["client"].post("/onboarding/applications", json=_body(**over))
     assert res.status_code == 400 and _code(res) == code
     assert FakeDAO.apps == {}
+
+
+def test_tc41_tax_code_optional_and_stored(env):
+    assert FakeDAO.apps[_create(env, tax_code="")[0]]["tax_code"] is None
+    assert FakeDAO.apps[_create(env, tax_code="0312345678-001")[0]]["tax_code"] == "0312345678-001"
 
 
 def test_tc35_stores_expiry_and_consent(env):
